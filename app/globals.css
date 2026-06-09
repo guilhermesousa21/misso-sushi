@@ -1,0 +1,31 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  background: #f6f6f6;
+  color: #111;
+  overflow-x: hidden;
+}
+
+/* remove scroll horizontal fantasma */
+body {
+  overflow-y: auto;
+}
+
+/* melhora botões padrão */
+button {
+  color: #111;
+  font-family: inherit;
+}
+
+/* remove herança estranha de tema escuro */
+html {
+  color-scheme: light;
+}
