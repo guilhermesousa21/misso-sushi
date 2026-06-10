@@ -3,28 +3,35 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
+type OrderItem = {
+  id: number;
+  name: string;
+  price: number;
+  quantity?: number;
+};
+
 type Order = {
   id: number;
   name: string;
   phone: string;
-  address: string;
-  items: {
-    id: number;
-    name: string;
-    price: number;
-    quantity?: number;
-  }[];
-  total: number;
+  items: OrderItem[];
+  note?: string; // <-- novo campo
+  total?: number;
   status: string;
   created_at: string;
 };
 
 const statusColor: Record<string, string> = {
-  pendente: "#ef4444",
+  recebido: "#ef4444",
   preparando: "#f59e0b",
   pronto: "#3b82f6",
-  entregue: "#22c55e",
 };
+
+const calcTotal = (items: OrderItem[]) =>
+  (items || []).reduce(
+    (sum, item) => sum + item.price * (item.quantity ?? 1),
+    0
+  );
 
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -37,14 +44,19 @@ export default function AdminPanel() {
       const { data } = await supabase
         .from("orders")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
 
-      if (mounted && data) setOrders(data);
+      if (mounted && data) {
+        const safeData: Order[] = data.map((order: Order) => ({
+          ...order,
+          items: Array.isArray(order.items) ? order.items : [],
+        }));
+        setOrders(safeData);
+      }
     };
 
     fetchOrders();
 
-    // 🔥 Realtime (sincroniza outros dispositivos)
     const channel = supabase
       .channel("orders-channel")
       .on(
@@ -62,12 +74,14 @@ export default function AdminPanel() {
     };
   }, []);
 
-  // 🚀 ATUALIZAÇÃO OTIMISTA (resolve seu problema)
   async function updateStatus(id: number, status: string) {
-    // atualiza no banco
+    if (status === "pronto") {
+      const confirm = window.confirm("Confirmar que o pedido está pronto?");
+      if (!confirm) return;
+    }
+
     await supabase.from("orders").update({ status }).eq("id", id);
 
-    // 🔥 atualiza UI na hora (sem refresh)
     setOrders((prev) =>
       prev.map((order) =>
         order.id === id ? { ...order, status } : order
@@ -80,20 +94,27 @@ export default function AdminPanel() {
       ? orders
       : orders.filter((o) => o.status === filter);
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.status === "pronto" && b.status !== "pronto") return 1;
+    if (b.status === "pronto" && a.status !== "pronto") return -1;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
   return (
     <div style={styles.page}>
-      {/* HEADER */}
       <header style={styles.header}>
         <h1 style={{ margin: 0 }}>🍣 Cozinha - Missô Sushi</h1>
-        <p style={{ margin: 0, opacity: 0.7 }}>
-          Painel em tempo real
-        </p>
+        <p style={{ margin: 0, opacity: 0.7 }}>Painel em tempo real</p>
       </header>
 
-      {/* FILTERS */}
       <div style={styles.filters}>
-        {["todos", "pendente", "preparando", "pronto", "entregue"].map(
-          (status) => (
+        {["todos", "recebido", "preparando", "pronto"].map((status) => {
+          const count =
+            status === "todos"
+              ? orders.length
+              : orders.filter((o) => o.status === status).length;
+
+          return (
             <button
               key={status}
               onClick={() => setFilter(status)}
@@ -104,18 +125,17 @@ export default function AdminPanel() {
                 borderColor: filter === status ? "#111" : "#e5e7eb",
               }}
             >
-              {status}
+              {status} ({count})
             </button>
-          )
-        )}
+          );
+        })}
       </div>
 
-      {/* GRID */}
       <div style={styles.grid}>
-        {filtered.map((order) => (
+        {sorted.map((order) => (
           <div key={order.id} style={styles.card}>
             <div style={styles.cardHeader}>
-              <div>
+              <div style={styles.cardInfo}>
                 <h3 style={{ margin: 0 }}>Pedido #{order.id}</h3>
                 <p style={styles.subText}>
                   {new Date(order.created_at).toLocaleString()}
@@ -139,29 +159,38 @@ export default function AdminPanel() {
               <p style={styles.text}>
                 <strong>Telefone:</strong> {order.phone}
               </p>
-              <p style={styles.text}>
-                <strong>Endereço:</strong> {order.address}
-              </p>
+              {order.note && (
+                <p style={styles.text}>
+                  <strong>Observação:</strong> {order.note}
+                </p>
+              )}
             </div>
 
             <div style={{ marginTop: 12 }}>
               <strong>Itens</strong>
               <div style={{ marginTop: 6 }}>
-                {order.items.map((item) => (
-                  <div key={item.id} style={styles.itemRow}>
-                    <span>
-                      {item.name} x{item.quantity ?? 1}
-                    </span>
-                    <span>
-                      R$ {(item.price * (item.quantity ?? 1)).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
+                {order.items && order.items.length > 0 ? (
+                  order.items.map((item, index) => (
+                    <div
+                      key={`${item.id}-${index}`}
+                      style={styles.itemRow}
+                    >
+                      <span>
+                        {item.name} x{item.quantity ?? 1}
+                      </span>
+                      <span>
+                        R$ {(item.price * (item.quantity ?? 1)).toFixed(2)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p style={styles.subText}>Nenhum item neste pedido</p>
+                )}
               </div>
             </div>
 
             <div style={styles.total}>
-              Total: <strong>R$ {order.total.toFixed(2)}</strong>
+              Total: <strong>R$ {calcTotal(order.items).toFixed(2)}</strong>
             </div>
 
             <div style={styles.actions}>
@@ -177,13 +206,6 @@ export default function AdminPanel() {
                 onClick={() => updateStatus(order.id, "pronto")}
               >
                 Pronto
-              </button>
-
-              <button
-                style={styles.btnGreen}
-                onClick={() => updateStatus(order.id, "entregue")}
-              >
-                Entregue
               </button>
             </div>
           </div>
@@ -202,65 +224,54 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#f6f7fb",
     minHeight: "100vh",
   },
-
-  header: {
-    marginBottom: 20,
-  },
-
+  header: { marginBottom: 20 },
   filters: {
     display: "flex",
     gap: 10,
     marginBottom: 20,
     flexWrap: "wrap",
   },
-
   filterBtn: {
-    padding: "8px 14px",
+    padding: "10px 18px",
     borderRadius: 999,
     border: "1px solid #ddd",
     cursor: "pointer",
-    fontWeight: 500,
+    fontWeight: 600,
+    fontSize: 16,
   },
-
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
     gap: 16,
   },
-
   card: {
     background: "#fff",
     borderRadius: 16,
-    padding: 16,
+    padding: 20,
     boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
+    minHeight: 250,
   },
-
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
   },
-
+  cardInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
   badge: {
     color: "#fff",
     padding: "4px 10px",
     borderRadius: 999,
     fontSize: 12,
     fontWeight: "bold",
+    width: 100,
+    textAlign: "center",
+    flexShrink: 0,
   },
-
-  subText: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
-  },
-
-  text: {
-    margin: "4px 0",
-    fontSize: 14,
-    color: "#333",
-  },
-
+  subText: { fontSize: 12, color: "#666", marginTop: 4 },
+  text: { margin: "4px 0", fontSize: 14, color: "#333" },
   itemRow: {
     display: "flex",
     justifyContent: "space-between",
@@ -268,45 +279,26 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "4px 0",
     borderBottom: "1px dashed #eee",
   },
-
-  total: {
-    marginTop: 10,
-    fontSize: 16,
-  },
-
-  actions: {
-    display: "flex",
-    gap: 8,
-    marginTop: 14,
-  },
-
+  total: { marginTop: 10, fontSize: 16 },
+  actions: { display: "flex", gap: 8, marginTop: 14 },
   btnYellow: {
     flex: 1,
-    padding: 8,
-    borderRadius: 10,
+    padding: 14,
+    borderRadius: 12,
     border: "none",
     background: "#f59e0b",
     color: "#fff",
+    fontSize: 16,
     cursor: "pointer",
   },
-
   btnBlue: {
     flex: 1,
-    padding: 8,
-    borderRadius: 10,
+    padding: 14,
+    borderRadius: 12,
     border: "none",
     background: "#3b82f6",
     color: "#fff",
-    cursor: "pointer",
-  },
-
-  btnGreen: {
-    flex: 1,
-    padding: 8,
-    borderRadius: 10,
-    border: "none",
-    background: "#22c55e",
-    color: "#fff",
+    fontSize: 16,
     cursor: "pointer",
   },
 };
