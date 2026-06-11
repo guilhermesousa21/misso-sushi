@@ -15,7 +15,6 @@ export default function CheckoutPage() {
   const [pixCode, setPixCode] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
 
-  // novo estado para observação
   const [note, setNote] = useState("");
 
   const generatePix = async () => {
@@ -24,12 +23,13 @@ export default function CheckoutPage() {
       setPixQr("");
       setPixCode("");
 
+      // Chama sua API backend que usa Mercado Pago
       const res = await fetch("/api/pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: total,
-          note, // envia observação junto com o pedido
+          note, // observação do cliente
         }),
       });
 
@@ -37,10 +37,11 @@ export default function CheckoutPage() {
 
       if (!res.ok) throw new Error(data?.error || "Erro ao gerar PIX");
 
+      // Mercado Pago retorna esses campos
       setPixQr(data.qr_code_base64 || "");
       setPixCode(data.qr_code || "");
     } catch (err) {
-      console.log("ERRO PIX:", err);
+      console.error("ERRO PIX:", err);
       alert("Erro ao gerar PIX");
     } finally {
       setLoading(false);
@@ -83,18 +84,17 @@ export default function CheckoutPage() {
           </div>
         ))}
 
-{/* OBSERVAÇÃO */}
-<div style={{ marginTop: 12 }}>
-  <label htmlFor="note"><strong>Alguma observação?</strong></label>
-  <textarea
-    id="note"
-    value={note}
-    onChange={(e) => setNote(e.target.value)}
-    placeholder="Escreva aqui..."
-    style={styles.textarea}
-  />
-</div>
-
+        {/* OBSERVAÇÃO */}
+        <div style={{ marginTop: 12 }}>
+          <label htmlFor="note"><strong>Alguma observação?</strong></label>
+          <textarea
+            id="note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Escreva aqui..."
+            style={styles.textarea}
+          />
+        </div>
       </div>
 
       {/* TOTAL */}
