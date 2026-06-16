@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 
 type OrderItem = {
   id: number;
@@ -44,6 +45,7 @@ const calcTotal = (items: OrderItem[]) =>
 
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const isMobile = useMediaQuery("(max-width: 720px)");
   const [filter, setFilter] = useState("todos");
 
   useEffect(() => {
@@ -106,8 +108,8 @@ export default function AdminPanel() {
   });
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
+    <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
+      <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <div>
           <p style={styles.eyebrow}>Painel em tempo real</p>
           <h1 style={styles.title}>Cozinha</h1>
@@ -147,7 +149,7 @@ export default function AdminPanel() {
           <p>A lista atualiza automaticamente quando um pedido chegar.</p>
         </section>
       ) : (
-        <section style={styles.grid}>
+        <section style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
           {sorted.map((order) => (
             <article key={order.id} style={styles.card}>
               <div style={styles.cardHeader}>
@@ -194,7 +196,7 @@ export default function AdminPanel() {
                 <strong>{money(order.total ?? calcTotal(order.items))}</strong>
               </div>
 
-              <div style={styles.actions}>
+              <div style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
                 <button
                   type="button"
                   style={styles.actionSecondary}
@@ -225,6 +227,9 @@ const styles: Record<string, CSSProperties> = {
     color: "#1c1a17",
     padding: "28px 20px 56px",
   },
+  pageMobile: {
+    padding: "22px 14px 42px",
+  },
   header: {
     maxWidth: 1180,
     margin: "0 auto 20px",
@@ -232,6 +237,10 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "end",
     gap: 16,
+  },
+  headerMobile: {
+    display: "grid",
+    alignItems: "start",
   },
   eyebrow: {
     color: "#9f1d2f",
@@ -285,6 +294,9 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
     gap: 14,
+  },
+  gridMobile: {
+    gridTemplateColumns: "1fr",
   },
   card: {
     background: "#fffdf8",
@@ -351,6 +363,9 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: 8,
+  },
+  actionsMobile: {
+    gridTemplateColumns: "1fr",
   },
   actionSecondary: {
     border: "none",

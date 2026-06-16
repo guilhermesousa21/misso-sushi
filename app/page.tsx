@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { MenuItem } from "../types";
 import { useCart } from "./context/CartContext";
 
@@ -74,6 +75,7 @@ const sortItems = (menuItems: MenuItem[]) =>
 
 export default function Page() {
   const router = useRouter();
+  const isMobile = useMediaQuery("(max-width: 720px)");
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [openCart, setOpenCart] = useState(false);
   const [activeCategory, setActiveCategory] = useState("");
@@ -136,7 +138,7 @@ export default function Page() {
   return (
     <main style={styles.page}>
       <header style={styles.header}>
-        <div style={styles.headerInner}>
+        <div style={{ ...styles.headerInner, ...(isMobile ? styles.headerInnerMobile : {}) }}>
           <div>
             <p style={styles.eyebrow}>Cardápio online</p>
             <h1 style={styles.brand}>Missô Sushi</h1>
@@ -163,7 +165,7 @@ export default function Page() {
               direto pelo site.
             </p>
           </div>
-          <div style={styles.summaryPanel}>
+          <div style={{ ...styles.summaryPanel, ...(isMobile ? styles.summaryPanelMobile : {}) }}>
             <span style={styles.summaryLabel}>Seu pedido</span>
             <strong style={styles.summaryValue}>{money(total)}</strong>
             <span style={styles.summaryNote}>
@@ -220,8 +222,11 @@ export default function Page() {
                   const quantity = getQuantity(item.id);
 
                   return (
-                    <article key={item.id} style={styles.menuCard}>
-                      <div style={styles.imageWrap}>
+                    <article
+                      key={item.id}
+                      style={{ ...styles.menuCard, ...(isMobile ? styles.menuCardMobile : {}) }}
+                    >
+                      <div style={{ ...styles.imageWrap, ...(isMobile ? styles.imageWrapMobile : {}) }}>
                         {item.image ? (
                           <Image
                             src={item.image}
@@ -247,7 +252,7 @@ export default function Page() {
                           )}
                         </div>
 
-                        <div style={styles.cardFooter}>
+                        <div style={{ ...styles.cardFooter, ...(isMobile ? styles.cardFooterMobile : {}) }}>
                           <strong style={styles.price}>
                             {money(Number(item.price))}
                           </strong>
@@ -419,6 +424,10 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     gap: 16,
   },
+  headerInnerMobile: {
+    alignItems: "flex-start",
+    gap: 10,
+  },
   eyebrow: {
     color: "#766e64",
     fontSize: 12,
@@ -499,6 +508,9 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
+  },
+  summaryPanelMobile: {
+    minHeight: 104,
   },
   summaryLabel: {
     color: "#d8d0c4",
@@ -581,7 +593,7 @@ const styles: Record<string, CSSProperties> = {
   },
   menuGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(290px, 100%), 1fr))",
     gap: 14,
   },
   menuCard: {
@@ -594,10 +606,17 @@ const styles: Record<string, CSSProperties> = {
     overflow: "hidden",
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
   },
+  menuCardMobile: {
+    gridTemplateColumns: "104px minmax(0, 1fr)",
+    minHeight: 150,
+  },
   imageWrap: {
     position: "relative",
     minHeight: 168,
     background: "#ebe3d6",
+  },
+  imageWrapMobile: {
+    minHeight: 150,
   },
   dishImage: {
     objectFit: "cover",
@@ -635,6 +654,10 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  cardFooterMobile: {
+    alignItems: "flex-start",
+    flexDirection: "column",
   },
   price: {
     fontSize: 17,

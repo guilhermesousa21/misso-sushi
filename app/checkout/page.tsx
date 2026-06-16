@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "../context/CartContext";
+import { useMediaQuery } from "../../lib/useMediaQuery";
 
 type PaymentMethod = "pix" | "card" | null;
 
@@ -16,6 +17,8 @@ const money = (value: number) =>
 
 export default function CheckoutPage() {
   const { cart, total } = useCart();
+  const isMobile = useMediaQuery("(max-width: 760px)");
+  const isTablet = useMediaQuery("(max-width: 980px)");
   const [method, setMethod] = useState<PaymentMethod>(null);
   const [loading, setLoading] = useState(false);
   const [pixQr, setPixQr] = useState("");
@@ -77,8 +80,8 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
+    <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
+      <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <Link href="/" style={styles.backLink}>
           Voltar ao cardápio
         </Link>
@@ -88,7 +91,7 @@ export default function CheckoutPage() {
         </div>
       </header>
 
-      <div style={styles.shell}>
+      <div style={{ ...styles.shell, ...(isTablet ? styles.shellStack : {}) }}>
         <section style={styles.mainColumn}>
           <div style={styles.card}>
             <div style={styles.cardHeader}>
@@ -220,7 +223,7 @@ export default function CheckoutPage() {
           </div>
         </section>
 
-        <aside style={styles.summaryCard}>
+        <aside style={{ ...styles.summaryCard, ...(isTablet ? styles.summaryCardStack : {}) }}>
           <p style={styles.cardEyebrow}>Total</p>
           <strong style={styles.total}>{money(total)}</strong>
           <p style={styles.muted}>
@@ -248,6 +251,9 @@ const styles: Record<string, CSSProperties> = {
     color: "#1c1a17",
     padding: "28px 20px 56px",
   },
+  pageMobile: {
+    padding: "20px 14px 42px",
+  },
   header: {
     maxWidth: 1120,
     margin: "0 auto 24px",
@@ -255,6 +261,11 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     gap: 16,
     alignItems: "end",
+  },
+  headerMobile: {
+    display: "grid",
+    alignItems: "start",
+    justifyContent: "stretch",
   },
   backLink: {
     color: "#9f1d2f",
@@ -280,6 +291,9 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 360px)",
     gap: 18,
     alignItems: "start",
+  },
+  shellStack: {
+    gridTemplateColumns: "1fr",
   },
   mainColumn: {
     display: "grid",
@@ -444,6 +458,10 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 8,
     padding: 22,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.18)",
+  },
+  summaryCardStack: {
+    position: "static",
+    order: -1,
   },
   total: {
     display: "block",

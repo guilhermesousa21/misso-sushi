@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { supabase } from "../../../lib/supabase";
+import { useMediaQuery } from "../../../lib/useMediaQuery";
 import { MenuItem } from "../../../types";
 
 type DeletedMenuItem = MenuItem & { deleted: true };
@@ -120,6 +121,8 @@ const uniqueById = (menuItems: MenuItem[]) => {
 
 export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
+  const isMobile = useMediaQuery("(max-width: 760px)");
+  const isTablet = useMediaQuery("(max-width: 1040px)");
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
@@ -310,10 +313,10 @@ export default function AdminMenuPage() {
   }, {} as Record<string, MenuItem[]>);
 
   return (
-    <main style={styles.page}>
-      <aside style={styles.sidebar}>
+    <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
+      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}) }}>
         <h2 style={styles.sidebarTitle}>Missô Admin</h2>
-        <nav style={styles.nav}>
+        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}) }}>
           <AdminLink href="/admin/faturamento" pathname={pathname}>
             Faturamento
           </AdminLink>
@@ -323,8 +326,8 @@ export default function AdminMenuPage() {
         </nav>
       </aside>
 
-      <section style={styles.content}>
-        <header style={styles.header}>
+      <section style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
+        <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
           <div>
             <p style={styles.eyebrow}>Operação</p>
             <h1 style={styles.title}>Cardápio</h1>
@@ -342,7 +345,7 @@ export default function AdminMenuPage() {
           </button>
         </header>
 
-        <section style={styles.toolbar}>
+        <section style={{ ...styles.toolbar, ...(isMobile ? styles.toolbarStack : {}) }}>
           <input
             type="text"
             placeholder="Buscar prato..."
@@ -380,13 +383,14 @@ export default function AdminMenuPage() {
                 onDragStart={() => canReorder && setDragged({ type: "category", category })}
                 onDragOver={(event) => canReorder && event.preventDefault()}
                 onDrop={() => handleCategoryDrop(category)}
-                style={{
-                  ...styles.categoryCard,
-                  opacity:
+                  style={{
+                    ...styles.categoryCard,
+                    ...(isMobile ? styles.categoryCardMobile : {}),
+                    opacity:
                     dragged?.type === "category" && dragged.category === category ? 0.55 : 1,
                 }}
               >
-                <div style={styles.categoryHeader}>
+                <div style={{ ...styles.categoryHeader, ...(isMobile ? styles.categoryHeaderMobile : {}) }}>
                   <div style={styles.categoryTitleGroup}>
                     <span style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}>
                       ::
@@ -418,10 +422,11 @@ export default function AdminMenuPage() {
                       }}
                       style={{
                         ...styles.itemCard,
+                        ...(isMobile ? styles.itemCardMobile : {}),
                         opacity: dragged?.type === "item" && dragged.itemId === item.id ? 0.55 : 1,
                       }}
                     >
-                      <div style={styles.itemMain}>
+                      <div style={{ ...styles.itemMain, ...(isMobile ? styles.itemMainMobile : {}) }}>
                         <span style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}>
                           ::
                         </span>
@@ -461,6 +466,7 @@ export default function AdminMenuPage() {
       {editingItem && (
         <EditModal
           item={editingItem}
+          compact={isTablet}
           onClose={() => setEditingItem(null)}
           onSave={(updated) => {
             if ("deleted" in updated) {
@@ -498,10 +504,12 @@ function AdminLink({
 
 function EditModal({
   item,
+  compact,
   onClose,
   onSave,
 }: {
   item: MenuItem;
+  compact: boolean;
   onClose: () => void;
   onSave: (item: MenuItem | DeletedMenuItem) => void;
 }) {
@@ -620,8 +628,8 @@ function EditModal({
 
   return (
     <div style={styles.modalOverlay}>
-      <div style={styles.modal}>
-        <div style={styles.modalHeader}>
+      <div style={{ ...styles.modal, ...(compact ? styles.modalCompact : {}) }}>
+        <div style={{ ...styles.modalHeader, ...(compact ? styles.modalHeaderCompact : {}) }}>
           <div>
             <p style={styles.cardEyebrow}>Cardápio</p>
             <h2 style={styles.modalTitle}>Editar item</h2>
@@ -631,7 +639,7 @@ function EditModal({
           </button>
         </div>
 
-        <div style={styles.modalBody}>
+        <div style={{ ...styles.modalBody, ...(compact ? styles.modalBodyCompact : {}) }}>
           <section style={styles.modalPanel}>
             <label style={styles.field}>
               <span style={styles.label}>Nome do prato</span>
@@ -647,7 +655,7 @@ function EditModal({
               />
             </label>
 
-            <div style={styles.formGrid}>
+            <div style={{ ...styles.formGrid, ...(compact ? styles.formGridCompact : {}) }}>
               <label style={styles.field}>
                 <span style={styles.label}>Preço</span>
                 <input
@@ -758,7 +766,7 @@ function EditModal({
           </aside>
         </div>
 
-        <div style={styles.modalActions}>
+        <div style={{ ...styles.modalActions, ...(compact ? styles.modalActionsCompact : {}) }}>
           <button
             type="button"
             onClick={handleDelete}
@@ -795,10 +803,17 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "240px minmax(0, 1fr)",
   },
+  pageStack: {
+    gridTemplateColumns: "1fr",
+  },
   sidebar: {
     borderRight: "1px solid rgba(28, 26, 23, 0.08)",
     background: "#fffdf8",
     padding: 22,
+  },
+  sidebarTop: {
+    borderRight: "none",
+    borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
   },
   sidebarTitle: {
     fontSize: 20,
@@ -807,6 +822,10 @@ const styles: Record<string, CSSProperties> = {
   nav: {
     display: "grid",
     gap: 8,
+  },
+  navInline: {
+    display: "flex",
+    flexWrap: "wrap",
   },
   navLink: {
     color: "#514a43",
@@ -822,12 +841,19 @@ const styles: Record<string, CSSProperties> = {
   content: {
     padding: "28px 24px 56px",
   },
+  contentMobile: {
+    padding: "22px 14px 42px",
+  },
   header: {
     display: "flex",
     justifyContent: "space-between",
     gap: 16,
     alignItems: "end",
     marginBottom: 18,
+  },
+  headerMobile: {
+    display: "grid",
+    alignItems: "start",
   },
   eyebrow: {
     color: "#9f1d2f",
@@ -858,6 +884,9 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: "minmax(220px, 1fr) minmax(180px, 280px)",
     gap: 10,
     marginBottom: 12,
+  },
+  toolbarStack: {
+    gridTemplateColumns: "1fr",
   },
   input: {
     width: "100%",
@@ -896,12 +925,18 @@ const styles: Record<string, CSSProperties> = {
     padding: 18,
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
   },
+  categoryCardMobile: {
+    padding: 14,
+  },
   categoryHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "start",
     gap: 16,
     marginBottom: 14,
+  },
+  categoryHeaderMobile: {
+    display: "grid",
   },
   categoryTitleGroup: {
     display: "flex",
@@ -952,11 +987,18 @@ const styles: Record<string, CSSProperties> = {
     padding: 12,
     background: "#fff",
   },
+  itemCardMobile: {
+    display: "grid",
+    alignItems: "start",
+  },
   itemMain: {
     minWidth: 0,
     display: "flex",
     alignItems: "center",
     gap: 12,
+  },
+  itemMainMobile: {
+    alignItems: "flex-start",
   },
   itemImage: {
     borderRadius: 8,
@@ -1006,12 +1048,19 @@ const styles: Record<string, CSSProperties> = {
     padding: 22,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.22)",
   },
+  modalCompact: {
+    width: "min(680px, 100%)",
+    padding: 18,
+  },
   modalHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "start",
     gap: 16,
     marginBottom: 16,
+  },
+  modalHeaderCompact: {
+    display: "grid",
   },
   modalTitle: {
     marginTop: 4,
@@ -1031,11 +1080,17 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: "minmax(0, 180px) minmax(0, 1fr)",
     gap: 10,
   },
+  formGridCompact: {
+    gridTemplateColumns: "1fr",
+  },
   modalBody: {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 330px)",
     gap: 18,
     alignItems: "start",
+  },
+  modalBodyCompact: {
+    gridTemplateColumns: "1fr",
   },
   modalPanel: {
     display: "grid",
@@ -1125,6 +1180,9 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 18,
     paddingTop: 16,
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
+  },
+  modalActionsCompact: {
+    display: "grid",
   },
   deleteButton: {
     border: "1px solid rgba(153, 27, 27, 0.16)",

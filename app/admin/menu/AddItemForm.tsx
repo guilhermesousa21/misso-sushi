@@ -4,6 +4,7 @@ import type { CSSProperties, FormEvent } from "react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 
 type MenuItem = {
   id?: number;
@@ -55,6 +56,7 @@ const sanitizeFileName = (value: string) =>
     .toLowerCase();
 
 export default function AddItemForm({ onAdd }: AddItemFormProps) {
+  const isMobile = useMediaQuery("(max-width: 680px)");
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
@@ -142,8 +144,8 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={styles.form}>
-      <header style={styles.header}>
+    <form onSubmit={handleSubmit} style={{ ...styles.form, ...(isMobile ? styles.formMobile : {}) }}>
+      <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <div>
           <p style={styles.eyebrow}>Novo item</p>
           <h2 style={styles.title}>Adicionar ao cardápio</h2>
@@ -153,7 +155,7 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
         </span>
       </header>
 
-      <div style={styles.grid}>
+      <div style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
         <label style={styles.field}>
           <span style={styles.label}>Nome do prato</span>
           <input
@@ -241,7 +243,7 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
 
       {error && <p style={styles.error}>{error}</p>}
 
-      <footer style={styles.actions}>
+      <footer style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
         <button
           type="button"
           onClick={() => {
@@ -285,11 +287,17 @@ const styles: Record<string, CSSProperties> = {
     color: "#1c1a17",
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
   },
+  formMobile: {
+    padding: 16,
+  },
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "start",
     gap: 16,
+  },
+  headerMobile: {
+    display: "grid",
   },
   eyebrow: {
     color: "#9f1d2f",
@@ -314,6 +322,9 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) minmax(150px, 190px)",
     gap: 12,
+  },
+  gridMobile: {
+    gridTemplateColumns: "1fr",
   },
   field: {
     display: "grid",
@@ -419,6 +430,9 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     justifyContent: "flex-end",
     gap: 10,
+  },
+  actionsMobile: {
+    display: "grid",
   },
   secondaryButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",

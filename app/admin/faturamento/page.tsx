@@ -18,6 +18,7 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { supabase } from "../../../lib/supabase";
+import { useMediaQuery } from "../../../lib/useMediaQuery";
 
 ChartJS.register(
   Title,
@@ -112,6 +113,8 @@ const getPayment = (order: Order) => order.payment_method || "pending";
 
 export default function FaturamentoPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const isMobile = useMediaQuery("(max-width: 760px)");
+  const isTablet = useMediaQuery("(max-width: 1040px)");
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<RangePreset>("30d");
   const [paymentFilter, setPaymentFilter] = useState("todos");
@@ -288,13 +291,13 @@ export default function FaturamentoPage() {
   const paymentOptions = Array.from(new Set(orders.map(getPayment)));
 
   return (
-    <main style={styles.page}>
-      <aside style={styles.sidebar}>
+    <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
+      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}) }}>
         <div>
           <h2 style={styles.sidebarTitle}>Missô Admin</h2>
           <p style={styles.sidebarMuted}>Gestão operacional</p>
         </div>
-        <nav style={styles.nav}>
+        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}) }}>
           <AdminLink href="/admin/faturamento" pathname={pathname}>
             Faturamento
           </AdminLink>
@@ -304,8 +307,8 @@ export default function FaturamentoPage() {
         </nav>
       </aside>
 
-      <section style={styles.content}>
-        <header style={styles.header}>
+      <section style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
+        <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
           <div>
             <p style={styles.eyebrow}>Financeiro</p>
             <h1 style={styles.title}>Faturamento</h1>
@@ -315,8 +318,11 @@ export default function FaturamentoPage() {
           </span>
         </header>
 
-        <section style={styles.toolbar} aria-label="Filtros de faturamento">
-          <div style={styles.segmented}>
+        <section
+          style={{ ...styles.toolbar, ...(isTablet ? styles.toolbarStack : {}) }}
+          aria-label="Filtros de faturamento"
+        >
+          <div style={{ ...styles.segmented, ...(isMobile ? styles.segmentedMobile : {}) }}>
             {(Object.keys(rangeLabels) as RangePreset[]).map((option) => (
               <button
                 key={option}
@@ -379,7 +385,7 @@ export default function FaturamentoPage() {
           />
         </section>
 
-        <section style={styles.dashboardGrid}>
+        <section style={{ ...styles.dashboardGrid, ...(isTablet ? styles.dashboardGridStack : {}) }}>
           <article style={styles.chartCard}>
             <div style={styles.cardHeader}>
               <div>
@@ -411,7 +417,7 @@ export default function FaturamentoPage() {
           </aside>
         </section>
 
-        <section style={styles.bottomGrid}>
+        <section style={{ ...styles.bottomGrid, ...(isTablet ? styles.bottomGridStack : {}) }}>
           <article style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
@@ -550,6 +556,9 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "240px minmax(0, 1fr)",
   },
+  pageStack: {
+    gridTemplateColumns: "1fr",
+  },
   sidebar: {
     borderRight: "1px solid rgba(28, 26, 23, 0.08)",
     background: "#fffdf8",
@@ -557,6 +566,11 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: 28,
+  },
+  sidebarTop: {
+    borderRight: "none",
+    borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
+    gap: 14,
   },
   sidebarTitle: {
     fontSize: 20,
@@ -570,6 +584,10 @@ const styles: Record<string, CSSProperties> = {
   nav: {
     display: "grid",
     gap: 8,
+  },
+  navInline: {
+    display: "flex",
+    flexWrap: "wrap",
   },
   navLink: {
     color: "#514a43",
@@ -586,12 +604,19 @@ const styles: Record<string, CSSProperties> = {
     padding: "28px 24px 56px",
     minWidth: 0,
   },
+  contentMobile: {
+    padding: "22px 14px 42px",
+  },
   header: {
     display: "flex",
     justifyContent: "space-between",
     gap: 16,
     alignItems: "end",
     marginBottom: 18,
+  },
+  headerMobile: {
+    display: "grid",
+    alignItems: "start",
   },
   eyebrow: {
     color: "#9f1d2f",
@@ -619,6 +644,9 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 14,
     alignItems: "center",
   },
+  toolbarStack: {
+    gridTemplateColumns: "1fr",
+  },
   segmented: {
     display: "grid",
     gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -627,6 +655,9 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid rgba(28, 26, 23, 0.1)",
     borderRadius: 8,
     padding: 4,
+  },
+  segmentedMobile: {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   },
   segmentButton: {
     border: "none",
@@ -696,6 +727,9 @@ const styles: Record<string, CSSProperties> = {
     gap: 16,
     alignItems: "stretch",
     marginBottom: 16,
+  },
+  dashboardGridStack: {
+    gridTemplateColumns: "1fr",
   },
   chartCard: {
     background: "#fffdf8",
@@ -787,6 +821,9 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, 0.8fr)",
     gap: 16,
+  },
+  bottomGridStack: {
+    gridTemplateColumns: "1fr",
   },
   table: {
     display: "grid",
