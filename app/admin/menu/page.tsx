@@ -107,6 +107,17 @@ const moveValue = <T,>(values: T[], from: number, to: number) => {
   return next;
 };
 
+const uniqueById = (menuItems: MenuItem[]) => {
+  const seen = new Set<number>();
+
+  return menuItems.filter((item) => {
+    if (typeof item.id !== "number") return true;
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+};
+
 export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -114,6 +125,7 @@ export default function AdminMenuPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [dragged, setDragged] = useState<DragState | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [addingItem, setAddingItem] = useState(false);
   const pathname = usePathname();
   const canReorder = !search.trim() && !filterCategory;
 
@@ -125,35 +137,42 @@ export default function AdminMenuPage() {
         .order("category", { ascending: true })
         .order("name", { ascending: true });
 
-      if (!error && data) setItems(data as MenuItem[]);
+      if (!error && data) setItems(uniqueById(data as MenuItem[]));
     }
 
     fetchMenu();
   }, []);
 
   const handleAddItem = async () => {
-    const { data, error } = await supabase
-      .from("menu")
-      .insert([
-        {
-          name: "Novo item",
-          price: 0,
-          category: "entradas",
-          category_order: getFallbackCategoryOrder("entradas"),
-          sort_order: items.filter((item) => item.category === "entradas").length,
-          description: "",
-        },
-      ])
-      .select();
+    if (addingItem) return;
+    setAddingItem(true);
 
-    if (error) {
-      toast.error("Erro ao adicionar item: " + error.message);
-      return;
-    }
+    try {
+      const { data, error } = await supabase
+        .from("menu")
+        .insert([
+          {
+            name: "Novo item",
+            price: 0,
+            category: "entradas",
+            category_order: getFallbackCategoryOrder("entradas"),
+            sort_order: items.filter((item) => item.category === "entradas").length,
+            description: "",
+          },
+        ])
+        .select();
 
-    if (data) {
-      setItems([data[0] as MenuItem, ...items]);
-      toast.success("Item criado.");
+      if (error) {
+        toast.error("Erro ao adicionar item: " + error.message);
+        return;
+      }
+
+      if (data) {
+        setItems((current) => uniqueById([data[0] as MenuItem, ...current]));
+        toast.success("Item criado.");
+      }
+    } finally {
+      setAddingItem(false);
     }
   };
 
@@ -310,8 +329,16 @@ export default function AdminMenuPage() {
             <p style={styles.eyebrow}>Operação</p>
             <h1 style={styles.title}>Cardápio</h1>
           </div>
-          <button type="button" onClick={handleAddItem} style={styles.primaryButton}>
-            Adicionar item
+          <button
+            type="button"
+            onClick={handleAddItem}
+            disabled={addingItem}
+            style={{
+              ...styles.primaryButton,
+              ...(addingItem ? styles.primaryButtonDisabled : {}),
+            }}
+          >
+            {addingItem ? "Criando..." : "Adicionar item"}
           </button>
         </header>
 
@@ -437,9 +464,11 @@ export default function AdminMenuPage() {
           onClose={() => setEditingItem(null)}
           onSave={(updated) => {
             if ("deleted" in updated) {
-              setItems(items.filter((item) => item.id !== updated.id));
+              setItems((current) => current.filter((item) => item.id !== updated.id));
             } else {
-              setItems(items.map((item) => (item.id === updated.id ? updated : item)));
+              setItems((current) =>
+                uniqueById(current.map((item) => (item.id === updated.id ? updated : item)))
+              );
             }
             setEditingItem(null);
           }}
@@ -479,8 +508,26 @@ function EditModal({
   const [form, setForm] = useState<MenuItem>(item);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  const canSave =
+    form.name.trim().length > 0 &&
+    Number(form.price) > 0 &&
+    form.category.trim().length > 0 &&
+    !uploading &&
+    !saving &&
+    !deleting;
 
   const handleImageUpload = async (file: File) => {
+    if (preview) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(file));
     setUploading(true);
     const filePath = `item-${form.id}-${Date.now()}.jpg`;
@@ -517,41 +564,58 @@ function EditModal({
       return;
     }
 
-    const { data, error } = await supabase
-      .from("menu")
-      .update({
-        name: form.name,
-        price: form.price,
-        category: form.category,
-        category_order: form.category_order ?? getFallbackCategoryOrder(form.category),
-        sort_order: form.sort_order ?? 0,
-        description: form.description,
-        image: form.image || null,
-      })
-      .eq("id", Number(form.id))
-      .select();
+    setSaving(true);
 
-    if (error) {
-      toast.error("Erro ao salvar: " + error.message);
-      return;
-    }
-    if (data && data.length > 0) {
-      onSave(data[0] as MenuItem);
-      toast.success("Item atualizado.");
+    try {
+      const { data, error } = await supabase
+        .from("menu")
+        .update({
+          name: form.name.trim(),
+          price: Number(form.price),
+          category: form.category,
+          category_order: form.category_order ?? getFallbackCategoryOrder(form.category),
+          sort_order: form.sort_order ?? 0,
+          description: form.description,
+          image: form.image || null,
+        })
+        .eq("id", Number(form.id))
+        .select();
+
+      if (error) {
+        toast.error("Erro ao salvar: " + error.message);
+        return;
+      }
+      if (data && data.length > 0) {
+        onSave(data[0] as MenuItem);
+        toast.success("Item atualizado.");
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    const { error } = await supabase.from("menu").delete().eq("id", Number(form.id));
-
-    if (error) {
-      toast.error("Erro ao excluir: " + error.message);
+    if (!confirmDelete) {
+      setConfirmDelete(true);
       return;
     }
 
-    onSave({ ...form, deleted: true });
-    toast.success("Item excluído.");
-    onClose();
+    setDeleting(true);
+
+    try {
+      const { error } = await supabase.from("menu").delete().eq("id", Number(form.id));
+
+      if (error) {
+        toast.error("Erro ao excluir: " + error.message);
+        return;
+      }
+
+      onSave({ ...form, deleted: true });
+      toast.success("Item excluído.");
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -567,69 +631,155 @@ function EditModal({
           </button>
         </div>
 
-        <div style={styles.formGrid}>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(event) => setForm({ ...form, name: event.target.value })}
-            placeholder="Nome do prato"
-            style={styles.input}
-          />
-          <input
-            type="number"
-            value={form.price}
-            onChange={(event) =>
-              setForm({ ...form, price: Number(event.target.value) })
-            }
-            placeholder="Preço"
-            style={styles.input}
-          />
-          <input
-            type="text"
-            value={form.category}
-            onChange={(event) => setForm({ ...form, category: event.target.value })}
-            placeholder="Categoria"
-            style={styles.input}
-          />
-          <textarea
-            value={form.description || ""}
-            onChange={(event) =>
-              setForm({ ...form, description: event.target.value })
-            }
-            placeholder="Descrição"
-            style={styles.textarea}
-          />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) handleImageUpload(file);
-            }}
-            style={styles.input}
-          />
+        <div style={styles.modalBody}>
+          <section style={styles.modalPanel}>
+            <label style={styles.field}>
+              <span style={styles.label}>Nome do prato</span>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(event) => {
+                  setConfirmDelete(false);
+                  setForm({ ...form, name: event.target.value });
+                }}
+                placeholder="Ex: Hot philadelphia"
+                style={styles.input}
+              />
+            </label>
+
+            <div style={styles.formGrid}>
+              <label style={styles.field}>
+                <span style={styles.label}>Preço</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.price}
+                  onChange={(event) => {
+                    setConfirmDelete(false);
+                    setForm({ ...form, price: Number(event.target.value) });
+                  }}
+                  placeholder="Preço"
+                  style={styles.input}
+                />
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Categoria</span>
+                <select
+                  value={form.category}
+                  onChange={(event) => {
+                    const category = event.target.value;
+                    setConfirmDelete(false);
+                    setForm({
+                      ...form,
+                      category,
+                      category_order: getFallbackCategoryOrder(category),
+                    });
+                  }}
+                  style={styles.select}
+                >
+                  {defaultCategoryOrder.map((category) => (
+                    <option key={category} value={category}>
+                      {categoryLabels[category]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label style={styles.field}>
+              <span style={styles.label}>Descrição</span>
+              <textarea
+                value={form.description || ""}
+                onChange={(event) => {
+                  setConfirmDelete(false);
+                  setForm({ ...form, description: event.target.value });
+                }}
+                placeholder="Detalhe ingredientes, porções ou observações importantes."
+                style={styles.textarea}
+              />
+            </label>
+
+            <div style={styles.pricePreview}>
+              <span>Prévia do preço</span>
+              <strong>{money(Number(form.price || 0))}</strong>
+            </div>
+          </section>
+
+          <aside style={styles.imagePanel}>
+            <div>
+              <p style={styles.cardEyebrow}>Imagem</p>
+              <h3 style={styles.imageTitle}>Foto do item</h3>
+            </div>
+
+            <label style={styles.uploadCard}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    setConfirmDelete(false);
+                    handleImageUpload(file);
+                  }
+                }}
+                style={styles.fileInput}
+              />
+              {preview ? (
+                <Image
+                  src={preview}
+                  alt="Prévia"
+                  width={520}
+                  height={320}
+                  unoptimized
+                  style={styles.previewImage}
+                />
+              ) : form.image ? (
+                <Image
+                  src={form.image}
+                  alt="Imagem atual"
+                  width={520}
+                  height={320}
+                  style={styles.previewImage}
+                />
+              ) : (
+                <span style={styles.uploadPlaceholder}>Selecionar imagem</span>
+              )}
+            </label>
+
+            {uploading ? (
+              <p style={styles.noticeStrong}>Enviando imagem...</p>
+            ) : (
+              <p style={styles.imageHint}>
+                Clique na área da foto para trocar a imagem do cardápio.
+              </p>
+            )}
+          </aside>
         </div>
 
-        {uploading && <p style={styles.noticeStrong}>Enviando imagem...</p>}
-        {preview && (
-          <Image src={preview} alt="Prévia" width={520} height={260} style={styles.previewImage} />
-        )}
-        {form.image && !preview && (
-          <Image
-            src={form.image}
-            alt="Imagem atual"
-            width={520}
-            height={260}
-            style={styles.previewImage}
-          />
-        )}
-
         <div style={styles.modalActions}>
-          <button type="button" onClick={handleDelete} style={styles.deleteButton}>
-            Excluir
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={saving || uploading || deleting}
+            style={{
+              ...styles.deleteButton,
+              ...(confirmDelete ? styles.deleteButtonConfirm : {}),
+            }}
+          >
+            {deleting ? "Excluindo..." : confirmDelete ? "Confirmar exclusão" : "Excluir"}
           </button>
-          <button type="button" onClick={handleSave} style={styles.primaryButton}>
-            Salvar
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!canSave}
+            style={{
+              ...styles.primaryButton,
+              ...(!canSave ? styles.primaryButtonDisabled : {}),
+            }}
+          >
+            {saving ? "Salvando..." : "Salvar alterações"}
           </button>
         </div>
       </div>
@@ -698,6 +848,10 @@ const styles: Record<string, CSSProperties> = {
     padding: "12px 16px",
     cursor: "pointer",
     fontWeight: 850,
+  },
+  primaryButtonDisabled: {
+    background: "#c9c0b4",
+    cursor: "not-allowed",
   },
   toolbar: {
     display: "grid",
@@ -844,7 +998,7 @@ const styles: Record<string, CSSProperties> = {
     padding: 20,
   },
   modal: {
-    width: "min(620px, 100%)",
+    width: "min(920px, 100%)",
     maxHeight: "92vh",
     overflowY: "auto",
     background: "#fffdf8",
@@ -874,11 +1028,32 @@ const styles: Record<string, CSSProperties> = {
   },
   formGrid: {
     display: "grid",
+    gridTemplateColumns: "minmax(0, 180px) minmax(0, 1fr)",
     gap: 10,
+  },
+  modalBody: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 330px)",
+    gap: 18,
+    alignItems: "start",
+  },
+  modalPanel: {
+    display: "grid",
+    gap: 13,
+    minWidth: 0,
+  },
+  field: {
+    display: "grid",
+    gap: 7,
+  },
+  label: {
+    color: "#514a43",
+    fontSize: 13,
+    fontWeight: 850,
   },
   textarea: {
     width: "100%",
-    minHeight: 90,
+    minHeight: 124,
     border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 8,
     padding: 12,
@@ -886,28 +1061,82 @@ const styles: Record<string, CSSProperties> = {
     background: "#fffdf8",
     outlineColor: "#9f1d2f",
   },
+  pricePreview: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 8,
+    background: "#f0ebe2",
+    color: "#514a43",
+    padding: "12px 14px",
+    fontWeight: 850,
+  },
+  imagePanel: {
+    display: "grid",
+    gap: 12,
+    minWidth: 0,
+  },
+  imageTitle: {
+    marginTop: 4,
+    fontSize: 20,
+    lineHeight: 1.15,
+  },
+  uploadCard: {
+    position: "relative",
+    minHeight: 250,
+    border: "1px dashed rgba(28, 26, 23, 0.24)",
+    borderRadius: 8,
+    background: "#fff",
+    display: "grid",
+    placeItems: "center",
+    overflow: "hidden",
+    cursor: "pointer",
+  },
+  fileInput: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    opacity: 0,
+    pointerEvents: "none",
+  },
+  uploadPlaceholder: {
+    borderRadius: 999,
+    background: "#f0ebe2",
+    color: "#514a43",
+    padding: "10px 14px",
+    fontWeight: 850,
+  },
   previewImage: {
     width: "100%",
-    height: "auto",
-    maxHeight: 260,
+    height: 250,
     objectFit: "cover",
-    borderRadius: 8,
-    marginTop: 14,
     background: "#f0ebe2",
+  },
+  imageHint: {
+    color: "#766e64",
+    fontSize: 13,
+    lineHeight: 1.4,
   },
   modalActions: {
     display: "flex",
     justifyContent: "space-between",
     gap: 10,
-    marginTop: 16,
+    marginTop: 18,
+    paddingTop: 16,
+    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
   },
   deleteButton: {
-    border: "none",
+    border: "1px solid rgba(153, 27, 27, 0.16)",
     borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
+    background: "#fee2e2",
+    color: "#991b1b",
     padding: "12px 16px",
     cursor: "pointer",
     fontWeight: 850,
+  },
+  deleteButtonConfirm: {
+    background: "#991b1b",
+    color: "#fff",
   },
 };
