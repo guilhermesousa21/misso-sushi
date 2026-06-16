@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
-export const supabase = createClient(
-  "https://taznskxoczjxnodylgnl.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhem5za3hvY3pqeG5vZHlsZ25sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MjgzMjgsImV4cCI6MjA5NjUwNDMyOH0.I2sc4hqVLjkP7X8--dFCFQ8Vl4i_cTB2MI7Mh5KqcOY"
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log("Supabase Key:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "OK" : "MISSING");

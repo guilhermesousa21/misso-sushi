@@ -18,7 +18,7 @@ export default function RootLayout({
           margin: 0,
           padding: 0,
           minHeight: "100vh",
-          background: "#f6f6f6",
+          background: "#f7f4ef",
           fontFamily: "system-ui, -apple-system, sans-serif",
         }}
       >

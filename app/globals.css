@@ -2,29 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Reset básico */
 * {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
 }
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   width: 100%;
-  background: #f6f6f6;
-  color: #111;
-  font-family: Arial, Helvetica, sans-serif;
   overflow-x: hidden;
+  background: #f7f4ef;
+  color: #1c1a17;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* remove scroll horizontal fantasma */
 body {
   overflow-y: auto;
 }
 
-/* remove herança estranha de tema escuro */
-html {
-  color-scheme: light;
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }

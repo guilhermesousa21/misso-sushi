@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -15,17 +16,25 @@ type Order = {
   name: string;
   phone: string;
   items: OrderItem[];
-  note?: string; // <-- novo campo
+  note?: string;
   total?: number;
   status: string;
   created_at: string;
 };
 
-const statusColor: Record<string, string> = {
-  recebido: "#ef4444",
-  preparando: "#f59e0b",
-  pronto: "#3b82f6",
+const statuses = ["todos", "recebido", "preparando", "pronto"];
+
+const statusStyle: Record<string, CSSProperties> = {
+  recebido: { background: "#fee2e2", color: "#991b1b" },
+  preparando: { background: "#fef3c7", color: "#92400e" },
+  pronto: { background: "#dbeafe", color: "#1e40af" },
 };
+
+const money = (value: number) =>
+  value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 
 const calcTotal = (items: OrderItem[]) =>
   (items || []).reduce(
@@ -83,16 +92,12 @@ export default function AdminPanel() {
     await supabase.from("orders").update({ status }).eq("id", id);
 
     setOrders((prev) =>
-      prev.map((order) =>
-        order.id === id ? { ...order, status } : order
-      )
+      prev.map((order) => (order.id === id ? { ...order, status } : order))
     );
   }
 
   const filtered =
-    filter === "todos"
-      ? orders
-      : orders.filter((o) => o.status === filter);
+    filter === "todos" ? orders : orders.filter((order) => order.status === filter);
 
   const sorted = [...filtered].sort((a, b) => {
     if (a.status === "pronto" && b.status !== "pronto") return 1;
@@ -101,204 +106,277 @@ export default function AdminPanel() {
   });
 
   return (
-    <div style={styles.page}>
+    <main style={styles.page}>
       <header style={styles.header}>
-        <h1 style={{ margin: 0 }}>🍣 Cozinha - Missô Sushi</h1>
-        <p style={{ margin: 0, opacity: 0.7 }}>Painel em tempo real</p>
+        <div>
+          <p style={styles.eyebrow}>Painel em tempo real</p>
+          <h1 style={styles.title}>Cozinha</h1>
+        </div>
+        <div style={styles.headerStat}>
+          <span>Pedidos ativos</span>
+          <strong>{orders.filter((order) => order.status !== "pronto").length}</strong>
+        </div>
       </header>
 
-      <div style={styles.filters}>
-        {["todos", "recebido", "preparando", "pronto"].map((status) => {
+      <nav style={styles.filters} aria-label="Filtrar pedidos">
+        {statuses.map((status) => {
           const count =
             status === "todos"
               ? orders.length
-              : orders.filter((o) => o.status === status).length;
+              : orders.filter((order) => order.status === status).length;
 
           return (
             <button
               key={status}
+              type="button"
               onClick={() => setFilter(status)}
               style={{
                 ...styles.filterBtn,
-                background: filter === status ? "#111" : "#fff",
-                color: filter === status ? "#fff" : "#111",
-                borderColor: filter === status ? "#111" : "#e5e7eb",
+                ...(filter === status ? styles.filterBtnActive : {}),
               }}
             >
-              {status} ({count})
+              {status} <span style={styles.filterCount}>{count}</span>
             </button>
           );
         })}
-      </div>
+      </nav>
 
-      <div style={styles.grid}>
-        {sorted.map((order) => (
-          <div key={order.id} style={styles.card}>
-            <div style={styles.cardHeader}>
-              <div style={styles.cardInfo}>
-                <h3 style={{ margin: 0 }}>Pedido #{order.id}</h3>
-                <p style={styles.subText}>
-                  {new Date(order.created_at).toLocaleString()}
-                </p>
+      {sorted.length === 0 ? (
+        <section style={styles.emptyState}>
+          <h2>Nenhum pedido nesta fila</h2>
+          <p>A lista atualiza automaticamente quando um pedido chegar.</p>
+        </section>
+      ) : (
+        <section style={styles.grid}>
+          {sorted.map((order) => (
+            <article key={order.id} style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div>
+                  <p style={styles.orderId}>Pedido #{order.id}</p>
+                  <p style={styles.time}>
+                    {new Date(order.created_at).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+                <span
+                  style={{
+                    ...styles.badge,
+                    ...(statusStyle[order.status] || {}),
+                  }}
+                >
+                  {order.status}
+                </span>
               </div>
 
-              <span
-                style={{
-                  ...styles.badge,
-                  background: statusColor[order.status] || "#999",
-                }}
-              >
-                {order.status}
-              </span>
-            </div>
+              <div style={styles.customerBox}>
+                <strong>{order.name || "Cliente"}</strong>
+                <span>{order.phone || "Telefone não informado"}</span>
+                {order.note && <p>Obs: {order.note}</p>}
+              </div>
 
-            <div style={{ marginTop: 12 }}>
-              <p style={styles.text}>
-                <strong>Cliente:</strong> {order.name}
-              </p>
-              <p style={styles.text}>
-                <strong>Telefone:</strong> {order.phone}
-              </p>
-              {order.note && (
-                <p style={styles.text}>
-                  <strong>Observação:</strong> {order.note}
-                </p>
-              )}
-            </div>
-
-            <div style={{ marginTop: 12 }}>
-              <strong>Itens</strong>
-              <div style={{ marginTop: 6 }}>
-                {order.items && order.items.length > 0 ? (
+              <div style={styles.itemsBox}>
+                <strong>Itens</strong>
+                {order.items.length > 0 ? (
                   order.items.map((item, index) => (
-                    <div
-                      key={`${item.id}-${index}`}
-                      style={styles.itemRow}
-                    >
+                    <div key={`${item.id}-${index}`} style={styles.itemRow}>
                       <span>
-                        {item.name} x{item.quantity ?? 1}
+                        {item.quantity ?? 1}x {item.name}
                       </span>
-                      <span>
-                        R$ {(item.price * (item.quantity ?? 1)).toFixed(2)}
-                      </span>
+                      <strong>{money(item.price * (item.quantity ?? 1))}</strong>
                     </div>
                   ))
                 ) : (
-                  <p style={styles.subText}>Nenhum item neste pedido</p>
+                  <p style={styles.muted}>Nenhum item neste pedido.</p>
                 )}
               </div>
-            </div>
 
-            <div style={styles.total}>
-              Total: <strong>R$ {calcTotal(order.items).toFixed(2)}</strong>
-            </div>
+              <div style={styles.total}>
+                <span>Total</span>
+                <strong>{money(order.total ?? calcTotal(order.items))}</strong>
+              </div>
 
-            <div style={styles.actions}>
-              <button
-                style={styles.btnYellow}
-                onClick={() => updateStatus(order.id, "preparando")}
-              >
-                Preparando
-              </button>
-
-              <button
-                style={styles.btnBlue}
-                onClick={() => updateStatus(order.id, "pronto")}
-              >
-                Pronto
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+              <div style={styles.actions}>
+                <button
+                  type="button"
+                  style={styles.actionSecondary}
+                  onClick={() => updateStatus(order.id, "preparando")}
+                >
+                  Preparando
+                </button>
+                <button
+                  type="button"
+                  style={styles.actionPrimary}
+                  onClick={() => updateStatus(order.id, "pronto")}
+                >
+                  Pronto
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+    </main>
   );
 }
 
-/* ================= UI ================= */
-
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page: {
-    padding: 24,
-    fontFamily: "Arial",
-    background: "#f6f7fb",
     minHeight: "100vh",
+    background: "#f7f4ef",
+    color: "#1c1a17",
+    padding: "28px 20px 56px",
   },
-  header: { marginBottom: 20 },
-  filters: {
+  header: {
+    maxWidth: 1180,
+    margin: "0 auto 20px",
     display: "flex",
-    gap: 10,
-    marginBottom: 20,
+    justifyContent: "space-between",
+    alignItems: "end",
+    gap: 16,
+  },
+  eyebrow: {
+    color: "#9f1d2f",
+    fontSize: 12,
+    fontWeight: 850,
+    textTransform: "uppercase",
+  },
+  title: {
+    marginTop: 4,
+    fontSize: "clamp(36px, 5vw, 58px)",
+    lineHeight: 1,
+  },
+  headerStat: {
+    background: "#1c1a17",
+    color: "#fffdf8",
+    borderRadius: 8,
+    padding: "14px 18px",
+    display: "grid",
+    gap: 4,
+    minWidth: 150,
+  },
+  filters: {
+    maxWidth: 1180,
+    margin: "0 auto 18px",
+    display: "flex",
+    gap: 8,
     flexWrap: "wrap",
   },
   filterBtn: {
-    padding: "10px 18px",
+    border: "1px solid rgba(28, 26, 23, 0.12)",
     borderRadius: 999,
-    border: "1px solid #ddd",
+    background: "#fffdf8",
+    color: "#514a43",
+    padding: "10px 13px",
     cursor: "pointer",
-    fontWeight: 600,
-    fontSize: 16,
+    fontWeight: 850,
+    textTransform: "capitalize",
+  },
+  filterBtnActive: {
+    background: "#1c1a17",
+    color: "#fffdf8",
+    borderColor: "#1c1a17",
+  },
+  filterCount: {
+    marginLeft: 6,
+    opacity: 0.72,
   },
   grid: {
+    maxWidth: 1180,
+    margin: "0 auto",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: 16,
+    gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
+    gap: 14,
   },
   card: {
-    background: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
-    minHeight: 250,
+    background: "#fffdf8",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    padding: 18,
+    boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
   },
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    gap: 12,
+    alignItems: "start",
   },
-  cardInfo: {
-    flex: 1,
-    minWidth: 0,
+  orderId: {
+    fontSize: 20,
+    fontWeight: 850,
+  },
+  time: {
+    marginTop: 4,
+    color: "#766e64",
+    fontSize: 13,
   },
   badge: {
-    color: "#fff",
-    padding: "4px 10px",
     borderRadius: 999,
+    padding: "7px 10px",
     fontSize: 12,
-    fontWeight: "bold",
-    width: 100,
-    textAlign: "center",
-    flexShrink: 0,
+    fontWeight: 850,
+    textTransform: "capitalize",
+    whiteSpace: "nowrap",
   },
-  subText: { fontSize: 12, color: "#666", marginTop: 4 },
-  text: { margin: "4px 0", fontSize: 14, color: "#333" },
+  customerBox: {
+    marginTop: 16,
+    display: "grid",
+    gap: 4,
+    color: "#514a43",
+    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
+    paddingTop: 14,
+  },
+  itemsBox: {
+    marginTop: 16,
+    display: "grid",
+    gap: 8,
+  },
   itemRow: {
     display: "flex",
     justifyContent: "space-between",
+    gap: 14,
+    padding: "7px 0",
+    borderBottom: "1px dashed rgba(28, 26, 23, 0.16)",
     fontSize: 14,
-    padding: "4px 0",
-    borderBottom: "1px dashed #eee",
   },
-  total: { marginTop: 10, fontSize: 16 },
-  actions: { display: "flex", gap: 8, marginTop: 14 },
-  btnYellow: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 12,
-    border: "none",
-    background: "#f59e0b",
-    color: "#fff",
-    fontSize: 16,
-    cursor: "pointer",
+  muted: {
+    color: "#766e64",
   },
-  btnBlue: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 12,
+  total: {
+    marginTop: 16,
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: 18,
+  },
+  actions: {
+    marginTop: 16,
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+  },
+  actionSecondary: {
     border: "none",
-    background: "#3b82f6",
-    color: "#fff",
-    fontSize: 16,
+    borderRadius: 999,
+    background: "#f0ebe2",
+    color: "#1c1a17",
+    padding: 12,
     cursor: "pointer",
+    fontWeight: 850,
+  },
+  actionPrimary: {
+    border: "none",
+    borderRadius: 999,
+    background: "#9f1d2f",
+    color: "#fff",
+    padding: 12,
+    cursor: "pointer",
+    fontWeight: 850,
+  },
+  emptyState: {
+    maxWidth: 1180,
+    margin: "0 auto",
+    background: "#fffdf8",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    padding: 28,
+    color: "#625b53",
   },
 };
