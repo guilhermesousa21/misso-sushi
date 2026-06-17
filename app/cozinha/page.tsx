@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 
@@ -21,14 +21,18 @@ type Order = {
   total?: number;
   status: string;
   created_at: string;
+  payment_method?: string;
+  payment_status?: string;
 };
 
-const statuses = ["todos", "recebido", "preparando", "pronto"];
+const statuses = ["todos", "recebido", "preparando", "pronto", "entregue", "retirado"];
 
 const statusStyle: Record<string, CSSProperties> = {
   recebido: { background: "#fee2e2", color: "#991b1b" },
   preparando: { background: "#fef3c7", color: "#92400e" },
   pronto: { background: "#dbeafe", color: "#1e40af" },
+  entregue: { background: "#dcfce7", color: "#166534" },
+  retirado: { background: "#e0e7ff", color: "#3730a3" },
 };
 
 const money = (value: number) =>
@@ -43,10 +47,33 @@ const calcTotal = (items: OrderItem[]) =>
     0
   );
 
+const minutesSince = (value: string) =>
+  Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+
+const playNotification = () => {
+  const AudioContextClass =
+    window.AudioContext ||
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  const audio = new AudioContextClass();
+  const oscillator = audio.createOscillator();
+  const gain = audio.createGain();
+  oscillator.connect(gain);
+  gain.connect(audio.destination);
+  oscillator.frequency.value = 880;
+  gain.gain.value = 0.08;
+  oscillator.start();
+  oscillator.stop(audio.currentTime + 0.18);
+};
+
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
   const isMobile = useMediaQuery("(max-width: 720px)");
   const [filter, setFilter] = useState("todos");
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const previousOrderIds = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     let mounted = true;
@@ -62,6 +89,17 @@ export default function AdminPanel() {
           ...order,
           items: Array.isArray(order.items) ? order.items : [],
         }));
+
+        const nextIds = new Set(safeData.map((order) => order.id));
+        const hasNewOrder =
+          previousOrderIds.current.size > 0 &&
+          safeData.some((order) => !previousOrderIds.current.has(order.id));
+        previousOrderIds.current = nextIds;
+
+        if (hasNewOrder && soundEnabled) {
+          playNotification();
+        }
+
         setOrders(safeData);
       }
     };
@@ -83,7 +121,7 @@ export default function AdminPanel() {
       mounted = false;
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [soundEnabled]);
 
   async function updateStatus(id: number, status: string) {
     if (status === "pronto") {
@@ -102,10 +140,16 @@ export default function AdminPanel() {
     filter === "todos" ? orders : orders.filter((order) => order.status === filter);
 
   const sorted = [...filtered].sort((a, b) => {
-    if (a.status === "pronto" && b.status !== "pronto") return 1;
-    if (b.status === "pronto" && a.status !== "pronto") return -1;
+    const aDone = ["pronto", "entregue", "retirado"].includes(a.status);
+    const bDone = ["pronto", "entregue", "retirado"].includes(b.status);
+    if (aDone && !bDone) return 1;
+    if (bDone && !aDone) return -1;
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
+
+  const activeOrders = orders.filter(
+    (order) => !["entregue", "retirado"].includes(order.status)
+  );
 
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
@@ -116,11 +160,21 @@ export default function AdminPanel() {
         </div>
         <div style={styles.headerStat}>
           <span>Pedidos ativos</span>
-          <strong>{orders.filter((order) => order.status !== "pronto").length}</strong>
+          <strong>{activeOrders.length}</strong>
         </div>
       </header>
 
       <nav style={styles.filters} aria-label="Filtrar pedidos">
+        <button
+          type="button"
+          onClick={() => {
+            setSoundEnabled(true);
+            playNotification();
+          }}
+          style={{ ...styles.filterBtn, ...(soundEnabled ? styles.filterBtnActive : {}) }}
+        >
+          Som {soundEnabled ? "ativo" : "ativar"}
+        </button>
         {statuses.map((status) => {
           const count =
             status === "todos"
@@ -151,13 +205,23 @@ export default function AdminPanel() {
       ) : (
         <section style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
           {sorted.map((order) => (
-            <article key={order.id} style={styles.card}>
+            <article
+              key={order.id}
+              style={{
+                ...styles.card,
+                ...(minutesSince(order.created_at) > 35 &&
+                !["pronto", "entregue", "retirado"].includes(order.status)
+                  ? styles.cardDelayed
+                  : {}),
+              }}
+            >
               <div style={styles.cardHeader}>
                 <div>
                   <p style={styles.orderId}>Pedido #{order.id}</p>
                   <p style={styles.time}>
                     {new Date(order.created_at).toLocaleString("pt-BR")}
                   </p>
+                  <p style={styles.time}>{minutesSince(order.created_at)} min na fila</p>
                 </div>
                 <span
                   style={{
@@ -172,6 +236,11 @@ export default function AdminPanel() {
               <div style={styles.customerBox}>
                 <strong>{order.name || "Cliente"}</strong>
                 <span>{order.phone || "Telefone não informado"}</span>
+                <span>Retirada no balcão</span>
+                <span>
+                  Pagamento: {(order.payment_method || "pendente").toUpperCase()} -{" "}
+                  {order.payment_status || "pendente"}
+                </span>
                 {order.note && <p>Obs: {order.note}</p>}
               </div>
 
@@ -200,6 +269,13 @@ export default function AdminPanel() {
                 <button
                   type="button"
                   style={styles.actionSecondary}
+                  onClick={() => window.print()}
+                >
+                  Imprimir
+                </button>
+                <button
+                  type="button"
+                  style={styles.actionSecondary}
                   onClick={() => updateStatus(order.id, "preparando")}
                 >
                   Preparando
@@ -210,6 +286,13 @@ export default function AdminPanel() {
                   onClick={() => updateStatus(order.id, "pronto")}
                 >
                   Pronto
+                </button>
+                <button
+                  type="button"
+                  style={styles.actionPrimary}
+                  onClick={() => updateStatus(order.id, "retirado")}
+                >
+                  Finalizar
                 </button>
               </div>
             </article>
@@ -305,6 +388,10 @@ const styles: Record<string, CSSProperties> = {
     padding: 18,
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
   },
+  cardDelayed: {
+    borderColor: "rgba(153, 27, 27, 0.28)",
+    boxShadow: "0 14px 35px rgba(153, 27, 27, 0.12)",
+  },
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -361,7 +448,7 @@ const styles: Record<string, CSSProperties> = {
   actions: {
     marginTop: 16,
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
     gap: 8,
   },
   actionsMobile: {

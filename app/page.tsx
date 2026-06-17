@@ -5,6 +5,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
+import {
+  getBusinessHours,
+  getNextOpeningLabel,
+  getTodayBusinessHoursLabel,
+  isWithinBusinessHours,
+  weeklyBusinessHours,
+  type BusinessHours,
+} from "../lib/storeHours";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { MenuItem } from "../types";
 import { useCart } from "./context/CartContext";
@@ -81,6 +89,11 @@ export default function Page() {
   const [activeCategory, setActiveCategory] = useState("");
   const [items, setItems] = useState<MenuItem[]>([]);
   const { addToCart, cart, increase, decrease, total } = useCart();
+  const [storeOpen, setStoreOpen] = useState(true);
+  const [manualOpen, setManualOpen] = useState(true);
+  const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
+  const [averageTime, setAverageTime] = useState("35 a 50 min");
+  const [topItems, setTopItems] = useState<Record<number, number>>({});
 
   useEffect(() => {
     async function fetchMenu() {
@@ -94,6 +107,40 @@ export default function Page() {
     }
 
     fetchMenu();
+  }, []);
+
+  useEffect(() => {
+    async function fetchOperationalData() {
+      const { data: settings } = await supabase
+        .from("store_settings")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+
+      if (settings) {
+        const manuallyOpen = settings.is_open !== false;
+        const savedBusinessHours = getBusinessHours(settings.business_hours);
+        setBusinessHours(savedBusinessHours);
+        setManualOpen(manuallyOpen);
+        setStoreOpen(manuallyOpen && isWithinBusinessHours(new Date(), savedBusinessHours));
+        if (settings.average_time) setAverageTime(String(settings.average_time));
+      } else {
+        setStoreOpen(isWithinBusinessHours(new Date(), weeklyBusinessHours));
+      }
+
+      const { data: orders } = await supabase.from("orders").select("items").limit(200);
+      if (orders) {
+        const ranking = new Map<number, number>();
+        orders.forEach((order: { items?: CartLine[] }) => {
+          (Array.isArray(order.items) ? order.items : []).forEach((item) => {
+            ranking.set(item.id, (ranking.get(item.id) || 0) + (item.quantity || 1));
+          });
+        });
+        setTopItems(Object.fromEntries(ranking.entries()));
+      }
+    }
+
+    fetchOperationalData();
   }, []);
 
   const groupedItems = useMemo(
@@ -126,7 +173,7 @@ export default function Page() {
   };
 
   const handleCheckout = () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || !storeOpen) return;
     sessionStorage.setItem("order", JSON.stringify({ items: cart, total }));
     setOpenCart(false);
     router.push("/checkout");
@@ -142,6 +189,14 @@ export default function Page() {
           <div>
             <p style={styles.eyebrow}>Cardápio online</p>
             <h1 style={styles.brand}>Missô Sushi</h1>
+            <p style={styles.headerStatus}>
+              {storeOpen
+                ? `Aberto - tempo médio de preparo ${averageTime}`
+                : "Loja fechada no momento"}
+            </p>
+            <p style={styles.headerStatus}>
+              {getTodayBusinessHoursLabel(new Date(), businessHours)}
+            </p>
           </div>
           <button
             type="button"
@@ -160,16 +215,25 @@ export default function Page() {
           <div style={styles.introCopy}>
             <p style={styles.kicker}>Sushi, sashimi e pratos japoneses</p>
             <h2 style={styles.title}>Escolha seus pratos favoritos</h2>
-            <p style={styles.subtitle}>
-              Cardápio organizado por categorias, com preparo artesanal e pedido
-              direto pelo site.
-            </p>
+            {!storeOpen && (
+              <p style={styles.closedNotice}>
+                {manualOpen
+                  ? `A loja esta fechada no momento e ${getNextOpeningLabel(
+                      new Date(),
+                      businessHours
+                    )}.`
+                  : `A loja esta fechada manualmente e ${getNextOpeningLabel(
+                      new Date(),
+                      businessHours
+                    )}.`}
+              </p>
+            )}
           </div>
           <div style={{ ...styles.summaryPanel, ...(isMobile ? styles.summaryPanelMobile : {}) }}>
             <span style={styles.summaryLabel}>Seu pedido</span>
             <strong style={styles.summaryValue}>{money(total)}</strong>
             <span style={styles.summaryNote}>
-              {itemCount === 0 ? "Carrinho vazio" : `${itemCount} item(ns)`}
+              {itemCount === 0 ? "Carrinho vazio" : `${itemCount} itens`}
             </span>
           </div>
         </div>
@@ -213,18 +277,29 @@ export default function Page() {
                   </h3>
                 </div>
                 <span style={styles.sectionCount}>
-                  {itemsInCategory.length} item(ns)
+                  {itemsInCategory.length} itens
                 </span>
               </div>
 
               <div style={styles.menuGrid}>
                 {itemsInCategory.map((item) => {
                   const quantity = getQuantity(item.id);
+                  const unavailable =
+                    item.active === false ||
+                    item.available === false ||
+                    item.unavailable === true ||
+                    item.availability_status === "esgotado" ||
+                    item.availability_status === "inativo";
+                  const isPopular = (topItems[item.id] || 0) > 0;
 
                   return (
                     <article
                       key={item.id}
-                      style={{ ...styles.menuCard, ...(isMobile ? styles.menuCardMobile : {}) }}
+                      style={{
+                        ...styles.menuCard,
+                        ...(isMobile ? styles.menuCardMobile : {}),
+                        ...(unavailable ? styles.menuCardUnavailable : {}),
+                      }}
                     >
                       <div style={{ ...styles.imageWrap, ...(isMobile ? styles.imageWrapMobile : {}) }}>
                         {item.image ? (
@@ -245,6 +320,12 @@ export default function Page() {
                       <div style={styles.cardBody}>
                         <div>
                           <h4 style={styles.itemName}>{item.name}</h4>
+                          <div style={styles.badgeLine}>
+                            {isPopular && <span style={styles.itemBadge}>Mais pedido</span>}
+                            {unavailable && (
+                              <span style={styles.unavailableBadge}>Indisponivel</span>
+                            )}
+                          </div>
                           {item.description && (
                             <p style={styles.itemDescription}>
                               {item.description}
@@ -261,9 +342,13 @@ export default function Page() {
                             <button
                               type="button"
                               onClick={() => addToCart(item)}
-                              style={styles.addButton}
+                              disabled={unavailable || !storeOpen}
+                              style={{
+                                ...styles.addButton,
+                                ...(unavailable || !storeOpen ? styles.addButtonDisabled : {}),
+                              }}
                             >
-                              Adicionar
+                              {unavailable ? "Esgotado" : "Adicionar"}
                             </button>
                           ) : (
                             <div style={styles.quantityControl}>
@@ -343,7 +428,7 @@ export default function Page() {
               ) : (
                 cart.map((item: CartLine) => (
                   <div key={item.id} style={styles.cartItem}>
-                    <div>
+                    <div style={styles.cartItemMain}>
                       <strong style={styles.cartItemName}>{item.name}</strong>
                       <p style={styles.cartItemPrice}>
                         {money(item.price * item.quantity)}
@@ -384,10 +469,10 @@ export default function Page() {
               <button
                 type="button"
                 onClick={handleCheckout}
-                disabled={cart.length === 0}
+                disabled={cart.length === 0 || !storeOpen}
                 style={{
                   ...styles.checkoutButton,
-                  ...(cart.length === 0 ? styles.checkoutButtonDisabled : {}),
+                  ...(cart.length === 0 || !storeOpen ? styles.checkoutButtonDisabled : {}),
                 }}
               >
                 Finalizar pedido
@@ -440,6 +525,12 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1,
     fontWeight: 800,
   },
+  headerStatus: {
+    marginTop: 5,
+    color: "#625b53",
+    fontSize: 13,
+    fontWeight: 750,
+  },
   headerCartButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
     background: "#fffdf8",
@@ -465,7 +556,6 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
   },
   intro: {
-    borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
   },
   introInner: {
     maxWidth: 1120,
@@ -492,12 +582,14 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     maxWidth: 720,
   },
-  subtitle: {
+  closedNotice: {
     marginTop: 14,
-    color: "#625b53",
-    fontSize: 16,
-    lineHeight: 1.6,
-    maxWidth: 560,
+    borderRadius: 8,
+    background: "#fee2e2",
+    color: "#991b1b",
+    padding: 12,
+    fontWeight: 800,
+    lineHeight: 1.45,
   },
   summaryPanel: {
     background: "#1c1a17",
@@ -606,6 +698,9 @@ const styles: Record<string, CSSProperties> = {
     overflow: "hidden",
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
   },
+  menuCardUnavailable: {
+    opacity: 0.62,
+  },
   menuCardMobile: {
     gridTemplateColumns: "104px minmax(0, 1fr)",
     minHeight: 150,
@@ -643,6 +738,29 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.25,
     fontWeight: 800,
   },
+  badgeLine: {
+    minHeight: 24,
+    marginTop: 7,
+    display: "flex",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  itemBadge: {
+    borderRadius: 999,
+    background: "#dbeafe",
+    color: "#1e40af",
+    padding: "4px 8px",
+    fontSize: 11,
+    fontWeight: 850,
+  },
+  unavailableBadge: {
+    borderRadius: 999,
+    background: "#fee2e2",
+    color: "#991b1b",
+    padding: "4px 8px",
+    fontSize: 11,
+    fontWeight: 850,
+  },
   itemDescription: {
     marginTop: 7,
     color: "#625b53",
@@ -671,6 +789,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     cursor: "pointer",
     whiteSpace: "nowrap",
+  },
+  addButtonDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
   },
   quantityControl: {
     height: 38,
@@ -785,6 +907,11 @@ const styles: Record<string, CSSProperties> = {
     gap: 16,
     padding: "14px 0",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
+  },
+  cartItemMain: {
+    minWidth: 0,
+    display: "grid",
+    gap: 6,
   },
   cartItemName: {
     display: "block",

@@ -8,5 +8,10 @@ export type MenuItem = {
   sort_order?: number | null;
   description?: string;
   image?: string;
+  active?: boolean | null;
+  available?: boolean | null;
+  unavailable?: boolean | null;
+  availability_status?: string | null;
+  featured?: boolean | null;
   created_at?: string;
 };

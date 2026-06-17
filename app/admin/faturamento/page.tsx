@@ -53,7 +53,6 @@ type RangePreset = "7d" | "30d" | "90d" | "all";
 const paymentLabels: Record<string, string> = {
   pix: "PIX",
   card: "Cartão",
-  dinheiro: "Dinheiro",
   pending: "Não informado",
 };
 
@@ -288,7 +287,7 @@ export default function FaturamentoPage() {
     },
   };
 
-  const paymentOptions = Array.from(new Set(orders.map(getPayment)));
+  const paymentOptions = ["pix", "card"];
 
   return (
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
@@ -298,11 +297,29 @@ export default function FaturamentoPage() {
           <p style={styles.sidebarMuted}>Gestão operacional</p>
         </div>
         <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}) }}>
+          <AdminLink href="/admin/menu" pathname={pathname}>
+            Cardápio
+          </AdminLink>
           <AdminLink href="/admin/faturamento" pathname={pathname}>
             Faturamento
           </AdminLink>
-          <AdminLink href="/admin/menu" pathname={pathname}>
-            Cardápio
+          <AdminLink href="/admin" pathname={pathname}>
+            Visão geral
+          </AdminLink>
+          <AdminLink href="/admin/pedidos" pathname={pathname}>
+            Pedidos
+          </AdminLink>
+          <AdminLink href="/admin/clientes" pathname={pathname}>
+            Clientes
+          </AdminLink>
+          <AdminLink href="/admin/pagamentos" pathname={pathname}>
+            Pagamentos
+          </AdminLink>
+          <AdminLink href="/admin/promocoes" pathname={pathname}>
+            Promoções
+          </AdminLink>
+          <AdminLink href="/admin/configuracoes" pathname={pathname}>
+            Configurações
           </AdminLink>
         </nav>
       </aside>

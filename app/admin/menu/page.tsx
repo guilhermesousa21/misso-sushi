@@ -10,6 +10,7 @@ import { supabase } from "../../../lib/supabase";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
 import { MenuItem } from "../../../types";
 
+type EditableMenuItem = MenuItem & { isNew?: boolean };
 type DeletedMenuItem = MenuItem & { deleted: true };
 type DragState =
   | { type: "category"; category: string }
@@ -123,12 +124,11 @@ export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const isMobile = useMediaQuery("(max-width: 760px)");
   const isTablet = useMediaQuery("(max-width: 1040px)");
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [editingItem, setEditingItem] = useState<EditableMenuItem | null>(null);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [dragged, setDragged] = useState<DragState | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
-  const [addingItem, setAddingItem] = useState(false);
   const pathname = usePathname();
   const canReorder = !search.trim() && !filterCategory;
 
@@ -146,37 +146,19 @@ export default function AdminMenuPage() {
     fetchMenu();
   }, []);
 
-  const handleAddItem = async () => {
-    if (addingItem) return;
-    setAddingItem(true);
-
-    try {
-      const { data, error } = await supabase
-        .from("menu")
-        .insert([
-          {
-            name: "Novo item",
-            price: 0,
-            category: "entradas",
-            category_order: getFallbackCategoryOrder("entradas"),
-            sort_order: items.filter((item) => item.category === "entradas").length,
-            description: "",
-          },
-        ])
-        .select();
-
-      if (error) {
-        toast.error("Erro ao adicionar item: " + error.message);
-        return;
-      }
-
-      if (data) {
-        setItems((current) => uniqueById([data[0] as MenuItem, ...current]));
-        toast.success("Item criado.");
-      }
-    } finally {
-      setAddingItem(false);
-    }
+  const handleAddItem = () => {
+    setEditingItem({
+      id: 0,
+      name: "",
+      price: 0,
+      category: "entradas",
+      category_order: getFallbackCategoryOrder("entradas"),
+      sort_order: items.filter((item) => item.category === "entradas").length,
+      description: "",
+      active: true,
+      availability_status: "ativo",
+      isNew: true,
+    });
   };
 
   const persistCategoryOrder = async (orderedCategories: string[]) => {
@@ -317,11 +299,29 @@ export default function AdminMenuPage() {
       <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}) }}>
         <h2 style={styles.sidebarTitle}>Missô Admin</h2>
         <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}) }}>
+          <AdminLink href="/admin/menu" pathname={pathname}>
+            Cardápio
+          </AdminLink>
           <AdminLink href="/admin/faturamento" pathname={pathname}>
             Faturamento
           </AdminLink>
-          <AdminLink href="/admin/menu" pathname={pathname}>
-            Cardápio
+          <AdminLink href="/admin" pathname={pathname}>
+            Visão geral
+          </AdminLink>
+          <AdminLink href="/admin/pedidos" pathname={pathname}>
+            Pedidos
+          </AdminLink>
+          <AdminLink href="/admin/clientes" pathname={pathname}>
+            Clientes
+          </AdminLink>
+          <AdminLink href="/admin/pagamentos" pathname={pathname}>
+            Pagamentos
+          </AdminLink>
+          <AdminLink href="/admin/promocoes" pathname={pathname}>
+            Promoções
+          </AdminLink>
+          <AdminLink href="/admin/configuracoes" pathname={pathname}>
+            Configurações
           </AdminLink>
         </nav>
       </aside>
@@ -335,13 +335,9 @@ export default function AdminMenuPage() {
           <button
             type="button"
             onClick={handleAddItem}
-            disabled={addingItem}
-            style={{
-              ...styles.primaryButton,
-              ...(addingItem ? styles.primaryButtonDisabled : {}),
-            }}
+            style={styles.primaryButton}
           >
-            {addingItem ? "Criando..." : "Adicionar item"}
+            Adicionar item
           </button>
         </header>
 
@@ -402,7 +398,7 @@ export default function AdminMenuPage() {
                       </h2>
                     </div>
                   </div>
-                  <span style={styles.pill}>{itemsInCategory.length} item(ns)</span>
+                  <span style={styles.pill}>{itemsInCategory.length} itens</span>
                 </div>
 
                 <div style={styles.itemList}>
@@ -472,9 +468,14 @@ export default function AdminMenuPage() {
             if ("deleted" in updated) {
               setItems((current) => current.filter((item) => item.id !== updated.id));
             } else {
-              setItems((current) =>
-                uniqueById(current.map((item) => (item.id === updated.id ? updated : item)))
-              );
+              setItems((current) => {
+                const exists = current.some((item) => item.id === updated.id);
+                return uniqueById(
+                  exists
+                    ? current.map((item) => (item.id === updated.id ? updated : item))
+                    : [updated, ...current]
+                );
+              });
             }
             setEditingItem(null);
           }}
@@ -508,17 +509,18 @@ function EditModal({
   onClose,
   onSave,
 }: {
-  item: MenuItem;
+  item: EditableMenuItem;
   compact: boolean;
   onClose: () => void;
   onSave: (item: MenuItem | DeletedMenuItem) => void;
 }) {
-  const [form, setForm] = useState<MenuItem>(item);
+  const [form, setForm] = useState<EditableMenuItem>(item);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const isNewItem = Boolean(item.isNew);
 
   useEffect(() => {
     return () => {
@@ -575,19 +577,25 @@ function EditModal({
     setSaving(true);
 
     try {
-      const { data, error } = await supabase
-        .from("menu")
-        .update({
-          name: form.name.trim(),
-          price: Number(form.price),
-          category: form.category,
-          category_order: form.category_order ?? getFallbackCategoryOrder(form.category),
-          sort_order: form.sort_order ?? 0,
-          description: form.description,
-          image: form.image || null,
-        })
-        .eq("id", Number(form.id))
-        .select();
+      const payload = {
+        name: form.name.trim(),
+        price: Number(form.price),
+        category: form.category,
+        category_order: form.category_order ?? getFallbackCategoryOrder(form.category),
+        sort_order: form.sort_order ?? 0,
+        description: form.description,
+        image: form.image || null,
+        active: form.active !== false && form.availability_status !== "inativo",
+        availability_status: form.availability_status || "ativo",
+      };
+
+      const { data, error } = isNewItem
+        ? await supabase.from("menu").insert([payload]).select()
+        : await supabase
+            .from("menu")
+            .update(payload)
+            .eq("id", Number(form.id))
+            .select();
 
       if (error) {
         toast.error("Erro ao salvar: " + error.message);
@@ -595,7 +603,7 @@ function EditModal({
       }
       if (data && data.length > 0) {
         onSave(data[0] as MenuItem);
-        toast.success("Item atualizado.");
+        toast.success(isNewItem ? "Item criado." : "Item atualizado.");
       }
     } finally {
       setSaving(false);
@@ -603,6 +611,11 @@ function EditModal({
   };
 
   const handleDelete = async () => {
+    if (isNewItem) {
+      onClose();
+      return;
+    }
+
     if (!confirmDelete) {
       setConfirmDelete(true);
       return;
@@ -632,7 +645,7 @@ function EditModal({
         <div style={{ ...styles.modalHeader, ...(compact ? styles.modalHeaderCompact : {}) }}>
           <div>
             <p style={styles.cardEyebrow}>Cardápio</p>
-            <h2 style={styles.modalTitle}>Editar item</h2>
+            <h2 style={styles.modalTitle}>{isNewItem ? "Adicionar item" : "Editar item"}</h2>
           </div>
           <button type="button" onClick={onClose} style={styles.closeButton}>
             Fechar
@@ -692,6 +705,27 @@ function EditModal({
                       {categoryLabels[category]}
                     </option>
                   ))}
+                </select>
+              </label>
+
+              <label style={styles.field}>
+                <span style={styles.label}>Disponibilidade</span>
+                <select
+                  value={form.availability_status || (form.active === false ? "inativo" : "ativo")}
+                  onChange={(event) => {
+                    const availability_status = event.target.value;
+                    setConfirmDelete(false);
+                    setForm({
+                      ...form,
+                      availability_status,
+                      active: availability_status !== "inativo",
+                    });
+                  }}
+                  style={styles.select}
+                >
+                  <option value="ativo">Ativo</option>
+                  <option value="esgotado">Esgotado</option>
+                  <option value="inativo">Inativo</option>
                 </select>
               </label>
             </div>
@@ -776,7 +810,13 @@ function EditModal({
               ...(confirmDelete ? styles.deleteButtonConfirm : {}),
             }}
           >
-            {deleting ? "Excluindo..." : confirmDelete ? "Confirmar exclusão" : "Excluir"}
+            {isNewItem
+              ? "Cancelar"
+              : deleting
+              ? "Excluindo..."
+              : confirmDelete
+              ? "Confirmar exclusão"
+              : "Excluir"}
           </button>
           <button
             type="button"
@@ -787,7 +827,7 @@ function EditModal({
               ...(!canSave ? styles.primaryButtonDisabled : {}),
             }}
           >
-            {saving ? "Salvando..." : "Salvar alterações"}
+            {saving ? "Salvando..." : isNewItem ? "Criar item" : "Salvar alterações"}
           </button>
         </div>
       </div>
