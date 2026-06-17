@@ -15,3 +15,10 @@ export type MenuItem = {
   featured?: boolean | null;
   created_at?: string;
 };
+
+export type OrderDiscount = {
+  subtotal?: number | null;
+  discount_amount?: number | null;
+  coupon_code?: string | null;
+  promotion_id?: number | null;
+};

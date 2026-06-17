@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
+import { printOrder } from "../../lib/printOrder";
 import { supabase } from "../../lib/supabase";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 
@@ -19,18 +20,19 @@ type Order = {
   items: OrderItem[];
   note?: string;
   total?: number;
+  subtotal?: number;
+  discount_amount?: number;
+  coupon_code?: string;
   status: string;
   created_at: string;
   payment_method?: string;
   payment_status?: string;
 };
 
-const statuses = ["todos", "recebido", "preparando", "pronto", "entregue", "retirado"];
+const statuses = ["todos", "recebido", "entregue", "retirado"];
 
 const statusStyle: Record<string, CSSProperties> = {
   recebido: { background: "#fee2e2", color: "#991b1b" },
-  preparando: { background: "#fef3c7", color: "#92400e" },
-  pronto: { background: "#dbeafe", color: "#1e40af" },
   entregue: { background: "#dcfce7", color: "#166534" },
   retirado: { background: "#e0e7ff", color: "#3730a3" },
 };
@@ -46,6 +48,12 @@ const calcTotal = (items: OrderItem[]) =>
     (sum, item) => sum + item.price * (item.quantity ?? 1),
     0
   );
+
+const paymentLabel = (order: Order) => {
+  const status = order.payment_status || "pendente";
+  if (!order.payment_method) return `Pagamento: ${status}`;
+  return `Pagamento: ${order.payment_method.toUpperCase()} - ${status}`;
+};
 
 const minutesSince = (value: string) =>
   Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
@@ -91,13 +99,19 @@ export default function AdminPanel() {
         }));
 
         const nextIds = new Set(safeData.map((order) => order.id));
+        const newOrders = safeData.filter(
+          (order) => !previousOrderIds.current.has(order.id)
+        );
         const hasNewOrder =
           previousOrderIds.current.size > 0 &&
-          safeData.some((order) => !previousOrderIds.current.has(order.id));
+          newOrders.length > 0;
         previousOrderIds.current = nextIds;
 
         if (hasNewOrder && soundEnabled) {
           playNotification();
+        }
+        if (hasNewOrder) {
+          newOrders.forEach((order) => printOrder(order));
         }
 
         setOrders(safeData);
@@ -124,8 +138,13 @@ export default function AdminPanel() {
   }, [soundEnabled]);
 
   async function updateStatus(id: number, status: string) {
-    if (status === "pronto") {
-      const confirm = window.confirm("Confirmar que o pedido está pronto?");
+    if (status === "retirado") {
+      const confirm = window.confirm("Finalizar este pedido como retirado?");
+      if (!confirm) return;
+    }
+
+    if (status === "recebido") {
+      const confirm = window.confirm("Reverter este pedido para recebido?");
       if (!confirm) return;
     }
 
@@ -140,8 +159,8 @@ export default function AdminPanel() {
     filter === "todos" ? orders : orders.filter((order) => order.status === filter);
 
   const sorted = [...filtered].sort((a, b) => {
-    const aDone = ["pronto", "entregue", "retirado"].includes(a.status);
-    const bDone = ["pronto", "entregue", "retirado"].includes(b.status);
+    const aDone = ["entregue", "retirado"].includes(a.status);
+    const bDone = ["entregue", "retirado"].includes(b.status);
     if (aDone && !bDone) return 1;
     if (bDone && !aDone) return -1;
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
@@ -210,7 +229,7 @@ export default function AdminPanel() {
               style={{
                 ...styles.card,
                 ...(minutesSince(order.created_at) > 35 &&
-                !["pronto", "entregue", "retirado"].includes(order.status)
+                !["entregue", "retirado"].includes(order.status)
                   ? styles.cardDelayed
                   : {}),
               }}
@@ -237,10 +256,7 @@ export default function AdminPanel() {
                 <strong>{order.name || "Cliente"}</strong>
                 <span>{order.phone || "Telefone não informado"}</span>
                 <span>Retirada no balcão</span>
-                <span>
-                  Pagamento: {(order.payment_method || "pendente").toUpperCase()} -{" "}
-                  {order.payment_status || "pendente"}
-                </span>
+                <span>{paymentLabel(order)}</span>
                 {order.note && <p>Obs: {order.note}</p>}
               </div>
 
@@ -269,31 +285,27 @@ export default function AdminPanel() {
                 <button
                   type="button"
                   style={styles.actionSecondary}
-                  onClick={() => window.print()}
+                  onClick={() => printOrder(order)}
                 >
                   Imprimir
                 </button>
-                <button
-                  type="button"
-                  style={styles.actionSecondary}
-                  onClick={() => updateStatus(order.id, "preparando")}
-                >
-                  Preparando
-                </button>
-                <button
-                  type="button"
-                  style={styles.actionPrimary}
-                  onClick={() => updateStatus(order.id, "pronto")}
-                >
-                  Pronto
-                </button>
-                <button
-                  type="button"
-                  style={styles.actionPrimary}
-                  onClick={() => updateStatus(order.id, "retirado")}
-                >
-                  Finalizar
-                </button>
+                {order.status === "retirado" ? (
+                  <button
+                    type="button"
+                    style={styles.actionSecondary}
+                    onClick={() => updateStatus(order.id, "recebido")}
+                  >
+                    Reverter
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    style={styles.actionPrimary}
+                    onClick={() => updateStatus(order.id, "retirado")}
+                  >
+                    Finalizar
+                  </button>
+                )}
               </div>
             </article>
           ))}

@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { printOrder } from "../../../lib/printOrder";
 import { supabase } from "../../../lib/supabase";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
 import {
@@ -16,13 +17,11 @@ import {
   type AdminOrder,
 } from "../AdminShell";
 
-const statuses = ["todos", "recebido", "preparando", "pronto", "retirado"];
+const statuses = ["todos", "recebido", "retirado"];
 
 const statusLabels: Record<string, string> = {
   todos: "Todos",
   recebido: "Recebido",
-  preparando: "Preparando",
-  pronto: "Pronto",
   retirado: "Retirado",
 };
 
@@ -84,6 +83,16 @@ export default function AdminOrdersPage() {
   }, [orders, search, status]);
 
   async function updateStatus(orderId: number | string, nextStatus: string) {
+    if (nextStatus === "retirado") {
+      const confirm = window.confirm("Finalizar este pedido como retirado?");
+      if (!confirm) return;
+    }
+
+    if (nextStatus === "recebido") {
+      const confirm = window.confirm("Reverter este pedido para recebido?");
+      if (!confirm) return;
+    }
+
     await supabase.from("orders").update({ status: nextStatus }).eq("id", orderId);
     setOrders((current) =>
       current.map((order) =>
@@ -155,26 +164,31 @@ export default function AdminOrdersPage() {
             <div style={localStyles.statusBar}>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => printOrder(order)}
                 style={localStyles.statusButton}
               >
                 Imprimir
               </button>
-              {statuses.slice(1).map((option) => (
+              {(order.status || "recebido") === "retirado" ? (
                 <button
-                  key={option}
                   type="button"
-                  onClick={() => updateStatus(order.id, option)}
+                  onClick={() => updateStatus(order.id, "recebido")}
+                  style={localStyles.statusButton}
+                >
+                  Reverter
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => updateStatus(order.id, "retirado")}
                   style={{
                     ...localStyles.statusButton,
-                    ...((order.status || "recebido") === option
-                      ? localStyles.statusButtonActive
-                      : {}),
+                    ...localStyles.statusButtonActive,
                   }}
                 >
-                  {statusLabels[option]}
+                  Finalizar
                 </button>
-              ))}
+              )}
             </div>
           </article>
         ))}

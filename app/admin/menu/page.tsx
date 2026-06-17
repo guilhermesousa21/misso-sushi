@@ -6,6 +6,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "react-hot-toast";
+import {
+  defaultMenuCategories,
+  getCategoryLabel,
+  getCategoryOrder,
+  normalizeCategorySlug,
+  sortCategories,
+  type MenuCategory,
+} from "../../../lib/menuCategories";
 import { supabase } from "../../../lib/supabase";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
 import { MenuItem } from "../../../types";
@@ -15,42 +23,6 @@ type DeletedMenuItem = MenuItem & { deleted: true };
 type DragState =
   | { type: "category"; category: string }
   | { type: "item"; itemId: number };
-
-const categoryLabels: Record<string, string> = {
-  entradas: "Entradas quentes",
-  frio: "Entradas frias",
-  sashimi: "Sashimis",
-  jyo: "Jyos",
-  niguiri: "Niguiris",
-  hot: "Hot rolls",
-  temaki: "Temakis",
-  yakissoba: "Yakissoba",
-  executivo: "Executivos",
-  poke: "Pokes",
-  combinado: "Combinados",
-  sobremesa: "Sobremesas",
-  bebida: "Bebidas",
-  drink: "Drinks",
-  destilado: "Destilados",
-};
-
-const defaultCategoryOrder = [
-  "entradas",
-  "frio",
-  "sashimi",
-  "jyo",
-  "niguiri",
-  "hot",
-  "temaki",
-  "yakissoba",
-  "executivo",
-  "poke",
-  "combinado",
-  "sobremesa",
-  "bebida",
-  "drink",
-  "destilado",
-];
 
 const money = (value: number) =>
   value.toLocaleString("pt-BR", {
@@ -64,11 +36,6 @@ const normalize = (str: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-const getFallbackCategoryOrder = (category: string) => {
-  const index = defaultCategoryOrder.indexOf(category);
-  return index === -1 ? defaultCategoryOrder.length : index;
-};
-
 const sortItems = (menuItems: MenuItem[]) =>
   [...menuItems].sort((a, b) => {
     const aOrder =
@@ -78,29 +45,6 @@ const sortItems = (menuItems: MenuItem[]) =>
     if (aOrder !== bOrder) return aOrder - bOrder;
     return a.name.localeCompare(b.name, "pt-BR");
   });
-
-const getOrderedCategories = (menuItems: MenuItem[]) => {
-  const categoryMap = new Map<string, number>();
-
-  menuItems.forEach((item) => {
-    const savedOrder =
-      typeof item.category_order === "number"
-        ? item.category_order
-        : getFallbackCategoryOrder(item.category);
-    const currentOrder = categoryMap.get(item.category);
-
-    if (currentOrder === undefined || savedOrder < currentOrder) {
-      categoryMap.set(item.category, savedOrder);
-    }
-  });
-
-  return Array.from(categoryMap.entries())
-    .sort(([aCategory, aOrder], [bCategory, bOrder]) => {
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return aCategory.localeCompare(bCategory, "pt-BR");
-    })
-    .map(([category]) => category);
-};
 
 const moveValue = <T,>(values: T[], from: number, to: number) => {
   const next = [...values];
@@ -120,8 +64,30 @@ const uniqueById = (menuItems: MenuItem[]) => {
   });
 };
 
+const getOrderedCategorySlugs = (
+  menuItems: MenuItem[],
+  categories: MenuCategory[],
+  includeEmpty = true
+) => {
+  const slugsWithItems = new Set(menuItems.map((item) => item.category));
+  const categorySlugs = sortCategories(categories)
+    .filter((category) => includeEmpty || slugsWithItems.has(category.slug))
+    .map((category) => category.slug);
+  const unknownSlugs = Array.from(slugsWithItems).filter(
+    (slug) => !categorySlugs.includes(slug)
+  );
+
+  return [...categorySlugs, ...unknownSlugs].sort(
+    (a, b) => getCategoryOrder(a, categories) - getCategoryOrder(b, categories)
+  );
+};
+
 export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<MenuCategory[]>(defaultMenuCategories);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
   const isMobile = useMediaQuery("(max-width: 760px)");
   const isTablet = useMediaQuery("(max-width: 1040px)");
   const [editingItem, setEditingItem] = useState<EditableMenuItem | null>(null);
@@ -133,27 +99,41 @@ export default function AdminMenuPage() {
   const canReorder = !search.trim() && !filterCategory;
 
   useEffect(() => {
-    async function fetchMenu() {
-      const { data, error } = await supabase
-        .from("menu")
-        .select("*")
-        .order("category", { ascending: true })
-        .order("name", { ascending: true });
+    async function fetchMenuData() {
+      const [{ data: menuData, error: menuError }, { data: categoryData }] =
+        await Promise.all([
+          supabase
+            .from("menu")
+            .select("*")
+            .order("category", { ascending: true })
+            .order("name", { ascending: true }),
+          supabase
+            .from("menu_categories")
+            .select("*")
+            .order("sort_order", { ascending: true }),
+        ]);
 
-      if (!error && data) setItems(uniqueById(data as MenuItem[]));
+      if (categoryData?.length) {
+        setCategories(sortCategories(categoryData as MenuCategory[]));
+      }
+
+      if (!menuError && menuData) setItems(uniqueById(menuData as MenuItem[]));
     }
 
-    fetchMenu();
+    fetchMenuData();
   }, []);
 
   const handleAddItem = () => {
+    const firstCategory = sortCategories(categories).find((category) => category.active) || categories[0];
+    const categorySlug = firstCategory?.slug || "entradas";
+
     setEditingItem({
       id: 0,
       name: "",
       price: 0,
-      category: "entradas",
-      category_order: getFallbackCategoryOrder("entradas"),
-      sort_order: items.filter((item) => item.category === "entradas").length,
+      category: categorySlug,
+      category_order: getCategoryOrder(categorySlug, categories),
+      sort_order: items.filter((item) => item.category === categorySlug).length,
       description: "",
       active: true,
       availability_status: "ativo",
@@ -166,7 +146,10 @@ export default function AdminMenuPage() {
 
     const updates = await Promise.all(
       orderedCategories.map((category, index) =>
-        supabase.from("menu").update({ category_order: index }).eq("category", category)
+        supabase
+          .from("menu_categories")
+          .update({ sort_order: index })
+          .eq("slug", category)
       )
     );
 
@@ -190,7 +173,7 @@ export default function AdminMenuPage() {
           .from("menu")
           .update({
             category: item.category,
-            category_order: item.category_order ?? getFallbackCategoryOrder(item.category),
+            category_order: item.category_order ?? getCategoryOrder(item.category, categories),
             sort_order: item.sort_order ?? 0,
           })
           .eq("id", Number(item.id))
@@ -214,17 +197,19 @@ export default function AdminMenuPage() {
       return;
     }
 
-    const categories = getOrderedCategories(items);
-    const fromIndex = categories.indexOf(dragged.category);
-    const toIndex = categories.indexOf(targetCategory);
+    const orderedCategorySlugs = getOrderedCategorySlugs(items, categories);
+    const fromIndex = orderedCategorySlugs.indexOf(dragged.category);
+    const toIndex = orderedCategorySlugs.indexOf(targetCategory);
     if (fromIndex === -1 || toIndex === -1) return;
 
-    const nextCategories = moveValue(categories, fromIndex, toIndex);
-    const nextItems = items.map((item) => ({
-      ...item,
-      category_order: nextCategories.indexOf(item.category),
+    const nextCategories = moveValue(orderedCategorySlugs, fromIndex, toIndex);
+    const nextCategoryRows = categories.map((category) => ({
+      ...category,
+      sort_order: nextCategories.indexOf(category.slug),
     }));
+    const nextItems = items.map((item) => ({ ...item }));
 
+    setCategories(sortCategories(nextCategoryRows));
     setItems(nextItems);
     setDragged(null);
     await persistCategoryOrder(nextCategories);
@@ -239,8 +224,8 @@ export default function AdminMenuPage() {
     const draggedItem = items.find((item) => item.id === dragged.itemId);
     if (!draggedItem) return;
 
-    const categories = getOrderedCategories(items);
-    const categoryOrderMap = new Map(categories.map((category, index) => [category, index]));
+    const orderedCategorySlugs = getOrderedCategorySlugs(items, categories);
+    const categoryOrderMap = new Map(orderedCategorySlugs.map((category, index) => [category, index]));
     const grouped = items.reduce((acc, item) => {
       if (item.id !== draggedItem.id) {
         acc[item.category] = acc[item.category] || [];
@@ -262,7 +247,7 @@ export default function AdminMenuPage() {
         ...draggedItem,
         category: targetCategory,
         category_order:
-          categoryOrderMap.get(targetCategory) ?? getFallbackCategoryOrder(targetCategory),
+          categoryOrderMap.get(targetCategory) ?? getCategoryOrder(targetCategory, categories),
       }
     );
     grouped[targetCategory] = targetItems;
@@ -271,7 +256,7 @@ export default function AdminMenuPage() {
       categoryItems.map((item, index) => ({
         ...item,
         category,
-        category_order: categoryOrderMap.get(category) ?? getFallbackCategoryOrder(category),
+        category_order: categoryOrderMap.get(category) ?? getCategoryOrder(category, categories),
         sort_order: index,
       }))
     );
@@ -293,6 +278,79 @@ export default function AdminMenuPage() {
     acc[item.category].push(item);
     return acc;
   }, {} as Record<string, MenuItem[]>);
+  const orderedCategories = getOrderedCategorySlugs(filteredItems, categories, !filterCategory);
+  const categoryOptions = sortCategories(categories);
+  const visibleCategoryCount = categoryOptions.filter((category) => category.active).length;
+  const hiddenCategoryCount = categoryOptions.length - visibleCategoryCount;
+  const itemCountByCategory = items.reduce((acc, item) => {
+    acc[item.category] = (acc[item.category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim();
+    const slug = normalizeCategorySlug(name);
+
+    if (!name || !slug) {
+      toast.error("Informe o nome da categoria.");
+      return;
+    }
+    if (categories.some((category) => category.slug === slug)) {
+      toast.error("Essa categoria ja existe.");
+      return;
+    }
+
+    const payload = {
+      slug,
+      name,
+      sort_order: categories.length,
+      active: true,
+    };
+    const { data, error } = await supabase
+      .from("menu_categories")
+      .insert([payload])
+      .select();
+
+    if (error) {
+      toast.error("Crie a tabela menu_categories no Supabase para salvar categorias.");
+      return;
+    }
+
+    setCategories(sortCategories([...(categories || []), (data?.[0] || payload) as MenuCategory]));
+    setNewCategoryName("");
+    toast.success("Categoria criada.");
+  };
+
+  const toggleItemActive = async (item: MenuItem) => {
+    const nextActive = item.active === false || item.availability_status === "inativo";
+    const payload = {
+      active: nextActive,
+      availability_status: nextActive ? "ativo" : "inativo",
+    };
+
+    setItems((current) =>
+      current.map((currentItem) =>
+        currentItem.id === item.id ? { ...currentItem, ...payload } : currentItem
+      )
+    );
+
+    const { error } = await supabase
+      .from("menu")
+      .update(payload)
+      .eq("id", Number(item.id));
+
+    if (error) {
+      setItems((current) =>
+        current.map((currentItem) =>
+          currentItem.id === item.id ? item : currentItem
+        )
+      );
+      toast.error("Nao foi possivel alterar o status do item.");
+      return;
+    }
+
+    toast.success(nextActive ? "Item ativado." : "Item pausado.");
+  };
 
   return (
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
@@ -305,17 +363,16 @@ export default function AdminMenuPage() {
           <AdminLink href="/admin/faturamento" pathname={pathname}>
             Faturamento
           </AdminLink>
+          {false && (
           <AdminLink href="/admin" pathname={pathname}>
             Visão geral
           </AdminLink>
+          )}
           <AdminLink href="/admin/pedidos" pathname={pathname}>
             Pedidos
           </AdminLink>
           <AdminLink href="/admin/clientes" pathname={pathname}>
             Clientes
-          </AdminLink>
-          <AdminLink href="/admin/pagamentos" pathname={pathname}>
-            Pagamentos
           </AdminLink>
           <AdminLink href="/admin/promocoes" pathname={pathname}>
             Promoções
@@ -355,12 +412,91 @@ export default function AdminMenuPage() {
             style={styles.select}
           >
             <option value="">Todas as categorias</option>
-            {defaultCategoryOrder.map((category) => (
-              <option key={category} value={category}>
-                {categoryLabels[category]}
+            {categoryOptions.map((category) => (
+              <option key={category.slug} value={category.slug}>
+                {category.name}
               </option>
             ))}
           </select>
+        </section>
+
+        <section style={styles.categoryManager}>
+          <div style={{ ...styles.categoryManagerHeader, ...(isMobile ? styles.categoryManagerHeaderMobile : {}) }}>
+            <div>
+              <p style={styles.cardEyebrow}>Categorias</p>
+              <h2 style={styles.categoryManagerTitle}>Editar categorias</h2>
+              <p style={styles.categoryManagerText}>
+                Altere nomes, crie novas categorias e oculte grupos do cardapio publico.
+              </p>
+            </div>
+            <div style={styles.categorySummarySide}>
+              <div style={styles.categoryStats}>
+                <div style={styles.categoryStat}>
+                  <strong>{categoryOptions.length}</strong>
+                  <span>Total</span>
+                </div>
+                <div style={styles.categoryStat}>
+                  <strong>{visibleCategoryCount}</strong>
+                  <span>Ativas</span>
+                </div>
+                <div style={styles.categoryStat}>
+                  <strong>{hiddenCategoryCount}</strong>
+                  <span>Pausadas</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCategoryManagerOpen((open) => !open)}
+                style={styles.categoryToggleButton}
+                aria-expanded={categoryManagerOpen}
+              >
+                {categoryManagerOpen ? "Fechar edicao" : "Editar categorias"}
+                <span style={styles.categoryToggleIcon}>
+                  {categoryManagerOpen ? "↑" : "↓"}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {categoryManagerOpen && (
+            <div style={styles.categoryDropdown}>
+              <div style={{ ...styles.newCategoryBox, ...(isMobile ? styles.newCategoryBoxMobile : {}) }}>
+                <label style={styles.newCategoryField}>
+                  <span style={styles.label}>Nova categoria</span>
+                  <input
+                    value={newCategoryName}
+                    onChange={(event) => setNewCategoryName(event.target.value)}
+                    placeholder="Ex: Promocoes"
+                    style={styles.input}
+                  />
+                </label>
+                <button type="button" onClick={handleCreateCategory} style={styles.primaryButton}>
+                  Criar categoria
+                </button>
+              </div>
+
+              <div style={styles.categoryEditorList}>
+                {categoryOptions.map((category) => (
+                  <div key={category.slug} style={{ ...styles.categoryEditorRow, ...(isMobile ? styles.categoryEditorRowMobile : {}) }}>
+                    <div style={styles.categoryOrderBadge}>{category.sort_order + 1}</div>
+                    <div style={styles.categoryEditMain}>
+                      <strong style={styles.categoryListName}>{category.name}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingCategory(category)}
+                      style={{ ...styles.secondaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
+                    >
+                      Editar
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p style={styles.categoryManagerHint}>
+                Para mudar a ordem, arraste os blocos de categoria na lista de pratos abaixo.
+              </p>
+            </div>
+          )}
         </section>
 
         {!canReorder && (
@@ -369,8 +505,10 @@ export default function AdminMenuPage() {
         {savingOrder && <p style={styles.noticeStrong}>Salvando nova ordem...</p>}
 
         <section style={styles.categoryList}>
-          {getOrderedCategories(filteredItems).map((category) => {
-            const itemsInCategory = sortItems(groupedItems[category]);
+          {orderedCategories.map((category) => {
+            const itemsInCategory = sortItems(groupedItems[category] || []);
+            const categoryActive =
+              categories.find((item) => item.slug === category)?.active !== false;
 
             return (
               <article
@@ -394,15 +532,22 @@ export default function AdminMenuPage() {
                     <div>
                       <p style={styles.cardEyebrow}>Categoria</p>
                       <h2 style={styles.categoryTitle}>
-                        {categoryLabels[category] || category}
+                        {getCategoryLabel(category, categories)}
                       </h2>
                     </div>
                   </div>
-                  <span style={styles.pill}>{itemsInCategory.length} itens</span>
+                  <span style={styles.pill}>
+                    {categoryActive ? `${itemsInCategory.length} itens` : "Pausada"}
+                  </span>
                 </div>
 
                 <div style={styles.itemList}>
                   {itemsInCategory.map((item) => (
+                    (() => {
+                      const itemActive =
+                        item.active !== false && item.availability_status !== "inativo";
+
+                      return (
                     <div
                       key={item.id}
                       draggable={canReorder}
@@ -419,6 +564,7 @@ export default function AdminMenuPage() {
                       style={{
                         ...styles.itemCard,
                         ...(isMobile ? styles.itemCardMobile : {}),
+                        ...(!itemActive ? styles.itemCardPaused : {}),
                         opacity: dragged?.type === "item" && dragged.itemId === item.id ? 0.55 : 1,
                       }}
                     >
@@ -438,19 +584,44 @@ export default function AdminMenuPage() {
                         <div>
                           <h3 style={styles.itemName}>{item.name}</h3>
                           <p style={styles.itemPrice}>{money(Number(item.price))}</p>
+                          {!itemActive && <p style={styles.itemPausedText}>Pausado</p>}
                           {item.description && (
                             <p style={styles.itemDescription}>{item.description}</p>
                           )}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setEditingItem(item)}
-                        style={styles.secondaryButton}
-                      >
-                        Editar
-                      </button>
+                      <div style={{ ...styles.itemActions, ...(isMobile ? styles.itemActionsMobile : {}) }}>
+                        <button
+                          type="button"
+                          onClick={() => toggleItemActive(item)}
+                          aria-pressed={itemActive}
+                          style={{
+                            ...styles.itemSwitch,
+                            ...(itemActive ? styles.itemSwitchActive : styles.itemSwitchPaused),
+                          }}
+                          aria-label={itemActive ? "Pausar item" : "Ativar item"}
+                        >
+                          <span
+                            style={{
+                              ...styles.itemSwitchThumb,
+                              ...(itemActive ? styles.itemSwitchThumbActive : {}),
+                            }}
+                          />
+                        </button>
+                        <span style={styles.itemSwitchLabel}>
+                          {itemActive ? "Ativo" : "Pausado"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingItem(item)}
+                          style={styles.secondaryButton}
+                        >
+                          Editar
+                        </button>
+                      </div>
                     </div>
+                      );
+                    })()
                   ))}
                 </div>
               </article>
@@ -459,9 +630,37 @@ export default function AdminMenuPage() {
         </section>
       </section>
 
+      {editingCategory && (
+        <CategoryEditModal
+          category={editingCategory}
+          itemCount={itemCountByCategory[editingCategory.slug] || 0}
+          onClose={() => setEditingCategory(null)}
+          onSave={(updated) => {
+            setCategories((current) =>
+              sortCategories(
+                current.map((category) =>
+                  category.slug === updated.slug ? updated : category
+                )
+              )
+            );
+            setEditingCategory(null);
+          }}
+          onDelete={(deleted) => {
+            setCategories((current) =>
+              current.filter((category) => category.slug !== deleted.slug)
+            );
+            setItems((current) =>
+              current.filter((item) => item.category !== deleted.slug)
+            );
+            setEditingCategory(null);
+          }}
+        />
+      )}
+
       {editingItem && (
         <EditModal
           item={editingItem}
+          categories={categoryOptions}
           compact={isTablet}
           onClose={() => setEditingItem(null)}
           onSave={(updated) => {
@@ -503,13 +702,203 @@ function AdminLink({
   );
 }
 
+function CategoryEditModal({
+  category,
+  itemCount,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  category: MenuCategory;
+  itemCount: number;
+  onClose: () => void;
+  onSave: (category: MenuCategory) => void;
+  onDelete: (category: MenuCategory) => void;
+}) {
+  const [name, setName] = useState(category.name);
+  const [active, setActive] = useState(category.active);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const canSave = name.trim().length > 0 && !saving && !deleting;
+  const canDelete = !saving && !deleting;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+
+    setSaving(true);
+    const payload = { name: name.trim(), active };
+    const { data, error } = await supabase
+      .from("menu_categories")
+      .update(payload)
+      .eq("slug", category.slug)
+      .select()
+      .maybeSingle();
+
+    setSaving(false);
+
+    if (error) {
+      toast.error("Nao foi possivel salvar a categoria.");
+      return;
+    }
+
+    onSave({ ...category, ...(data as Partial<MenuCategory>), ...payload });
+    toast.success("Categoria atualizada.");
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+
+    setDeleting(true);
+    if (itemCount > 0) {
+      const { error: deleteItemsError } = await supabase
+        .from("menu")
+        .delete()
+        .eq("category", category.slug);
+
+      if (deleteItemsError) {
+        setDeleting(false);
+        toast.error("Nao foi possivel excluir os itens desta categoria.");
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from("menu_categories")
+      .delete()
+      .eq("slug", category.slug);
+
+    setDeleting(false);
+
+    if (error) {
+      toast.error("Nao foi possivel excluir a categoria.");
+      return;
+    }
+
+    onDelete(category);
+    toast.success("Categoria excluida.");
+  };
+
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={{ ...styles.modal, ...styles.categoryModal }}>
+        <div style={styles.modalHeader}>
+          <div>
+            <p style={styles.cardEyebrow}>Categoria</p>
+            <h2 style={styles.modalTitle}>Editar categoria</h2>
+          </div>
+          <button type="button" onClick={onClose} style={styles.closeButton}>
+            Fechar
+          </button>
+        </div>
+
+        <div style={styles.modalPanel}>
+          <label style={styles.field}>
+            <span style={styles.label}>Nome da categoria</span>
+            <input
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                setConfirmDelete(false);
+              }}
+              style={styles.input}
+            />
+          </label>
+
+          <div style={styles.categoryReadOnlyBox}>
+            <span>Identificador</span>
+            <strong>{category.slug}</strong>
+          </div>
+
+          <div style={styles.categoryReadOnlyBox}>
+            <span>Itens nesta categoria</span>
+            <strong>{itemCount}</strong>
+          </div>
+
+          <div style={styles.categoryStatusPanel}>
+            <span style={styles.label}>Status no cardapio</span>
+            <div style={styles.categoryStatusActions}>
+              <button
+                type="button"
+                onClick={() => {
+                  setActive(true);
+                  setConfirmDelete(false);
+                }}
+                style={{
+                  ...styles.statusChoice,
+                  ...(active ? styles.statusChoiceActive : {}),
+                }}
+              >
+                Ativo
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActive(false);
+                  setConfirmDelete(false);
+                }}
+                style={{
+                  ...styles.statusChoice,
+                  ...(!active ? styles.statusChoiceDanger : {}),
+                }}
+              >
+                Pausado
+              </button>
+            </div>
+          </div>
+          {itemCount > 0 && (
+            <p style={styles.notice}>
+              Ao excluir esta categoria, {itemCount} itens tambem serao excluidos.
+            </p>
+          )}
+        </div>
+
+        <div style={styles.modalActions}>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={!canDelete}
+            style={{
+              ...styles.deleteButton,
+              ...(confirmDelete ? styles.deleteButtonConfirm : {}),
+              ...(!canDelete ? styles.disabledSoftButton : {}),
+            }}
+          >
+            {deleting
+              ? "Excluindo..."
+              : confirmDelete
+              ? "Confirmar exclusao"
+              : "Excluir categoria"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!canSave}
+            style={{
+              ...styles.primaryButton,
+              ...(!canSave ? styles.primaryButtonDisabled : {}),
+            }}
+          >
+            {saving ? "Salvando..." : "Salvar alteracoes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditModal({
   item,
+  categories,
   compact,
   onClose,
   onSave,
 }: {
   item: EditableMenuItem;
+  categories: MenuCategory[];
   compact: boolean;
   onClose: () => void;
   onSave: (item: MenuItem | DeletedMenuItem) => void;
@@ -581,7 +970,7 @@ function EditModal({
         name: form.name.trim(),
         price: Number(form.price),
         category: form.category,
-        category_order: form.category_order ?? getFallbackCategoryOrder(form.category),
+        category_order: form.category_order ?? getCategoryOrder(form.category, categories),
         sort_order: form.sort_order ?? 0,
         description: form.description,
         image: form.image || null,
@@ -695,39 +1084,19 @@ function EditModal({
                     setForm({
                       ...form,
                       category,
-                      category_order: getFallbackCategoryOrder(category),
+                      category_order: getCategoryOrder(category, categories),
                     });
                   }}
                   style={styles.select}
                 >
-                  {defaultCategoryOrder.map((category) => (
-                    <option key={category} value={category}>
-                      {categoryLabels[category]}
+                  {categories.map((category) => (
+                    <option key={category.slug} value={category.slug}>
+                      {category.name}
                     </option>
                   ))}
                 </select>
               </label>
 
-              <label style={styles.field}>
-                <span style={styles.label}>Disponibilidade</span>
-                <select
-                  value={form.availability_status || (form.active === false ? "inativo" : "ativo")}
-                  onChange={(event) => {
-                    const availability_status = event.target.value;
-                    setConfirmDelete(false);
-                    setForm({
-                      ...form,
-                      availability_status,
-                      active: availability_status !== "inativo",
-                    });
-                  }}
-                  style={styles.select}
-                >
-                  <option value="ativo">Ativo</option>
-                  <option value="esgotado">Esgotado</option>
-                  <option value="inativo">Inativo</option>
-                </select>
-              </label>
             </div>
 
             <label style={styles.field}>
@@ -954,6 +1323,197 @@ const styles: Record<string, CSSProperties> = {
     margin: "8px 0 14px",
     fontWeight: 850,
   },
+  categoryManager: {
+    background: "#1c1a17",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    padding: 20,
+    marginBottom: 16,
+    boxShadow: "0 18px 45px rgba(28, 26, 23, 0.16)",
+  },
+  categoryManagerHeader: {
+    display: "grid",
+    gridTemplateColumns: "minmax(220px, 1fr) minmax(260px, 420px)",
+    gap: 18,
+    alignItems: "start",
+    marginBottom: 16,
+  },
+  categoryManagerHeaderMobile: {
+    gridTemplateColumns: "1fr",
+  },
+  categoryManagerTitle: {
+    marginTop: 3,
+    fontSize: 24,
+    color: "#fffdf8",
+  },
+  categoryManagerText: {
+    marginTop: 6,
+    color: "#d8d0c4",
+    fontSize: 13,
+    lineHeight: 1.45,
+    maxWidth: 520,
+  },
+  categoryStats: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: 10,
+  },
+  categorySummarySide: {
+    display: "grid",
+    gap: 10,
+  },
+  categoryStat: {
+    border: "1px solid rgba(255, 253, 248, 0.12)",
+    borderRadius: 8,
+    padding: 12,
+    background: "rgba(255, 253, 248, 0.06)",
+    color: "#fffdf8",
+    display: "grid",
+    gap: 4,
+  },
+  categoryToggleButton: {
+    width: "100%",
+    border: "1px solid rgba(255, 253, 248, 0.16)",
+    borderRadius: 8,
+    background: "#fffdf8",
+    color: "#1c1a17",
+    padding: "12px 14px",
+    cursor: "pointer",
+    fontWeight: 850,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  categoryToggleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    background: "#f0ebe2",
+    color: "#9f1d2f",
+    display: "grid",
+    placeItems: "center",
+    fontWeight: 850,
+  },
+  categoryDropdown: {
+    borderTop: "1px solid rgba(255, 253, 248, 0.12)",
+    paddingTop: 12,
+  },
+  newCategoryBox: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gap: 10,
+    alignItems: "end",
+    borderRadius: 8,
+    background: "#fffdf8",
+    padding: 12,
+    marginBottom: 12,
+  },
+  newCategoryBoxMobile: {
+    gridTemplateColumns: "1fr",
+  },
+  newCategoryField: {
+    display: "grid",
+    gap: 7,
+  },
+  categoryEditorList: {
+    display: "grid",
+    gap: 8,
+  },
+  categoryEditorRow: {
+    display: "grid",
+    gridTemplateColumns: "42px minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: 12,
+    border: "1px solid rgba(255, 253, 248, 0.1)",
+    borderRadius: 8,
+    background: "#fffdf8",
+    padding: 10,
+  },
+  categoryEditorRowMobile: {
+    gridTemplateColumns: "38px minmax(0, 1fr)",
+  },
+  categoryOrderBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    display: "grid",
+    placeItems: "center",
+    background: "#f0ebe2",
+    color: "#514a43",
+    fontWeight: 850,
+    fontSize: 13,
+  },
+  categoryEditMain: {
+    minWidth: 0,
+    display: "grid",
+    gap: 6,
+  },
+  categoryListName: {
+    color: "#1c1a17",
+    fontSize: 16,
+    lineHeight: 1.25,
+  },
+  categoryNameInput: {
+    width: "100%",
+    border: "none",
+    borderRadius: 6,
+    padding: "7px 8px",
+    background: "#f7f4ef",
+    color: "#1c1a17",
+    outlineColor: "#9f1d2f",
+    fontWeight: 850,
+    fontSize: 16,
+  },
+  fullWidthMobile: {
+    gridColumn: "1 / -1",
+    width: "100%",
+  },
+  categoryMetaLine: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    color: "#766e64",
+    fontSize: 12,
+    fontWeight: 750,
+  },
+  visibilityButton: {
+    minWidth: 104,
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    padding: "10px 12px",
+    cursor: "pointer",
+    fontWeight: 850,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    whiteSpace: "nowrap",
+  },
+  visibilityButtonActive: {
+    background: "#dcfce7",
+    color: "#166534",
+  },
+  visibilityButtonInactive: {
+    background: "#fee2e2",
+    color: "#991b1b",
+  },
+  visibilityButtonMobile: {
+    gridColumn: "1 / -1",
+    width: "100%",
+  },
+  visibilityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    background: "currentColor",
+  },
+  categoryManagerHint: {
+    marginTop: 12,
+    color: "#d8d0c4",
+    fontSize: 13,
+    lineHeight: 1.4,
+  },
   categoryList: {
     display: "grid",
     gap: 16,
@@ -1027,6 +1587,10 @@ const styles: Record<string, CSSProperties> = {
     padding: 12,
     background: "#fff",
   },
+  itemCardPaused: {
+    background: "#f7f4ef",
+    opacity: 0.76,
+  },
   itemCardMobile: {
     display: "grid",
     alignItems: "start",
@@ -1054,11 +1618,64 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 4,
     fontWeight: 850,
   },
+  itemPausedText: {
+    marginTop: 4,
+    color: "#991b1b",
+    fontSize: 12,
+    fontWeight: 850,
+  },
   itemDescription: {
     color: "#766e64",
     marginTop: 4,
     fontSize: 13,
     lineHeight: 1.35,
+  },
+  itemActions: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "end",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  itemActionsMobile: {
+    justifyContent: "stretch",
+  },
+  itemSwitch: {
+    width: 40,
+    height: 24,
+    border: "none",
+    borderRadius: 999,
+    padding: 3,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    boxShadow: "inset 0 1px 2px rgba(28, 26, 23, 0.16)",
+    transition: "background 160ms ease",
+  },
+  itemSwitchActive: {
+    background: "#34c759",
+  },
+  itemSwitchPaused: {
+    background: "#d1d5db",
+  },
+  itemSwitchThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    background: "#fff",
+    boxShadow: "0 2px 5px rgba(28, 26, 23, 0.22)",
+    transform: "translateX(0)",
+    transition: "transform 160ms ease",
+  },
+  itemSwitchThumbActive: {
+    transform: "translateX(16px)",
+  },
+  itemSwitchLabel: {
+    color: "#625b53",
+    fontSize: 12,
+    fontWeight: 850,
+    minWidth: 48,
   },
   secondaryButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
@@ -1069,6 +1686,10 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     fontWeight: 850,
     whiteSpace: "nowrap",
+  },
+  inactiveButton: {
+    background: "#f0ebe2",
+    color: "#766e64",
   },
   modalOverlay: {
     position: "fixed",
@@ -1087,6 +1708,9 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 8,
     padding: 22,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.22)",
+  },
+  categoryModal: {
+    width: "min(560px, 100%)",
   },
   modalCompact: {
     width: "min(680px, 100%)",
@@ -1167,6 +1791,44 @@ const styles: Record<string, CSSProperties> = {
     padding: "12px 14px",
     fontWeight: 850,
   },
+  categoryReadOnlyBox: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 8,
+    background: "#f0ebe2",
+    color: "#514a43",
+    padding: "12px 14px",
+  },
+  categoryStatusPanel: {
+    display: "grid",
+    gap: 8,
+  },
+  categoryStatusActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+  },
+  statusChoice: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 8,
+    background: "#fffdf8",
+    color: "#514a43",
+    padding: "12px 14px",
+    cursor: "pointer",
+    fontWeight: 850,
+  },
+  statusChoiceActive: {
+    background: "#dcfce7",
+    borderColor: "#86efac",
+    color: "#166534",
+  },
+  statusChoiceDanger: {
+    background: "#fee2e2",
+    borderColor: "#fecaca",
+    color: "#991b1b",
+  },
   imagePanel: {
     display: "grid",
     gap: 12,
@@ -1236,5 +1898,9 @@ const styles: Record<string, CSSProperties> = {
   deleteButtonConfirm: {
     background: "#991b1b",
     color: "#fff",
+  },
+  disabledSoftButton: {
+    opacity: 0.5,
+    cursor: "not-allowed",
   },
 };

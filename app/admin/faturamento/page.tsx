@@ -44,6 +44,9 @@ type Order = {
   items?: OrderItem[] | null;
   note?: string | null;
   total?: number | null;
+  subtotal?: number | null;
+  discount_amount?: number | null;
+  coupon_code?: string | null;
   created_at: string;
   payment_method?: string | null;
 };
@@ -107,6 +110,8 @@ const calcTotal = (order: Order) =>
         (sum, item) => sum + Number(item.price || 0) * (item.quantity ?? 1),
         0
       );
+
+const calcDiscount = (order: Order) => Number(order.discount_amount || 0);
 
 const getPayment = (order: Order) => order.payment_method || "pending";
 
@@ -186,6 +191,10 @@ export default function FaturamentoPage() {
     const todayRevenue = filteredOrders
       .filter((order) => toDateKey(order.created_at) === todayKey)
       .reduce((sum, order) => sum + calcTotal(order), 0);
+    const totalDiscount = filteredOrders.reduce(
+      (sum, order) => sum + calcDiscount(order),
+      0
+    );
 
     const revenueByDay = filteredOrders.reduce((acc, order) => {
       const day = toDateKey(order.created_at);
@@ -196,6 +205,12 @@ export default function FaturamentoPage() {
     const paymentTotals = filteredOrders.reduce((acc, order) => {
       const payment = getPayment(order);
       acc[payment] = (acc[payment] || 0) + calcTotal(order);
+      return acc;
+    }, {} as Record<string, number>);
+
+    const couponTotals = filteredOrders.reduce((acc, order) => {
+      if (!order.coupon_code) return acc;
+      acc[order.coupon_code] = (acc[order.coupon_code] || 0) + calcDiscount(order);
       return acc;
     }, {} as Record<string, number>);
 
@@ -219,10 +234,12 @@ export default function FaturamentoPage() {
     return {
       averagePerDay,
       bestDay,
+      couponTotals,
       paymentTotals,
       revenueByDay,
       ticketMedio,
       todayRevenue,
+      totalDiscount,
       topItems: Array.from(topItems.entries())
         .map(([name, value]) => ({ name, ...value }))
         .sort((a, b) => b.revenue - a.revenue)
@@ -303,17 +320,16 @@ export default function FaturamentoPage() {
           <AdminLink href="/admin/faturamento" pathname={pathname}>
             Faturamento
           </AdminLink>
+          {false && (
           <AdminLink href="/admin" pathname={pathname}>
             Visão geral
           </AdminLink>
+          )}
           <AdminLink href="/admin/pedidos" pathname={pathname}>
             Pedidos
           </AdminLink>
           <AdminLink href="/admin/clientes" pathname={pathname}>
             Clientes
-          </AdminLink>
-          <AdminLink href="/admin/pagamentos" pathname={pathname}>
-            Pagamentos
           </AdminLink>
           <AdminLink href="/admin/promocoes" pathname={pathname}>
             Promoções
@@ -392,12 +408,12 @@ export default function FaturamentoPage() {
             detail="Valor médio por pedido"
           />
           <Metric
-            label="Média diária"
-            value={money(analytics.averagePerDay)}
+            label="Descontos"
+            value={money(analytics.totalDiscount)}
             detail={
-              analytics.bestDay
-                ? `Melhor dia: ${formatDate(`${analytics.bestDay[0]}T00:00:00`)}`
-                : "Sem movimento no período"
+              Object.keys(analytics.couponTotals).length > 0
+                ? `${Object.keys(analytics.couponTotals).length} cupons usados`
+                : "Nenhum cupom no periodo"
             }
           />
         </section>
@@ -431,6 +447,14 @@ export default function FaturamentoPage() {
                 display: money(value),
               }))}
             />
+            <Breakdown
+              title="Cupons"
+              entries={Object.entries(analytics.couponTotals).map(([label, value]) => ({
+                label,
+                value,
+                display: money(value),
+              }))}
+            />
           </aside>
         </section>
 
@@ -450,6 +474,11 @@ export default function FaturamentoPage() {
                     <p style={styles.mutedSmall}>
                       {order.name || "Cliente"} - {formatDateTime(order.created_at)}
                     </p>
+                    {order.coupon_code && (
+                      <p style={styles.mutedSmall}>
+                        Cupom {order.coupon_code} - desconto {money(calcDiscount(order))}
+                      </p>
+                    )}
                   </div>
                   <strong style={styles.alignRight}>{money(calcTotal(order))}</strong>
                 </div>

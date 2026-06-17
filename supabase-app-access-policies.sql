@@ -8,6 +8,7 @@ alter table if exists public.menu enable row level security;
 alter table if exists public.orders enable row level security;
 alter table if exists public.store_settings enable row level security;
 alter table if exists public.promotions enable row level security;
+alter table if exists public.menu_categories enable row level security;
 
 drop policy if exists "App can read menu" on public.menu;
 create policy "App can read menu"
@@ -77,3 +78,24 @@ create policy "App can update promotions"
 on public.promotions for update
 using (true)
 with check (true);
+
+drop policy if exists "App can read menu categories" on public.menu_categories;
+create policy "App can read menu categories"
+on public.menu_categories for select
+using (true);
+
+drop policy if exists "App can insert menu categories" on public.menu_categories;
+create policy "App can insert menu categories"
+on public.menu_categories for insert
+with check (true);
+
+drop policy if exists "App can update menu categories" on public.menu_categories;
+create policy "App can update menu categories"
+on public.menu_categories for update
+using (true)
+with check (true);
+
+drop policy if exists "App can delete menu categories" on public.menu_categories;
+create policy "App can delete menu categories"
+on public.menu_categories for delete
+using (true);

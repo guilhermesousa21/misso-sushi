@@ -8,10 +8,8 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 const navItems = [
   { href: "/admin/menu", label: "Cardapio" },
   { href: "/admin/faturamento", label: "Faturamento" },
-  { href: "/admin", label: "Visao geral" },
   { href: "/admin/pedidos", label: "Pedidos" },
   { href: "/admin/clientes", label: "Clientes" },
-  { href: "/admin/pagamentos", label: "Pagamentos" },
   { href: "/admin/promocoes", label: "Promocoes" },
   { href: "/admin/configuracoes", label: "Configuracoes" },
 ];
@@ -53,6 +51,9 @@ export type AdminOrder = {
   items?: AdminOrderItem[] | null;
   note?: string | null;
   total?: number | null;
+  subtotal?: number | null;
+  discount_amount?: number | null;
+  coupon_code?: string | null;
   status?: string | null;
   created_at: string;
   payment_method?: string | null;

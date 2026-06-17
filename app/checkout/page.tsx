@@ -15,9 +15,19 @@ import {
   type BusinessHours,
 } from "../../lib/storeHours";
 import { useMediaQuery } from "../../lib/useMediaQuery";
+import type { MenuItem } from "../../types";
 import { useCart } from "../context/CartContext";
 
 type PaymentMethod = "pix" | "card";
+
+type Promotion = {
+  id: number;
+  code: string;
+  description?: string | null;
+  discount_type: "percent" | "fixed";
+  discount_value: number;
+  active: boolean;
+};
 
 const money = (value: number) =>
   value.toLocaleString("pt-BR", {
@@ -51,15 +61,43 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
+const sanitizeCoupon = (value: string) =>
+  value
+    .replace(/[^a-z0-9-]/gi, "")
+    .slice(0, 24)
+    .toUpperCase();
+
+const calculateDiscount = (promotion: Promotion | null, subtotal: number) => {
+  if (!promotion || subtotal <= 0) return 0;
+
+  const value = Number(promotion.discount_value || 0);
+  const discount =
+    promotion.discount_type === "percent" ? subtotal * (value / 100) : value;
+
+  return Math.min(subtotal, Math.max(0, discount));
+};
+
+const isItemOrderable = (item?: MenuItem) =>
+  Boolean(item) &&
+  item?.active !== false &&
+  item?.available !== false &&
+  item?.unavailable !== true &&
+  item?.availability_status !== "inativo" &&
+  item?.availability_status !== "esgotado";
+
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, total, clear } = useCart();
+  const { cart, cartLoaded, total, clear, remove } = useCart();
   const isMobile = useMediaQuery("(max-width: 760px)");
   const isTablet = useMediaQuery("(max-width: 980px)");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("pix");
   const [note, setNote] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<Promotion | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponMessage, setCouponMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [pixLoading, setPixLoading] = useState(false);
   const [pixQr, setPixQr] = useState("");
@@ -70,6 +108,10 @@ export default function CheckoutPage() {
   const [storeOpen, setStoreOpen] = useState(true);
   const [manualOpen, setManualOpen] = useState(true);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [cartNotice, setCartNotice] = useState("");
+  const discountAmount = calculateDiscount(appliedCoupon, total);
+  const finalTotal = Math.max(0, total - discountAmount);
 
   useEffect(() => {
     async function fetchStoreStatus() {
@@ -88,6 +130,43 @@ export default function CheckoutPage() {
 
     fetchStoreStatus();
   }, []);
+
+  useEffect(() => {
+    async function fetchMenuAvailability() {
+      const { data } = await supabase
+        .from("menu")
+        .select("id,name,active,available,unavailable,availability_status");
+
+      if (data) setMenuItems(data as MenuItem[]);
+    }
+
+    fetchMenuAvailability();
+  }, []);
+
+  useEffect(() => {
+    if (!menuItems.length || !cart.length) return;
+
+    const unavailableCartItems = cart.filter((cartItem) => {
+      const menuItem = menuItems.find((item) => item.id === cartItem.id);
+      return !isItemOrderable(menuItem);
+    });
+
+    if (unavailableCartItems.length === 0) return;
+
+    unavailableCartItems.forEach((item) => remove(item.id));
+    const timer = window.setTimeout(() => {
+      setPixQr("");
+      setPixCode("");
+      setPixPaymentId(null);
+      setCartNotice(
+        unavailableCartItems.length === 1
+          ? `${unavailableCartItems[0].name} foi removido do carrinho porque esta pausado ou indisponivel.`
+          : "Alguns itens foram removidos do carrinho porque estao pausados ou indisponiveis."
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [cart, menuItems, remove]);
 
   const canSubmit =
     cart.length > 0 &&
@@ -108,7 +187,7 @@ export default function CheckoutPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: total,
+          amount: finalTotal,
           note: `Pedido Misso Sushi - ${name || "Cliente"}`,
           payer: { name: normalizeName(name), phone: onlyDigits(phone) },
         }),
@@ -125,6 +204,58 @@ export default function CheckoutPage() {
     } finally {
       setPixLoading(false);
     }
+  };
+
+  const handleApplyCoupon = async () => {
+    const code = sanitizeCoupon(couponCode);
+    setCouponMessage("");
+    setAppliedCoupon(null);
+
+    if (!code) {
+      setCouponMessage("Digite um cupom para aplicar.");
+      return;
+    }
+
+    setCouponLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("promotions")
+        .select("*")
+        .eq("code", code)
+        .eq("active", true)
+        .maybeSingle();
+
+      if (error || !data) {
+        setCouponMessage("Cupom invalido ou inativo.");
+        return;
+      }
+
+      const promotion = data as Promotion;
+      const discount = calculateDiscount(promotion, total);
+      if (discount <= 0) {
+        setCouponMessage("Este cupom nao gera desconto para este pedido.");
+        return;
+      }
+
+      setCouponCode(code);
+      setAppliedCoupon(promotion);
+      setPixQr("");
+      setPixCode("");
+      setPixPaymentId(null);
+      setCouponMessage(`Cupom aplicado: -${money(discount)}.`);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponMessage("");
+    setPixQr("");
+    setPixCode("");
+    setPixPaymentId(null);
   };
 
   const handleCopyPix = async () => {
@@ -158,7 +289,11 @@ export default function CheckoutPage() {
         quantity: item.quantity,
       })),
       note: note.trim(),
-      total,
+      subtotal: total,
+      discount_amount: discountAmount,
+      total: finalTotal,
+      coupon_code: appliedCoupon?.code || null,
+      promotion_id: appliedCoupon?.id || null,
       status: "recebido",
       payment_method: method,
       payment_status: "pendente",
@@ -177,7 +312,12 @@ export default function CheckoutPage() {
           name: orderPayload.name,
           phone: orderPayload.phone,
           items: orderPayload.items,
-          note: [orderPayload.note, "Retirada no balcao", `Pagamento: ${method.toUpperCase()} - pendente`]
+          note: [
+            orderPayload.note,
+            "Retirada no balcao",
+            appliedCoupon ? `Cupom: ${appliedCoupon.code} (-${money(discountAmount)})` : "",
+            `Pagamento: ${method.toUpperCase()} - pendente`,
+          ]
             .filter(Boolean)
             .join("\n"),
           total: orderPayload.total,
@@ -194,6 +334,12 @@ export default function CheckoutPage() {
         throw new Error(insertError?.message || "Nao foi possivel criar o pedido.");
       }
 
+      fetch("/api/whatsapp/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data[0]),
+      }).catch(() => {});
+
       clear();
       router.push(`/pedido/${data[0].id}`);
     } catch (err) {
@@ -202,6 +348,18 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
+
+  if (!cartLoaded) {
+    return (
+      <main style={styles.page}>
+        <section style={styles.emptyState}>
+          <p style={styles.eyebrow}>Checkout</p>
+          <h1 style={styles.title}>Carregando pedido</h1>
+          <p style={styles.muted}>Estamos recuperando os itens do seu carrinho.</p>
+        </section>
+      </main>
+    );
+  }
 
   if (cart.length === 0) {
     return (
@@ -302,6 +460,7 @@ export default function CheckoutPage() {
               </div>
               <span style={styles.pill}>{cart.length} itens</span>
             </div>
+            {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
             <div style={styles.orderList}>
               {cart.map((item) => (
                 <div key={item.id} style={styles.orderRow}>
@@ -313,6 +472,53 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <div>
+                <p style={styles.cardEyebrow}>Cupom</p>
+                <h2 style={styles.cardTitle}>Aplicar desconto</h2>
+              </div>
+              {appliedCoupon && <span style={styles.pill}>-{money(discountAmount)}</span>}
+            </div>
+            <div style={{ ...styles.couponRow, ...(isMobile ? styles.couponRowMobile : {}) }}>
+              <input
+                value={couponCode}
+                onChange={(event) => {
+                  setCouponCode(sanitizeCoupon(event.target.value));
+                  setCouponMessage("");
+                  if (appliedCoupon) {
+                    setAppliedCoupon(null);
+                    setPixQr("");
+                    setPixCode("");
+                    setPixPaymentId(null);
+                  }
+                }}
+                placeholder="CODIGO"
+                disabled={couponLoading}
+                style={styles.input}
+              />
+              {appliedCoupon ? (
+                <button type="button" onClick={handleRemoveCoupon} style={styles.secondaryButton}>
+                  Remover
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={couponLoading}
+                  style={styles.secondaryButton}
+                >
+                  {couponLoading ? "Aplicando..." : "Aplicar"}
+                </button>
+              )}
+            </div>
+            {couponMessage && (
+              <p style={appliedCoupon ? styles.successText : styles.mutedSmall}>
+                {couponMessage}
+              </p>
+            )}
           </div>
 
           <div style={styles.card}>
@@ -363,9 +569,12 @@ export default function CheckoutPage() {
 
         <aside style={{ ...styles.summaryCard, ...(isTablet ? styles.summaryCardStack : {}) }}>
           <p style={styles.cardEyebrow}>Total</p>
-          <strong style={styles.total}>{money(total)}</strong>
+          <strong style={styles.total}>{money(finalTotal)}</strong>
           <div style={styles.divider} />
-          <div style={styles.summaryLine}><span>Itens</span><strong>{money(total)}</strong></div>
+          <div style={styles.summaryLine}><span>Subtotal</span><strong>{money(total)}</strong></div>
+          {discountAmount > 0 && (
+            <div style={styles.summaryLine}><span>Desconto</span><strong>-{money(discountAmount)}</strong></div>
+          )}
           <div style={styles.summaryLine}><span>Recebimento</span><strong>Retirada</strong></div>
           <div style={styles.summaryLine}><span>Pagamento</span><strong>{method.toUpperCase()}</strong></div>
           <button type="submit" disabled={!canSubmit} style={{ ...styles.checkoutButton, ...(!canSubmit ? styles.checkoutButtonDisabled : {}) }}>
@@ -395,6 +604,8 @@ const styles: Record<string, CSSProperties> = {
   pill: { borderRadius: 999, background: "#f0ebe2", padding: "7px 10px", color: "#625b53", fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" },
   formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   formGridMobile: { gridTemplateColumns: "1fr" },
+  couponRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center" },
+  couponRowMobile: { gridTemplateColumns: "1fr" },
   field: { display: "grid", gap: 7 },
   label: { display: "block", marginBottom: 8, fontWeight: 850 },
   input: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.14)", borderRadius: 8, padding: 12, background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f" },
@@ -407,6 +618,7 @@ const styles: Record<string, CSSProperties> = {
   itemName: { display: "block", lineHeight: 1.35 },
   muted: { color: "#625b53", lineHeight: 1.55 },
   mutedSmall: { marginTop: 4, color: "#766e64", fontSize: 13, lineHeight: 1.4 },
+  noticeError: { borderRadius: 8, background: "#fee2e2", color: "#991b1b", padding: 12, marginBottom: 12, fontSize: 13, fontWeight: 800, lineHeight: 1.4 },
   paymentBox: { marginTop: 18, borderTop: "1px solid rgba(28, 26, 23, 0.08)", paddingTop: 18 },
   qrWrap: { marginTop: 14, display: "grid", justifyItems: "start", gap: 10 },
   qrImage: { borderRadius: 8, border: "1px solid rgba(28, 26, 23, 0.08)" },

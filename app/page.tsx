@@ -14,44 +14,15 @@ import {
   type BusinessHours,
 } from "../lib/storeHours";
 import { useMediaQuery } from "../lib/useMediaQuery";
+import {
+  defaultMenuCategories,
+  getCategoryLabel,
+  getCategoryOrder,
+  sortCategories,
+  type MenuCategory,
+} from "../lib/menuCategories";
 import { MenuItem } from "../types";
 import { useCart } from "./context/CartContext";
-
-const categoryLabels: Record<string, string> = {
-  entradas: "Entradas quentes",
-  frio: "Entradas frias",
-  sashimi: "Sashimis",
-  jyo: "Jyos",
-  niguiri: "Niguiris",
-  hot: "Hot rolls",
-  temaki: "Temakis",
-  yakissoba: "Yakissoba",
-  executivo: "Executivos",
-  poke: "Pokes",
-  combinado: "Combinados",
-  sobremesa: "Sobremesas",
-  bebida: "Bebidas",
-  drink: "Drinks",
-  destilado: "Destilados",
-};
-
-const defaultCategoryOrder = [
-  "entradas",
-  "frio",
-  "sashimi",
-  "jyo",
-  "niguiri",
-  "hot",
-  "temaki",
-  "yakissoba",
-  "executivo",
-  "poke",
-  "combinado",
-  "sobremesa",
-  "bebida",
-  "drink",
-  "destilado",
-];
 
 type CartLine = MenuItem & { quantity: number };
 
@@ -60,16 +31,6 @@ const money = (value: number) =>
     style: "currency",
     currency: "BRL",
   });
-
-const getCategoryOrder = (
-  category: string,
-  groupedItems: Record<string, MenuItem[]>
-) => {
-  const savedOrder = groupedItems[category]?.[0]?.category_order;
-  if (typeof savedOrder === "number") return savedOrder;
-  const fallbackOrder = defaultCategoryOrder.indexOf(category);
-  return fallbackOrder === -1 ? defaultCategoryOrder.length : fallbackOrder;
-};
 
 const sortItems = (menuItems: MenuItem[]) =>
   [...menuItems].sort((a, b) => {
@@ -81,6 +42,14 @@ const sortItems = (menuItems: MenuItem[]) =>
     return a.name.localeCompare(b.name, "pt-BR");
   });
 
+const isItemOrderable = (item?: MenuItem) =>
+  Boolean(item) &&
+  item?.active !== false &&
+  item?.available !== false &&
+  item?.unavailable !== true &&
+  item?.availability_status !== "inativo" &&
+  item?.availability_status !== "esgotado";
+
 export default function Page() {
   const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 720px)");
@@ -88,7 +57,9 @@ export default function Page() {
   const [openCart, setOpenCart] = useState(false);
   const [activeCategory, setActiveCategory] = useState("");
   const [items, setItems] = useState<MenuItem[]>([]);
-  const { addToCart, cart, increase, decrease, total } = useCart();
+  const [categories, setCategories] = useState<MenuCategory[]>(defaultMenuCategories);
+  const { addToCart, cart, increase, decrease, remove, total } = useCart();
+  const [cartNotice, setCartNotice] = useState("");
   const [storeOpen, setStoreOpen] = useState(true);
   const [manualOpen, setManualOpen] = useState(true);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
@@ -96,17 +67,28 @@ export default function Page() {
   const [topItems, setTopItems] = useState<Record<number, number>>({});
 
   useEffect(() => {
-    async function fetchMenu() {
-      const { data, error } = await supabase
-        .from("menu")
-        .select("*")
-        .order("category", { ascending: true })
-        .order("name", { ascending: true });
+    async function fetchMenuData() {
+      const [{ data: menuData, error: menuError }, { data: categoryData }] =
+        await Promise.all([
+          supabase
+            .from("menu")
+            .select("*")
+            .order("category", { ascending: true })
+            .order("name", { ascending: true }),
+          supabase
+            .from("menu_categories")
+            .select("*")
+            .order("sort_order", { ascending: true }),
+        ]);
 
-      if (!error && data) setItems(data as MenuItem[]);
+      if (categoryData?.length) {
+        setCategories(sortCategories(categoryData as MenuCategory[]));
+      }
+
+      if (!menuError && menuData) setItems(menuData as MenuItem[]);
     }
 
-    fetchMenu();
+    fetchMenuData();
   }, []);
 
   useEffect(() => {
@@ -143,22 +125,53 @@ export default function Page() {
     fetchOperationalData();
   }, []);
 
+  useEffect(() => {
+    if (!items.length || !cart.length) return;
+
+    const unavailableCartItems = cart.filter((cartItem) => {
+      const menuItem = items.find((item) => item.id === cartItem.id);
+      return !isItemOrderable(menuItem);
+    });
+
+    if (unavailableCartItems.length === 0) return;
+
+    unavailableCartItems.forEach((item) => remove(item.id));
+    const timer = window.setTimeout(() => {
+      setCartNotice(
+        unavailableCartItems.length === 1
+          ? `${unavailableCartItems[0].name} foi removido do carrinho porque esta pausado ou indisponivel.`
+          : "Alguns itens foram removidos do carrinho porque estao pausados ou indisponiveis."
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [cart, items, remove]);
+
   const groupedItems = useMemo(
     () =>
-      items.reduce((acc, item) => {
-        acc[item.category] = acc[item.category] || [];
-        acc[item.category].push(item);
-        return acc;
-      }, {} as Record<string, MenuItem[]>),
-    [items]
+      items
+        .filter((item) => {
+          const category = categories.find((entry) => entry.slug === item.category);
+          return (
+            category?.active !== false &&
+            item.active !== false &&
+            item.availability_status !== "inativo"
+          );
+        })
+        .reduce((acc, item) => {
+          acc[item.category] = acc[item.category] || [];
+          acc[item.category].push(item);
+          return acc;
+        }, {} as Record<string, MenuItem[]>),
+    [categories, items]
   );
 
   const orderedCategories = useMemo(
     () =>
       Object.keys(groupedItems).sort(
-        (a, b) => getCategoryOrder(a, groupedItems) - getCategoryOrder(b, groupedItems)
+        (a, b) => getCategoryOrder(a, categories) - getCategoryOrder(b, categories)
       ),
-    [groupedItems]
+    [categories, groupedItems]
   );
 
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -251,7 +264,7 @@ export default function Page() {
                 ...(selectedCategory === category ? styles.categoryButtonActive : {}),
               }}
             >
-              {categoryLabels[category] || category}
+              {getCategoryLabel(category, categories)}
             </button>
           ))}
         </div>
@@ -273,7 +286,7 @@ export default function Page() {
                 <div>
                   <p style={styles.sectionEyebrow}>Categoria</p>
                   <h3 style={styles.sectionTitle}>
-                    {categoryLabels[category] || category}
+                    {getCategoryLabel(category, categories)}
                   </h3>
                 </div>
                 <span style={styles.sectionCount}>
@@ -423,6 +436,7 @@ export default function Page() {
             </div>
 
             <div style={styles.cartList}>
+              {cartNotice && <p style={styles.cartNotice}>{cartNotice}</p>}
               {cart.length === 0 ? (
                 <p style={styles.emptyCart}>Seu carrinho está vazio.</p>
               ) : (
@@ -899,6 +913,16 @@ const styles: Record<string, CSSProperties> = {
   },
   emptyCart: {
     color: "#625b53",
+  },
+  cartNotice: {
+    borderRadius: 8,
+    background: "#fee2e2",
+    color: "#991b1b",
+    padding: 12,
+    marginBottom: 12,
+    fontSize: 13,
+    fontWeight: 800,
+    lineHeight: 1.4,
   },
   cartItem: {
     display: "flex",
