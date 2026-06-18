@@ -289,7 +289,7 @@ export default function Page() {
       </section>
 
       <nav style={styles.categoryNav} aria-label="Categorias do cardápio">
-        <div style={{ ...styles.categoryBar, ...(isMobile ? styles.categoryBarMobile : {}) }}>
+        <div style={styles.searchRow}>
           <label style={styles.searchBox}>
             <span style={styles.searchIcon}>⌕</span>
             <input
@@ -299,6 +299,8 @@ export default function Page() {
               style={styles.searchInput}
             />
           </label>
+        </div>
+        <div style={{ ...styles.categoryBar, ...(isMobile ? styles.categoryBarMobile : {}) }}>
           <div style={styles.categoryTrack}>
             {orderedCategories.map((category) => (
               <button
@@ -317,17 +319,17 @@ export default function Page() {
         </div>
       </nav>
 
-      <div style={styles.content}>
+      <div style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
         {showPopular && (
-          <section style={styles.categorySection}>
-            <div style={styles.sectionHeader}>
+          <section style={{ ...styles.categorySection, ...(isMobile ? styles.categorySectionMobile : {}) }}>
+            <div style={{ ...styles.sectionHeader, ...(isMobile ? styles.sectionHeaderMobile : {}) }}>
               <div>
                 <p style={styles.sectionEyebrow}>Favoritos</p>
-                <h3 style={styles.sectionTitle}>Mais pedidos</h3>
+                <h3 style={{ ...styles.sectionTitle, ...(isMobile ? styles.sectionTitleMobile : {}) }}>Mais pedidos</h3>
               </div>
               <span style={styles.sectionCount}>{popularItems.length} itens</span>
             </div>
-            <div style={styles.menuGrid}>
+            <div style={{ ...styles.menuGrid, ...(isMobile ? styles.menuGridMobile : {}) }}>
               {popularItems.map((item) => {
                 const quantity = getQuantity(item.id);
                 const unavailable =
@@ -363,18 +365,23 @@ export default function Page() {
                       )}
                     </div>
 
-                    <div style={styles.cardBody}>
+                    <div style={{ ...styles.cardBody, ...(isMobile ? styles.cardBodyMobile : {}) }}>
                       <div>
-                        <h4 style={styles.itemName}>{item.name}</h4>
-                        <div style={styles.badgeLine}>
-                          <span style={styles.itemBadge}>Mais pedido</span>
-                          {unavailable && <span style={styles.unavailableBadge}>Indisponível</span>}
-                        </div>
-                        {item.description && <p style={styles.itemDescription}>{item.description}</p>}
+                        <h4 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h4>
+                        {unavailable && (
+                          <div style={styles.badgeLine}>
+                            <span style={styles.unavailableBadge}>Indisponível</span>
+                          </div>
+                        )}
+                        {item.description && (
+                          <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>
+                            {item.description}
+                          </p>
+                        )}
                       </div>
 
                       <div style={{ ...styles.cardFooter, ...(isMobile ? styles.cardFooterMobile : {}) }}>
-                        <strong style={styles.price}>{money(Number(item.price))}</strong>
+                        <strong style={{ ...styles.price, ...(isMobile ? styles.priceMobile : {}) }}>{money(Number(item.price))}</strong>
                         {quantity === 0 ? (
                           <button
                             type="button"
@@ -382,6 +389,7 @@ export default function Page() {
                             disabled={unavailable || !storeOpen}
                             style={{
                               ...styles.addButton,
+                              ...(isMobile ? styles.addButtonMobile : {}),
                               ...(unavailable || !storeOpen ? styles.addButtonDisabled : {}),
                             }}
                             aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
@@ -389,10 +397,10 @@ export default function Page() {
                             {unavailable ? "Esgotado" : "Adicionar"}
                           </button>
                         ) : (
-                          <div style={styles.quantityControl}>
-                            <button type="button" onClick={() => decrease(item.id)} style={styles.quantityButton} aria-label={`Remover ${item.name}`}>-</button>
-                            <span style={styles.quantityValue}>{quantity}</span>
-                            <button type="button" onClick={() => handleIncrease(item.id)} style={{ ...styles.quantityButton, ...styles.quantityButtonDark }} aria-label={`Adicionar ${item.name}`}>+</button>
+                          <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
+                            <button type="button" onClick={() => decrease(item.id)} style={{ ...styles.quantityButton, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Remover ${item.name}`}>-</button>
+                            <span style={{ ...styles.quantityValue, ...(isMobile ? styles.quantityValueMobile : {}) }}>{quantity}</span>
+                            <button type="button" onClick={() => handleIncrease(item.id)} style={{ ...styles.quantityButton, ...styles.quantityButtonDark, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Adicionar ${item.name}`}>+</button>
                           </div>
                         )}
                       </div>
@@ -420,12 +428,12 @@ export default function Page() {
               ref={(element) => {
                 sectionRefs.current[category] = element;
               }}
-              style={styles.categorySection}
+              style={{ ...styles.categorySection, ...(isMobile ? styles.categorySectionMobile : {}) }}
             >
-              <div style={styles.sectionHeader}>
+              <div style={{ ...styles.sectionHeader, ...(isMobile ? styles.sectionHeaderMobile : {}) }}>
                 <div>
                   <p style={styles.sectionEyebrow}>Categoria</p>
-                  <h3 style={styles.sectionTitle}>
+                  <h3 style={{ ...styles.sectionTitle, ...(isMobile ? styles.sectionTitleMobile : {}) }}>
                     {getCategoryLabel(category, categories)}
                   </h3>
                 </div>
@@ -434,7 +442,7 @@ export default function Page() {
                 </span>
               </div>
 
-              <div style={styles.menuGrid}>
+              <div style={{ ...styles.menuGrid, ...(isMobile ? styles.menuGridMobile : {}) }}>
                 {itemsInCategory.map((item) => {
                   const quantity = getQuantity(item.id);
                   const unavailable =
@@ -443,7 +451,6 @@ export default function Page() {
                     item.unavailable === true ||
                     item.availability_status === "esgotado" ||
                     item.availability_status === "inativo";
-                  const isPopular = (topItems[item.id] || 0) > 0;
 
                   return (
                     <article
@@ -471,24 +478,23 @@ export default function Page() {
                         )}
                       </div>
 
-                      <div style={styles.cardBody}>
+                      <div style={{ ...styles.cardBody, ...(isMobile ? styles.cardBodyMobile : {}) }}>
                         <div>
-                          <h4 style={styles.itemName}>{item.name}</h4>
-                          <div style={styles.badgeLine}>
-                            {isPopular && <span style={styles.itemBadge}>Mais pedido</span>}
-                            {unavailable && (
+                          <h4 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h4>
+                          {unavailable && (
+                            <div style={styles.badgeLine}>
                               <span style={styles.unavailableBadge}>Indisponível</span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                           {item.description && (
-                            <p style={styles.itemDescription}>
+                            <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>
                               {item.description}
                             </p>
                           )}
                         </div>
 
                         <div style={{ ...styles.cardFooter, ...(isMobile ? styles.cardFooterMobile : {}) }}>
-                          <strong style={styles.price}>
+                          <strong style={{ ...styles.price, ...(isMobile ? styles.priceMobile : {}) }}>
                             {money(Number(item.price))}
                           </strong>
 
@@ -499,6 +505,7 @@ export default function Page() {
                               disabled={unavailable || !storeOpen}
                               style={{
                                 ...styles.addButton,
+                                ...(isMobile ? styles.addButtonMobile : {}),
                                 ...(unavailable || !storeOpen ? styles.addButtonDisabled : {}),
                               }}
                               aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
@@ -506,16 +513,16 @@ export default function Page() {
                               {unavailable ? "Esgotado" : "Adicionar"}
                             </button>
                           ) : (
-                            <div style={styles.quantityControl}>
+                            <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
                               <button
                                 type="button"
                                 onClick={() => decrease(item.id)}
-                                style={styles.quantityButton}
+                                style={{ ...styles.quantityButton, ...(isMobile ? styles.quantityButtonMobile : {}) }}
                                 aria-label={`Remover ${item.name}`}
                               >
                                 -
                               </button>
-                              <span style={styles.quantityValue}>
+                              <span style={{ ...styles.quantityValue, ...(isMobile ? styles.quantityValueMobile : {}) }}>
                                 {quantity}
                               </span>
                               <button
@@ -524,6 +531,7 @@ export default function Page() {
                                 style={{
                                   ...styles.quantityButton,
                                   ...styles.quantityButtonDark,
+                                  ...(isMobile ? styles.quantityButtonMobile : {}),
                                 }}
                                 aria-label={`Adicionar ${item.name}`}
                               >
@@ -804,18 +812,20 @@ const styles: Record<string, CSSProperties> = {
   categoryBar: {
     maxWidth: 1120,
     margin: "0 auto",
-    padding: "10px 20px",
-    display: "grid",
-    gridTemplateColumns: "minmax(180px, 240px) minmax(0, 1fr)",
-    gap: 10,
-    alignItems: "center",
+    padding: "0 20px 10px",
   },
   categoryBarMobile: {
-    gridTemplateColumns: "1fr",
-    gap: 8,
+    padding: "0 16px 10px",
+  },
+  searchRow: {
+    maxWidth: 1120,
+    margin: "0 auto",
+    padding: "10px 20px 8px",
   },
   searchBox: {
     height: 38,
+    width: "100%",
+    maxWidth: 320,
     display: "flex",
     alignItems: "center",
     gap: 8,
@@ -866,9 +876,16 @@ const styles: Record<string, CSSProperties> = {
     margin: "0 auto",
     padding: "28px 20px",
   },
+  contentMobile: {
+    padding: "16px 12px 88px",
+  },
   categorySection: {
     scrollMarginTop: 140,
     marginBottom: 42,
+  },
+  categorySectionMobile: {
+    scrollMarginTop: 126,
+    marginBottom: 28,
   },
   sectionHeader: {
     display: "flex",
@@ -876,6 +893,9 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "end",
     gap: 16,
     marginBottom: 14,
+  },
+  sectionHeaderMobile: {
+    marginBottom: 9,
   },
   sectionEyebrow: {
     color: "#9f1d2f",
@@ -889,6 +909,9 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.1,
     fontWeight: 820,
   },
+  sectionTitleMobile: {
+    fontSize: 21,
+  },
   sectionCount: {
     color: "#766e64",
     fontSize: 13,
@@ -899,6 +922,9 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(min(290px, 100%), 1fr))",
     gap: 14,
+  },
+  menuGridMobile: {
+    gap: 8,
   },
   menuCard: {
     minHeight: 132,
@@ -922,8 +948,8 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.62,
   },
   menuCardMobile: {
-    gridTemplateColumns: "92px minmax(0, 1fr)",
-    minHeight: 132,
+    gridTemplateColumns: "82px minmax(0, 1fr)",
+    minHeight: 104,
   },
   imageWrap: {
     position: "relative",
@@ -931,7 +957,7 @@ const styles: Record<string, CSSProperties> = {
     background: "#ebe3d6",
   },
   imageWrapMobile: {
-    minHeight: 132,
+    minHeight: 104,
   },
   dishImage: {
     objectFit: "cover",
@@ -954,10 +980,18 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     gap: 14,
   },
+  cardBodyMobile: {
+    padding: "9px 10px",
+    gap: 8,
+  },
   itemName: {
     fontSize: 16,
     lineHeight: 1.25,
     fontWeight: 800,
+  },
+  itemNameMobile: {
+    fontSize: 14,
+    lineHeight: 1.18,
   },
   badgeLine: {
     minHeight: 24,
@@ -965,14 +999,6 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     gap: 6,
     flexWrap: "wrap",
-  },
-  itemBadge: {
-    borderRadius: 999,
-    background: "#dbeafe",
-    color: "#1e40af",
-    padding: "4px 8px",
-    fontSize: 11,
-    fontWeight: 850,
   },
   unavailableBadge: {
     borderRadius: 999,
@@ -988,6 +1014,15 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 12,
     lineHeight: 1.4,
   },
+  itemDescriptionMobile: {
+    marginTop: 3,
+    fontSize: 11,
+    lineHeight: 1.25,
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
+  },
   cardFooter: {
     display: "flex",
     alignItems: "center",
@@ -995,11 +1030,15 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
   },
   cardFooterMobile: {
-    alignItems: "flex-start",
-    flexDirection: "column",
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   price: {
     fontSize: 16,
+  },
+  priceMobile: {
+    fontSize: 14,
   },
   addButton: {
     border: "none",
@@ -1010,6 +1049,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     cursor: "pointer",
     whiteSpace: "nowrap",
+  },
+  addButtonMobile: {
+    padding: "7px 10px",
+    fontSize: 12,
   },
   addButtonDisabled: {
     opacity: 0.5,
@@ -1024,6 +1067,10 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 999,
     padding: 2,
   },
+  quantityControlMobile: {
+    height: 32,
+    gridTemplateColumns: "32px 28px 32px",
+  },
   quantityButton: {
     width: 34,
     height: 34,
@@ -1035,6 +1082,11 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 18,
     fontWeight: 800,
   },
+  quantityButtonMobile: {
+    width: 28,
+    height: 28,
+    fontSize: 15,
+  },
   quantityButtonDark: {
     background: "#9f1d2f",
     color: "#fff",
@@ -1043,6 +1095,9 @@ const styles: Record<string, CSSProperties> = {
     textAlign: "center",
     fontSize: 14,
     fontWeight: 800,
+  },
+  quantityValueMobile: {
+    fontSize: 12,
   },
   floatingCart: {
     position: "fixed",
