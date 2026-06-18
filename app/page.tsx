@@ -23,14 +23,9 @@ import {
 } from "../lib/menuCategories";
 import { MenuItem } from "../types";
 import { useCart } from "./context/CartContext";
+import { money, isItemOrderable } from "../lib/orderUtils";
 
 type CartLine = MenuItem & { quantity: number };
-
-const money = (value: number) =>
-  value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
 
 const sortItems = (menuItems: MenuItem[]) =>
   [...menuItems].sort((a, b) => {
@@ -42,26 +37,19 @@ const sortItems = (menuItems: MenuItem[]) =>
     return a.name.localeCompare(b.name, "pt-BR");
   });
 
-const isItemOrderable = (item?: MenuItem) =>
-  Boolean(item) &&
-  item?.active !== false &&
-  item?.available !== false &&
-  item?.unavailable !== true &&
-  item?.availability_status !== "inativo" &&
-  item?.availability_status !== "esgotado";
-
 export default function Page() {
   const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 720px)");
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [openCart, setOpenCart] = useState(false);
   const [activeCategory, setActiveCategory] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>(defaultMenuCategories);
   const { addToCart, cart, increase, decrease, remove, total } = useCart();
   const [cartNotice, setCartNotice] = useState("");
+  const [addedPulseId, setAddedPulseId] = useState<number | null>(null);
   const [storeOpen, setStoreOpen] = useState(true);
-  const [manualOpen, setManualOpen] = useState(true);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
   const [averageTime, setAverageTime] = useState("35 a 50 min");
   const [topItems, setTopItems] = useState<Record<number, number>>({});
@@ -103,17 +91,21 @@ export default function Page() {
         const manuallyOpen = settings.is_open !== false;
         const savedBusinessHours = getBusinessHours(settings.business_hours);
         setBusinessHours(savedBusinessHours);
-        setManualOpen(manuallyOpen);
         setStoreOpen(manuallyOpen && isWithinBusinessHours(new Date(), savedBusinessHours));
         if (settings.average_time) setAverageTime(String(settings.average_time));
       } else {
         setStoreOpen(isWithinBusinessHours(new Date(), weeklyBusinessHours));
       }
 
-      const { data: orders } = await supabase.from("orders").select("items").limit(200);
+      const { data: orders } = await supabase
+        .from("orders")
+        .select("items,payment_status")
+        .eq("payment_status", "pago")
+        .limit(200);
       if (orders) {
         const ranking = new Map<number, number>();
-        orders.forEach((order: { items?: CartLine[] }) => {
+        orders.forEach((order: { items?: CartLine[]; payment_status?: string }) => {
+          if (order.payment_status !== "pago") return;
           (Array.isArray(order.items) ? order.items : []).forEach((item) => {
             ranking.set(item.id, (ranking.get(item.id) || 0) + (item.quantity || 1));
           });
@@ -139,43 +131,85 @@ export default function Page() {
     const timer = window.setTimeout(() => {
       setCartNotice(
         unavailableCartItems.length === 1
-          ? `${unavailableCartItems[0].name} foi removido do carrinho porque esta pausado ou indisponivel.`
-          : "Alguns itens foram removidos do carrinho porque estao pausados ou indisponiveis."
+          ? `${unavailableCartItems[0].name} foi removido do carrinho porque está pausado ou indisponível.`
+          : "Alguns itens foram removidos do carrinho porque estão pausados ou indisponíveis."
       );
     }, 0);
 
     return () => window.clearTimeout(timer);
   }, [cart, items, remove]);
 
-  const groupedItems = useMemo(
+  const orderableItems = useMemo(
     () =>
-      items
-        .filter((item) => {
-          const category = categories.find((entry) => entry.slug === item.category);
-          return (
-            category?.active !== false &&
-            item.active !== false &&
-            item.availability_status !== "inativo"
-          );
-        })
-        .reduce((acc, item) => {
-          acc[item.category] = acc[item.category] || [];
-          acc[item.category].push(item);
-          return acc;
-        }, {} as Record<string, MenuItem[]>),
+      items.filter((item) => {
+        const category = categories.find((entry) => entry.slug === item.category);
+        return (
+          category?.active !== false &&
+          item.active !== false &&
+          item.availability_status !== "inativo"
+        );
+      }),
     [categories, items]
   );
+
+  const filteredItems = useMemo(() => {
+    const query = searchTerm.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return orderableItems;
+
+    return orderableItems.filter((item) =>
+      [item.name, item.description || "", getCategoryLabel(item.category, categories)]
+        .join(" ")
+        .toLocaleLowerCase("pt-BR")
+        .includes(query)
+    );
+  }, [categories, orderableItems, searchTerm]);
+
+  const groupedItems = useMemo(
+    () =>
+      filteredItems.reduce((acc, item) => {
+        acc[item.category] = acc[item.category] || [];
+        acc[item.category].push(item);
+        return acc;
+      }, {} as Record<string, MenuItem[]>),
+    [filteredItems]
+  );
+
+  const categoryOrderByItem = useMemo(() => {
+    const orderMap = new Map<string, number>();
+
+    orderableItems.forEach((item) => {
+      if (typeof item.category_order !== "number") return;
+
+      const currentOrder = orderMap.get(item.category);
+      if (currentOrder === undefined || item.category_order < currentOrder) {
+        orderMap.set(item.category, item.category_order);
+      }
+    });
+
+    return orderMap;
+  }, [orderableItems]);
 
   const orderedCategories = useMemo(
     () =>
       Object.keys(groupedItems).sort(
-        (a, b) => getCategoryOrder(a, categories) - getCategoryOrder(b, categories)
+        (a, b) =>
+          (categoryOrderByItem.get(a) ?? getCategoryOrder(a, categories)) -
+          (categoryOrderByItem.get(b) ?? getCategoryOrder(b, categories))
       ),
-    [categories, groupedItems]
+    [categories, categoryOrderByItem, groupedItems]
   );
 
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const selectedCategory = activeCategory || orderedCategories[0] || "";
+  const popularItems = useMemo(
+    () =>
+      orderableItems
+        .filter((item) => (topItems[item.id] || 0) > 0)
+        .sort((a, b) => (topItems[b.id] || 0) - (topItems[a.id] || 0))
+        .slice(0, 4),
+    [orderableItems, topItems]
+  );
+  const showPopular = !searchTerm.trim() && popularItems.length > 0;
 
   const handleCategoryClick = (category: string) => {
     setActiveCategory(category);
@@ -187,7 +221,6 @@ export default function Page() {
 
   const handleCheckout = () => {
     if (cart.length === 0 || !storeOpen) return;
-    sessionStorage.setItem("order", JSON.stringify({ items: cart, total }));
     setOpenCart(false);
     router.push("/checkout");
   };
@@ -195,21 +228,37 @@ export default function Page() {
   const getQuantity = (id: number) =>
     cart.find((item) => item.id === id)?.quantity || 0;
 
+  const handleAddToCart = (item: MenuItem) => {
+    addToCart(item);
+    setAddedPulseId(item.id);
+    window.setTimeout(() => setAddedPulseId((current) => (current === item.id ? null : current)), 280);
+  };
+
+  const handleIncrease = (id: number) => {
+    increase(id);
+    setAddedPulseId(id);
+    window.setTimeout(() => setAddedPulseId((current) => (current === id ? null : current)), 280);
+  };
+
   return (
     <main style={styles.page}>
       <header style={styles.header}>
         <div style={{ ...styles.headerInner, ...(isMobile ? styles.headerInnerMobile : {}) }}>
           <div>
-            <p style={styles.eyebrow}>Cardápio online</p>
             <h1 style={styles.brand}>Missô Sushi</h1>
             <p style={styles.headerStatus}>
               {storeOpen
                 ? `Aberto - tempo médio de preparo ${averageTime}`
                 : "Loja fechada no momento"}
             </p>
-            <p style={styles.headerStatus}>
+            <p style={styles.headerHours}>
               {getTodayBusinessHoursLabel(new Date(), businessHours)}
             </p>
+            {!storeOpen && (
+              <p style={styles.closedBanner}>
+                Fechado agora · {getNextOpeningLabel(new Date(), businessHours)}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -228,19 +277,6 @@ export default function Page() {
           <div style={styles.introCopy}>
             <p style={styles.kicker}>Sushi, sashimi e pratos japoneses</p>
             <h2 style={styles.title}>Escolha seus pratos favoritos</h2>
-            {!storeOpen && (
-              <p style={styles.closedNotice}>
-                {manualOpen
-                  ? `A loja esta fechada no momento e ${getNextOpeningLabel(
-                      new Date(),
-                      businessHours
-                    )}.`
-                  : `A loja esta fechada manualmente e ${getNextOpeningLabel(
-                      new Date(),
-                      businessHours
-                    )}.`}
-              </p>
-            )}
           </div>
           <div style={{ ...styles.summaryPanel, ...(isMobile ? styles.summaryPanelMobile : {}) }}>
             <span style={styles.summaryLabel}>Seu pedido</span>
@@ -253,24 +289,128 @@ export default function Page() {
       </section>
 
       <nav style={styles.categoryNav} aria-label="Categorias do cardápio">
-        <div style={styles.categoryTrack}>
-          {orderedCategories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() => handleCategoryClick(category)}
-              style={{
-                ...styles.categoryButton,
-                ...(selectedCategory === category ? styles.categoryButtonActive : {}),
-              }}
-            >
-              {getCategoryLabel(category, categories)}
-            </button>
-          ))}
+        <div style={{ ...styles.categoryBar, ...(isMobile ? styles.categoryBarMobile : {}) }}>
+          <label style={styles.searchBox}>
+            <span style={styles.searchIcon}>⌕</span>
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Buscar prato"
+              style={styles.searchInput}
+            />
+          </label>
+          <div style={styles.categoryTrack}>
+            {orderedCategories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => handleCategoryClick(category)}
+                style={{
+                  ...styles.categoryButton,
+                  ...(selectedCategory === category ? styles.categoryButtonActive : {}),
+                }}
+              >
+                {getCategoryLabel(category, categories)}
+              </button>
+            ))}
+          </div>
         </div>
       </nav>
 
       <div style={styles.content}>
+        {showPopular && (
+          <section style={styles.categorySection}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <p style={styles.sectionEyebrow}>Favoritos</p>
+                <h3 style={styles.sectionTitle}>Mais pedidos</h3>
+              </div>
+              <span style={styles.sectionCount}>{popularItems.length} itens</span>
+            </div>
+            <div style={styles.menuGrid}>
+              {popularItems.map((item) => {
+                const quantity = getQuantity(item.id);
+                const unavailable =
+                  item.active === false ||
+                  item.available === false ||
+                  item.unavailable === true ||
+                  item.availability_status === "esgotado" ||
+                  item.availability_status === "inativo";
+
+                return (
+                  <article
+                    key={`popular-${item.id}`}
+                    style={{
+                      ...styles.menuCard,
+                      ...(isMobile ? styles.menuCardMobile : {}),
+                      ...(unavailable ? styles.menuCardUnavailable : {}),
+                      ...(addedPulseId === item.id ? styles.menuCardPulse : {}),
+                    }}
+                  >
+                    <div style={{ ...styles.imageWrap, ...(isMobile ? styles.imageWrapMobile : {}) }}>
+                      {item.image ? (
+                        <Image
+                          src={item.image}
+                          alt={item.name}
+                          fill
+                          sizes="(max-width: 720px) 34vw, 160px"
+                          style={styles.dishImage}
+                        />
+                      ) : (
+                        <div style={styles.imageFallback}>
+                          <span>Missô</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={styles.cardBody}>
+                      <div>
+                        <h4 style={styles.itemName}>{item.name}</h4>
+                        <div style={styles.badgeLine}>
+                          <span style={styles.itemBadge}>Mais pedido</span>
+                          {unavailable && <span style={styles.unavailableBadge}>Indisponível</span>}
+                        </div>
+                        {item.description && <p style={styles.itemDescription}>{item.description}</p>}
+                      </div>
+
+                      <div style={{ ...styles.cardFooter, ...(isMobile ? styles.cardFooterMobile : {}) }}>
+                        <strong style={styles.price}>{money(Number(item.price))}</strong>
+                        {quantity === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(item)}
+                            disabled={unavailable || !storeOpen}
+                            style={{
+                              ...styles.addButton,
+                              ...(unavailable || !storeOpen ? styles.addButtonDisabled : {}),
+                            }}
+                            aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
+                          >
+                            {unavailable ? "Esgotado" : "Adicionar"}
+                          </button>
+                        ) : (
+                          <div style={styles.quantityControl}>
+                            <button type="button" onClick={() => decrease(item.id)} style={styles.quantityButton} aria-label={`Remover ${item.name}`}>-</button>
+                            <span style={styles.quantityValue}>{quantity}</span>
+                            <button type="button" onClick={() => handleIncrease(item.id)} style={{ ...styles.quantityButton, ...styles.quantityButtonDark }} aria-label={`Adicionar ${item.name}`}>+</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {orderedCategories.length === 0 && (
+          <section style={styles.emptySearch}>
+            <h3>Nenhum prato encontrado</h3>
+            <p>Confira o termo digitado ou escolha outra categoria.</p>
+          </section>
+        )}
+
         {orderedCategories.map((category) => {
           const itemsInCategory = sortItems(groupedItems[category]);
 
@@ -312,6 +452,7 @@ export default function Page() {
                         ...styles.menuCard,
                         ...(isMobile ? styles.menuCardMobile : {}),
                         ...(unavailable ? styles.menuCardUnavailable : {}),
+                        ...(addedPulseId === item.id ? styles.menuCardPulse : {}),
                       }}
                     >
                       <div style={{ ...styles.imageWrap, ...(isMobile ? styles.imageWrapMobile : {}) }}>
@@ -336,7 +477,7 @@ export default function Page() {
                           <div style={styles.badgeLine}>
                             {isPopular && <span style={styles.itemBadge}>Mais pedido</span>}
                             {unavailable && (
-                              <span style={styles.unavailableBadge}>Indisponivel</span>
+                              <span style={styles.unavailableBadge}>Indisponível</span>
                             )}
                           </div>
                           {item.description && (
@@ -354,12 +495,13 @@ export default function Page() {
                           {quantity === 0 ? (
                             <button
                               type="button"
-                              onClick={() => addToCart(item)}
+                              onClick={() => handleAddToCart(item)}
                               disabled={unavailable || !storeOpen}
                               style={{
                                 ...styles.addButton,
                                 ...(unavailable || !storeOpen ? styles.addButtonDisabled : {}),
                               }}
+                              aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
                             >
                               {unavailable ? "Esgotado" : "Adicionar"}
                             </button>
@@ -378,7 +520,7 @@ export default function Page() {
                               </span>
                               <button
                                 type="button"
-                                onClick={() => increase(item.id)}
+                                onClick={() => handleIncrease(item.id)}
                                 style={{
                                   ...styles.quantityButton,
                                   ...styles.quantityButtonDark,
@@ -406,7 +548,7 @@ export default function Page() {
           onClick={() => setOpenCart(true)}
           style={styles.floatingCart}
         >
-          <span>Ver carrinho</span>
+          <span>Ver carrinho · {itemCount === 1 ? "1 item" : `${itemCount} itens`}</span>
           <strong>{money(total)}</strong>
         </button>
       )}
@@ -425,6 +567,7 @@ export default function Page() {
               <div>
                 <p style={styles.cartEyebrow}>Pedido</p>
                 <h3 style={styles.cartTitle}>Carrinho</h3>
+                <p style={styles.cartMeta}>{itemCount === 1 ? "1 item" : `${itemCount} itens`}</p>
               </div>
               <button
                 type="button"
@@ -460,7 +603,7 @@ export default function Page() {
                       <span style={styles.quantityValue}>{item.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => increase(item.id)}
+                        onClick={() => handleIncrease(item.id)}
                         style={{
                           ...styles.quantityButton,
                           ...styles.quantityButtonDark,
@@ -476,6 +619,10 @@ export default function Page() {
             </div>
 
             <div style={styles.cartFooter}>
+              <div style={styles.cartSubtotalRow}>
+                <span>Subtotal</span>
+                <strong>{money(total)}</strong>
+              </div>
               <div style={styles.totalRow}>
                 <span>Total</span>
                 <strong>{money(total)}</strong>
@@ -534,7 +681,6 @@ const styles: Record<string, CSSProperties> = {
     textTransform: "uppercase",
   },
   brand: {
-    marginTop: 2,
     fontSize: 24,
     lineHeight: 1,
     fontWeight: 800,
@@ -544,6 +690,22 @@ const styles: Record<string, CSSProperties> = {
     color: "#625b53",
     fontSize: 13,
     fontWeight: 750,
+  },
+  headerHours: {
+    marginTop: 3,
+    color: "#766e64",
+    fontSize: 12,
+    fontWeight: 650,
+  },
+  closedBanner: {
+    marginTop: 7,
+    display: "inline-flex",
+    borderRadius: 999,
+    background: "#fee2e2",
+    color: "#991b1b",
+    padding: "6px 10px",
+    fontSize: 12,
+    fontWeight: 850,
   },
   headerCartButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
@@ -610,7 +772,7 @@ const styles: Record<string, CSSProperties> = {
     color: "#fffdf8",
     borderRadius: 8,
     padding: 18,
-    minHeight: 132,
+    minHeight: 148,
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
@@ -635,26 +797,62 @@ const styles: Record<string, CSSProperties> = {
     position: "sticky",
     top: 67,
     zIndex: 20,
-    background: "rgba(247, 244, 239, 0.94)",
+    background: "rgba(247, 244, 239, 0.96)",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
     backdropFilter: "blur(14px)",
   },
-  categoryTrack: {
+  categoryBar: {
     maxWidth: 1120,
     margin: "0 auto",
-    padding: "12px 20px",
-    display: "flex",
+    padding: "10px 20px",
+    display: "grid",
+    gridTemplateColumns: "minmax(180px, 240px) minmax(0, 1fr)",
+    gap: 10,
+    alignItems: "center",
+  },
+  categoryBarMobile: {
+    gridTemplateColumns: "1fr",
     gap: 8,
+  },
+  searchBox: {
+    height: 38,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    border: "1px solid rgba(28, 26, 23, 0.1)",
+    background: "#fffdf8",
+    borderRadius: 999,
+    padding: "0 12px",
+  },
+  searchIcon: {
+    color: "#766e64",
+    fontSize: 15,
+    lineHeight: 1,
+  },
+  searchInput: {
+    width: "100%",
+    border: "none",
+    outline: "none",
+    background: "transparent",
+    color: "#1c1a17",
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  categoryTrack: {
+    display: "flex",
+    gap: 6,
     overflowX: "auto",
   },
   categoryButton: {
-    border: "1px solid rgba(28, 26, 23, 0.12)",
-    background: "#fffdf8",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "transparent",
+    background: "rgba(255, 253, 248, 0.74)",
     color: "#514a43",
     borderRadius: 999,
-    padding: "10px 14px",
-    fontSize: 14,
-    fontWeight: 700,
+    padding: "8px 12px",
+    fontSize: 13,
+    fontWeight: 800,
     whiteSpace: "nowrap",
     cursor: "pointer",
   },
@@ -703,32 +901,41 @@ const styles: Record<string, CSSProperties> = {
     gap: 14,
   },
   menuCard: {
-    minHeight: 168,
+    minHeight: 132,
     background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(28, 26, 23, 0.08)",
     borderRadius: 8,
     display: "grid",
-    gridTemplateColumns: "132px minmax(0, 1fr)",
+    gridTemplateColumns: "116px minmax(0, 1fr)",
     overflow: "hidden",
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
+    transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
+  },
+  menuCardPulse: {
+    transform: "scale(1.015)",
+    borderColor: "rgba(159, 29, 47, 0.36)",
+    boxShadow: "0 16px 38px rgba(159, 29, 47, 0.14)",
   },
   menuCardUnavailable: {
     opacity: 0.62,
   },
   menuCardMobile: {
-    gridTemplateColumns: "104px minmax(0, 1fr)",
-    minHeight: 150,
+    gridTemplateColumns: "92px minmax(0, 1fr)",
+    minHeight: 132,
   },
   imageWrap: {
     position: "relative",
-    minHeight: 168,
+    minHeight: 148,
     background: "#ebe3d6",
   },
   imageWrapMobile: {
-    minHeight: 150,
+    minHeight: 132,
   },
   dishImage: {
     objectFit: "cover",
+    objectPosition: "center",
   },
   imageFallback: {
     width: "100%",
@@ -741,14 +948,14 @@ const styles: Record<string, CSSProperties> = {
   },
   cardBody: {
     minWidth: 0,
-    padding: 16,
+    padding: 14,
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
     gap: 14,
   },
   itemName: {
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: 1.25,
     fontWeight: 800,
   },
@@ -776,10 +983,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
   },
   itemDescription: {
-    marginTop: 7,
+    marginTop: 5,
     color: "#625b53",
-    fontSize: 13,
-    lineHeight: 1.45,
+    fontSize: 12,
+    lineHeight: 1.4,
   },
   cardFooter: {
     display: "flex",
@@ -792,14 +999,14 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: "column",
   },
   price: {
-    fontSize: 17,
+    fontSize: 16,
   },
   addButton: {
     border: "none",
     background: "#1c1a17",
     color: "#fffdf8",
     borderRadius: 999,
-    padding: "10px 14px",
+    padding: "9px 13px",
     fontWeight: 800,
     cursor: "pointer",
     whiteSpace: "nowrap",
@@ -843,12 +1050,12 @@ const styles: Record<string, CSSProperties> = {
     bottom: 18,
     transform: "translateX(-50%)",
     zIndex: 25,
-    width: "min(520px, calc(100% - 32px))",
+    width: "min(360px, calc(100% - 32px))",
     border: "none",
     borderRadius: 999,
     background: "#1c1a17",
     color: "#fffdf8",
-    padding: "15px 18px",
+    padding: "13px 16px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -898,6 +1105,12 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 28,
     lineHeight: 1,
   },
+  cartMeta: {
+    marginTop: 5,
+    color: "#766e64",
+    fontSize: 13,
+    fontWeight: 750,
+  },
   closeButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
     background: "#f7f4ef",
@@ -909,7 +1122,7 @@ const styles: Record<string, CSSProperties> = {
   cartList: {
     flex: 1,
     overflowY: "auto",
-    padding: 20,
+    padding: "12px 20px",
   },
   emptyCart: {
     color: "#625b53",
@@ -929,7 +1142,7 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     gap: 16,
-    padding: "14px 0",
+    padding: "12px 0",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
   },
   cartItemMain: {
@@ -950,6 +1163,14 @@ const styles: Record<string, CSSProperties> = {
     padding: 20,
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
     background: "#fffdf8",
+  },
+  cartSubtotalRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    color: "#625b53",
+    fontSize: 14,
   },
   totalRow: {
     display: "flex",
@@ -972,5 +1193,12 @@ const styles: Record<string, CSSProperties> = {
   checkoutButtonDisabled: {
     opacity: 0.45,
     cursor: "not-allowed",
+  },
+  emptySearch: {
+    borderRadius: 8,
+    background: "#fffdf8",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    padding: 24,
+    color: "#625b53",
   },
 };

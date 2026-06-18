@@ -86,6 +86,8 @@ alter table if exists public.menu
   add column if not exists featured boolean not null default false;
 
 alter table if exists public.orders
+  add column if not exists note text,
+  add column if not exists payment_method text,
   add column if not exists payment_status text not null default 'pendente',
   add column if not exists fulfillment text not null default 'retirada',
   add column if not exists mercado_pago_payment_id text,

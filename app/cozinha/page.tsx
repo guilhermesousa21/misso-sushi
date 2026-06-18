@@ -29,13 +29,25 @@ type Order = {
   payment_status?: string;
 };
 
-const statuses = ["todos", "recebido", "entregue", "retirado"];
+type ConfirmationState =
+  | { action: "print"; order: Order }
+  | { action: "ready"; order: Order }
+  | null;
+
+const statusLabels: Record<string, string> = {
+  recebido: "Recebido",
+  pronto: "Pronto",
+  retirado: "Retirado",
+};
 
 const statusStyle: Record<string, CSSProperties> = {
   recebido: { background: "#fee2e2", color: "#991b1b" },
-  entregue: { background: "#dcfce7", color: "#166534" },
+  pronto: { background: "#dcfce7", color: "#166534" },
   retirado: { background: "#e0e7ff", color: "#3730a3" },
 };
+
+const normalizeKitchenStatus = (status?: string) =>
+  status === "preparando" ? "recebido" : status || "recebido";
 
 const money = (value: number) =>
   value.toLocaleString("pt-BR", {
@@ -49,38 +61,30 @@ const calcTotal = (items: OrderItem[]) =>
     0
   );
 
-const paymentLabel = (order: Order) => {
-  const status = order.payment_status || "pendente";
-  if (!order.payment_method) return `Pagamento: ${status}`;
-  return `Pagamento: ${order.payment_method.toUpperCase()} - ${status}`;
+const parseSupabaseDate = (value: string) => {
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  return new Date(hasTimezone ? value : `${value}Z`);
 };
 
-const minutesSince = (value: string) =>
-  Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+const minutesSinceAt = (value: string, now: Date) =>
+  Math.max(0, Math.floor((now.getTime() - parseSupabaseDate(value).getTime()) / 60000));
 
-const playNotification = () => {
-  const AudioContextClass =
-    window.AudioContext ||
-    (window as typeof window & { webkitAudioContext?: typeof AudioContext })
-      .webkitAudioContext;
-  if (!AudioContextClass) return;
-
-  const audio = new AudioContextClass();
-  const oscillator = audio.createOscillator();
-  const gain = audio.createGain();
-  oscillator.connect(gain);
-  gain.connect(audio.destination);
-  oscillator.frequency.value = 880;
-  gain.gain.value = 0.08;
-  oscillator.start();
-  oscillator.stop(audio.currentTime + 0.18);
-};
+const formatBrasiliaDateTime = (value: string) =>
+  parseSupabaseDate(value).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
   const isMobile = useMediaQuery("(max-width: 720px)");
-  const [filter, setFilter] = useState("todos");
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+  const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
+  const [confirming, setConfirming] = useState(false);
   const previousOrderIds = useRef<Set<number>>(new Set());
 
   useEffect(() => {
@@ -90,13 +94,16 @@ export default function AdminPanel() {
       const { data } = await supabase
         .from("orders")
         .select("*")
+        .eq("payment_status", "pago")
         .order("created_at", { ascending: true });
 
       if (mounted && data) {
-        const safeData: Order[] = data.map((order: Order) => ({
-          ...order,
-          items: Array.isArray(order.items) ? order.items : [],
-        }));
+        const safeData: Order[] = data
+          .filter((order: Order) => order.payment_status === "pago")
+          .map((order: Order) => ({
+            ...order,
+            items: Array.isArray(order.items) ? order.items : [],
+          }));
 
         const nextIds = new Set(safeData.map((order) => order.id));
         const newOrders = safeData.filter(
@@ -107,9 +114,6 @@ export default function AdminPanel() {
           newOrders.length > 0;
         previousOrderIds.current = nextIds;
 
-        if (hasNewOrder && soundEnabled) {
-          playNotification();
-        }
         if (hasNewOrder) {
           newOrders.forEach((order) => printOrder(order));
         }
@@ -135,39 +139,67 @@ export default function AdminPanel() {
       mounted = false;
       supabase.removeChannel(channel);
     };
-  }, [soundEnabled]);
+  }, []);
 
-  async function updateStatus(id: number, status: string) {
-    if (status === "retirado") {
-      const confirm = window.confirm("Finalizar este pedido como retirado?");
-      if (!confirm) return;
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  async function markOrderReady(order: Order) {
+    if (normalizeKitchenStatus(order.status) === "pronto") return;
+
+    const { error } = await supabase.from("orders").update({ status: "pronto" }).eq("id", order.id);
+    if (error) {
+      window.alert("Não foi possível marcar o pedido como pronto.");
+      return;
     }
-
-    if (status === "recebido") {
-      const confirm = window.confirm("Reverter este pedido para recebido?");
-      if (!confirm) return;
-    }
-
-    await supabase.from("orders").update({ status }).eq("id", id);
 
     setOrders((prev) =>
-      prev.map((order) => (order.id === id ? { ...order, status } : order))
+      prev.map((current) => (current.id === order.id ? { ...current, status: "pronto" } : current))
     );
+
+    const response = await fetch("/api/whatsapp/customer-ready", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...order, status: "pronto" }),
+    }).catch(() => null);
+
+    const result = response ? await response.json().catch(() => null) : null;
+    if (!response?.ok || result?.ok === false) {
+      window.alert(result?.error || "Pedido marcado como pronto, mas não foi possível enviar o WhatsApp ao cliente.");
+    }
   }
 
-  const filtered =
-    filter === "todos" ? orders : orders.filter((order) => order.status === filter);
+  async function handleConfirmAction() {
+    if (!confirmation) return;
 
-  const sorted = [...filtered].sort((a, b) => {
-    const aDone = ["entregue", "retirado"].includes(a.status);
-    const bDone = ["entregue", "retirado"].includes(b.status);
+    setConfirming(true);
+    try {
+      if (confirmation.action === "print") {
+        printOrder(confirmation.order);
+      } else {
+        await markOrderReady(confirmation.order);
+      }
+      setConfirmation(null);
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  const sorted = [...orders].sort((a, b) => {
+    const aDone = ["retirado"].includes(a.status);
+    const bDone = ["retirado"].includes(b.status);
     if (aDone && !bDone) return 1;
     if (bDone && !aDone) return -1;
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 
   const activeOrders = orders.filter(
-    (order) => !["entregue", "retirado"].includes(order.status)
+    (order) => !["retirado"].includes(order.status)
   );
 
   return (
@@ -183,39 +215,6 @@ export default function AdminPanel() {
         </div>
       </header>
 
-      <nav style={styles.filters} aria-label="Filtrar pedidos">
-        <button
-          type="button"
-          onClick={() => {
-            setSoundEnabled(true);
-            playNotification();
-          }}
-          style={{ ...styles.filterBtn, ...(soundEnabled ? styles.filterBtnActive : {}) }}
-        >
-          Som {soundEnabled ? "ativo" : "ativar"}
-        </button>
-        {statuses.map((status) => {
-          const count =
-            status === "todos"
-              ? orders.length
-              : orders.filter((order) => order.status === status).length;
-
-          return (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setFilter(status)}
-              style={{
-                ...styles.filterBtn,
-                ...(filter === status ? styles.filterBtnActive : {}),
-              }}
-            >
-              {status} <span style={styles.filterCount}>{count}</span>
-            </button>
-          );
-        })}
-      </nav>
-
       {sorted.length === 0 ? (
         <section style={styles.emptyState}>
           <h2>Nenhum pedido nesta fila</h2>
@@ -224,12 +223,16 @@ export default function AdminPanel() {
       ) : (
         <section style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
           {sorted.map((order) => (
+            (() => {
+              const kitchenStatus = normalizeKitchenStatus(order.status);
+
+              return (
             <article
               key={order.id}
               style={{
                 ...styles.card,
-                ...(minutesSince(order.created_at) > 35 &&
-                !["entregue", "retirado"].includes(order.status)
+                ...(minutesSinceAt(order.created_at, now) > 35 &&
+                !["retirado"].includes(order.status)
                   ? styles.cardDelayed
                   : {}),
               }}
@@ -238,17 +241,17 @@ export default function AdminPanel() {
                 <div>
                   <p style={styles.orderId}>Pedido #{order.id}</p>
                   <p style={styles.time}>
-                    {new Date(order.created_at).toLocaleString("pt-BR")}
+                    {formatBrasiliaDateTime(order.created_at)}
                   </p>
-                  <p style={styles.time}>{minutesSince(order.created_at)} min na fila</p>
+                  <p style={styles.time}>{minutesSinceAt(order.created_at, now)} min na fila</p>
                 </div>
                 <span
                   style={{
                     ...styles.badge,
-                    ...(statusStyle[order.status] || {}),
+                    ...(statusStyle[kitchenStatus] || {}),
                   }}
                 >
-                  {order.status}
+                  {statusLabels[kitchenStatus] || kitchenStatus}
                 </span>
               </div>
 
@@ -256,7 +259,6 @@ export default function AdminPanel() {
                 <strong>{order.name || "Cliente"}</strong>
                 <span>{order.phone || "Telefone não informado"}</span>
                 <span>Retirada no balcão</span>
-                <span>{paymentLabel(order)}</span>
                 {order.note && <p>Obs: {order.note}</p>}
               </div>
 
@@ -285,31 +287,103 @@ export default function AdminPanel() {
                 <button
                   type="button"
                   style={styles.actionSecondary}
-                  onClick={() => printOrder(order)}
+                  onClick={() => setConfirmation({ action: "print", order })}
                 >
                   Imprimir
                 </button>
-                {order.status === "retirado" ? (
-                  <button
-                    type="button"
-                    style={styles.actionSecondary}
-                    onClick={() => updateStatus(order.id, "recebido")}
-                  >
-                    Reverter
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    style={styles.actionPrimary}
-                    onClick={() => updateStatus(order.id, "retirado")}
-                  >
-                    Finalizar
-                  </button>
-                )}
+                <button
+                  type="button"
+                  style={{
+                    ...styles.actionPrimary,
+                    ...(kitchenStatus === "pronto" ? styles.actionReady : {}),
+                  }}
+                  onClick={() => setConfirmation({ action: "ready", order })}
+                  disabled={kitchenStatus === "pronto"}
+                >
+                  {kitchenStatus === "pronto" ? "Pedido pronto" : "Pedido pronto"}
+                </button>
               </div>
             </article>
+              );
+            })()
           ))}
         </section>
+      )}
+
+      {confirmation && (
+        <div
+          style={styles.modalOverlay}
+          role="presentation"
+          onClick={() => !confirming && setConfirmation(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-title"
+            style={{ ...styles.confirmModal, ...(isMobile ? styles.confirmModalMobile : {}) }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={styles.confirmHeader}>
+              <span style={styles.confirmIcon}>
+                {confirmation.action === "ready" ? "✓" : "•"}
+              </span>
+              <div>
+                <p style={styles.confirmEyebrow}>
+                  {confirmation.action === "ready" ? "Aviso ao cliente" : "Impressão"}
+                </p>
+                <h2 id="confirm-title" style={styles.confirmTitle}>
+                  {confirmation.action === "ready"
+                    ? `Marcar pedido #${confirmation.order.id} como pronto?`
+                    : `Imprimir pedido #${confirmation.order.id}?`}
+                </h2>
+              </div>
+            </div>
+
+            <div style={styles.confirmBody}>
+              <div style={styles.confirmRow}>
+                <span>Cliente</span>
+                <strong>{confirmation.order.name || "Cliente"}</strong>
+              </div>
+              <div style={styles.confirmRow}>
+                <span>Telefone</span>
+                <strong>{confirmation.order.phone || "Não informado"}</strong>
+              </div>
+              <div style={styles.confirmRow}>
+                <span>Total</span>
+                <strong>{money(confirmation.order.total ?? calcTotal(confirmation.order.items))}</strong>
+              </div>
+            </div>
+
+            {confirmation.action === "ready" && (
+              <p style={styles.confirmNote}>
+                O pedido será marcado como pronto e o cliente receberá uma mensagem automática no WhatsApp.
+              </p>
+            )}
+
+            <div style={styles.confirmActions}>
+              <button
+                type="button"
+                style={styles.confirmCancel}
+                onClick={() => setConfirmation(null)}
+                disabled={confirming}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                style={styles.confirmPrimary}
+                onClick={handleConfirmAction}
+                disabled={confirming}
+              >
+                {confirming
+                  ? "Processando..."
+                  : confirmation.action === "ready"
+                    ? "Confirmar pronto"
+                    : "Confirmar impressão"}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
     </main>
   );
@@ -357,32 +431,6 @@ const styles: Record<string, CSSProperties> = {
     gap: 4,
     minWidth: 150,
   },
-  filters: {
-    maxWidth: 1180,
-    margin: "0 auto 18px",
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  filterBtn: {
-    border: "1px solid rgba(28, 26, 23, 0.12)",
-    borderRadius: 999,
-    background: "#fffdf8",
-    color: "#514a43",
-    padding: "10px 13px",
-    cursor: "pointer",
-    fontWeight: 850,
-    textTransform: "capitalize",
-  },
-  filterBtnActive: {
-    background: "#1c1a17",
-    color: "#fffdf8",
-    borderColor: "#1c1a17",
-  },
-  filterCount: {
-    marginLeft: 6,
-    opacity: 0.72,
-  },
   grid: {
     maxWidth: 1180,
     margin: "0 auto",
@@ -395,7 +443,9 @@ const styles: Record<string, CSSProperties> = {
   },
   card: {
     background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(28, 26, 23, 0.08)",
     borderRadius: 8,
     padding: 18,
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
@@ -460,11 +510,13 @@ const styles: Record<string, CSSProperties> = {
   actions: {
     marginTop: 16,
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: 8,
+    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
+    paddingTop: 14,
   },
   actionsMobile: {
-    gridTemplateColumns: "1fr",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   },
   actionSecondary: {
     border: "none",
@@ -474,6 +526,8 @@ const styles: Record<string, CSSProperties> = {
     padding: 12,
     cursor: "pointer",
     fontWeight: 850,
+    minHeight: 46,
+    whiteSpace: "nowrap",
   },
   actionPrimary: {
     border: "none",
@@ -481,6 +535,106 @@ const styles: Record<string, CSSProperties> = {
     background: "#9f1d2f",
     color: "#fff",
     padding: 12,
+    cursor: "pointer",
+    fontWeight: 850,
+    minHeight: 46,
+    whiteSpace: "nowrap",
+  },
+  actionReady: {
+    background: "#15803d",
+    color: "#fff",
+    cursor: "not-allowed",
+  },
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 40,
+    background: "rgba(28, 26, 23, 0.48)",
+    display: "grid",
+    placeItems: "center",
+    padding: 18,
+  },
+  confirmModal: {
+    width: "min(100%, 460px)",
+    background: "#fffdf8",
+    borderRadius: 8,
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    boxShadow: "0 30px 80px rgba(28, 26, 23, 0.28)",
+    padding: 22,
+  },
+  confirmModalMobile: {
+    padding: 18,
+  },
+  confirmHeader: {
+    display: "flex",
+    gap: 14,
+    alignItems: "start",
+  },
+  confirmIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 18,
+    fontWeight: 900,
+    flex: "0 0 auto",
+  },
+  confirmEyebrow: {
+    color: "#9f1d2f",
+    fontSize: 12,
+    fontWeight: 850,
+    textTransform: "uppercase",
+  },
+  confirmTitle: {
+    marginTop: 4,
+    fontSize: 28,
+    lineHeight: 1.05,
+  },
+  confirmBody: {
+    marginTop: 18,
+    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
+    borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
+    padding: "10px 0",
+    display: "grid",
+    gap: 2,
+  },
+  confirmRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 16,
+    padding: "8px 0",
+    color: "#625b53",
+  },
+  confirmNote: {
+    marginTop: 14,
+    color: "#514a43",
+    lineHeight: 1.45,
+  },
+  confirmActions: {
+    marginTop: 18,
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 10,
+  },
+  confirmCancel: {
+    border: "none",
+    borderRadius: 999,
+    background: "#f0ebe2",
+    color: "#1c1a17",
+    padding: "13px 14px",
+    cursor: "pointer",
+    fontWeight: 850,
+  },
+  confirmPrimary: {
+    border: "none",
+    borderRadius: 999,
+    background: "#9f1d2f",
+    color: "#fff",
+    padding: "13px 14px",
     cursor: "pointer",
     fontWeight: 850,
   },

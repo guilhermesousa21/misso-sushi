@@ -6,12 +6,12 @@ import { usePathname } from "next/navigation";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 
 const navItems = [
-  { href: "/admin/menu", label: "Cardapio" },
+  { href: "/admin/menu", label: "Cardápio" },
   { href: "/admin/faturamento", label: "Faturamento" },
   { href: "/admin/pedidos", label: "Pedidos" },
   { href: "/admin/clientes", label: "Clientes" },
-  { href: "/admin/promocoes", label: "Promocoes" },
-  { href: "/admin/configuracoes", label: "Configuracoes" },
+  { href: "/admin/promocoes", label: "Promoções" },
+  { href: "/admin/configuracoes", label: "Configurações" },
 ];
 
 export const money = (value: number) =>
@@ -93,8 +93,8 @@ export function AdminShell({
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
       <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}) }}>
         <div>
-          <h2 style={styles.sidebarTitle}>Misso Admin</h2>
-          <p style={styles.sidebarMuted}>Gestao operacional</p>
+          <h2 style={styles.sidebarTitle}>Missô Admin</h2>
+          <p style={styles.sidebarMuted}>Gestão operacional</p>
         </div>
         <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}) }}>
           {navItems.map((item) => (

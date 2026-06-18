@@ -79,6 +79,11 @@ on public.promotions for update
 using (true)
 with check (true);
 
+drop policy if exists "App can delete promotions" on public.promotions;
+create policy "App can delete promotions"
+on public.promotions for delete
+using (true);
+
 drop policy if exists "App can read menu categories" on public.menu_categories;
 create policy "App can read menu categories"
 on public.menu_categories for select

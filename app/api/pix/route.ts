@@ -7,12 +7,12 @@ export async function POST(req: Request) {
     const value = Number(amount);
 
     if (!value || value <= 0) {
-      return NextResponse.json({ error: "Valor invalido" }, { status: 400 });
+      return NextResponse.json({ error: "Valor inválido" }, { status: 400 });
     }
 
     const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
     if (!token) {
-      return NextResponse.json({ error: "Token nao configurado" }, { status: 500 });
+      return NextResponse.json({ error: "Token não configurado" }, { status: 500 });
     }
 
     const client = new MercadoPagoConfig({ accessToken: token });
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       body: {
         transaction_amount: value,
         payment_method_id: "pix",
-        description: note || "Misso Sushi Pedido",
+        description: note || "Missô Sushi Pedido",
         payer: {
           email: "cliente@email.com",
           first_name: payer?.name || "Cliente",
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
 
     const pix = result.point_of_interaction?.transaction_data;
     if (!pix) {
-      return NextResponse.json({ error: "PIX nao retornou" }, { status: 500 });
+      return NextResponse.json({ error: "PIX não retornou" }, { status: 500 });
     }
 
     return NextResponse.json({

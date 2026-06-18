@@ -1,15 +1,14 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
-import Image from "next/image";
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../lib/supabase";
 import {
   getBusinessHours,
   getNextOpeningLabel,
-  getTodayBusinessHoursLabel,
   isWithinBusinessHours,
   weeklyBusinessHours,
   type BusinessHours,
@@ -17,6 +16,7 @@ import {
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import type { MenuItem } from "../../types";
 import { useCart } from "../context/CartContext";
+import { money, isItemOrderable } from "../../lib/orderUtils";
 
 type PaymentMethod = "pix" | "card";
 
@@ -26,14 +26,11 @@ type Promotion = {
   description?: string | null;
   discount_type: "percent" | "fixed";
   discount_value: number;
-  active: boolean;
 };
 
-const money = (value: number) =>
-  value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
+type CheckoutState = "form" | "generating" | "awaiting_pix" | "paid";
+
+const PIX_WAIT_SECONDS = 15 * 60;
 
 const sanitizeName = (value: string) =>
   value
@@ -51,45 +48,49 @@ const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
 const formatPhone = (value: string) => {
   const digits = onlyDigits(value).slice(0, 11);
-
   if (digits.length <= 2) return digits;
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  if (digits.length <= 10) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-  }
-
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
 const sanitizeCoupon = (value: string) =>
-  value
-    .replace(/[^a-z0-9-]/gi, "")
-    .slice(0, 24)
-    .toUpperCase();
+  value.replace(/[^a-z0-9-]/gi, "").slice(0, 24).toUpperCase();
 
 const calculateDiscount = (promotion: Promotion | null, subtotal: number) => {
   if (!promotion || subtotal <= 0) return 0;
-
   const value = Number(promotion.discount_value || 0);
   const discount =
     promotion.discount_type === "percent" ? subtotal * (value / 100) : value;
-
   return Math.min(subtotal, Math.max(0, discount));
 };
 
-const isItemOrderable = (item?: MenuItem) =>
-  Boolean(item) &&
-  item?.active !== false &&
-  item?.available !== false &&
-  item?.unavailable !== true &&
-  item?.availability_status !== "inativo" &&
-  item?.availability_status !== "esgotado";
+const optionalOrderColumns = [
+  "note",
+  "subtotal",
+  "discount_amount",
+  "coupon_code",
+  "promotion_id",
+  "fulfillment",
+  "payment_method",
+  "payment_status",
+  "mercado_pago_payment_id",
+];
+
+const getMissingSchemaColumn = (message: string) =>
+  optionalOrderColumns.find((column) => message.includes(`'${column}' column`));
+
+const formatCountdown = (seconds: number) => {
+  const minutes = Math.floor(Math.max(0, seconds) / 60);
+  const remainingSeconds = Math.max(0, seconds) % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+};
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { cart, cartLoaded, total, clear, remove } = useCart();
   const isMobile = useMediaQuery("(max-width: 760px)");
-  const isTablet = useMediaQuery("(max-width: 980px)");
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("pix");
@@ -98,20 +99,24 @@ export default function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<Promotion | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponMessage, setCouponMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [pixLoading, setPixLoading] = useState(false);
+
+  const [checkoutState, setCheckoutState] = useState<CheckoutState>("form");
+  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
   const [pixQr, setPixQr] = useState("");
   const [pixCode, setPixCode] = useState("");
-  const [pixPaymentId, setPixPaymentId] = useState<number | string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [pixCountdown, setPixCountdown] = useState(PIX_WAIT_SECONDS);
   const [error, setError] = useState("");
+
   const [storeOpen, setStoreOpen] = useState(true);
   const [manualOpen, setManualOpen] = useState(true);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [cartNotice, setCartNotice] = useState("");
+
   const discountAmount = calculateDiscount(appliedCoupon, total);
   const finalTotal = Math.max(0, total - discountAmount);
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
     async function fetchStoreStatus() {
@@ -120,14 +125,12 @@ export default function CheckoutPage() {
         .select("is_open,business_hours")
         .limit(1)
         .maybeSingle();
-
       const manuallyOpen = data?.is_open !== false;
       const savedBusinessHours = getBusinessHours(data?.business_hours);
       setBusinessHours(savedBusinessHours);
       setManualOpen(manuallyOpen);
       setStoreOpen(manuallyOpen && isWithinBusinessHours(new Date(), savedBusinessHours));
     }
-
     fetchStoreStatus();
   }, []);
 
@@ -136,114 +139,190 @@ export default function CheckoutPage() {
       const { data } = await supabase
         .from("menu")
         .select("id,name,active,available,unavailable,availability_status");
-
       if (data) setMenuItems(data as MenuItem[]);
     }
-
     fetchMenuAvailability();
   }, []);
 
   useEffect(() => {
     if (!menuItems.length || !cart.length) return;
-
     const unavailableCartItems = cart.filter((cartItem) => {
       const menuItem = menuItems.find((item) => item.id === cartItem.id);
       return !isItemOrderable(menuItem);
     });
-
     if (unavailableCartItems.length === 0) return;
-
     unavailableCartItems.forEach((item) => remove(item.id));
     const timer = window.setTimeout(() => {
-      setPixQr("");
-      setPixCode("");
-      setPixPaymentId(null);
       setCartNotice(
         unavailableCartItems.length === 1
-          ? `${unavailableCartItems[0].name} foi removido do carrinho porque esta pausado ou indisponivel.`
-          : "Alguns itens foram removidos do carrinho porque estao pausados ou indisponiveis."
+          ? `${unavailableCartItems[0].name} foi removido do carrinho porque está pausado ou indisponível.`
+          : "Alguns itens foram removidos do carrinho porque estão pausados ou indisponíveis."
       );
     }, 0);
-
     return () => window.clearTimeout(timer);
   }, [cart, menuItems, remove]);
 
-  const canSubmit =
+  useEffect(() => {
+    if (!pendingOrderId || checkoutState !== "awaiting_pix") return;
+    let redirected = false;
+    const markAsPaid = () => {
+      if (redirected) return;
+      redirected = true;
+      setCheckoutState("paid");
+      clear();
+      setTimeout(() => router.push(`/pedido/${pendingOrderId}`), 2200);
+    };
+
+    const channel = supabase
+      .channel(`checkout-payment-${pendingOrderId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${pendingOrderId}` },
+        (payload) => {
+          if (payload.new.payment_status === "pago") {
+            markAsPaid();
+          }
+        }
+      )
+      .subscribe();
+
+    const poll = window.setInterval(async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("payment_status")
+        .eq("id", pendingOrderId)
+        .maybeSingle();
+
+      if (data?.payment_status === "pago") {
+        markAsPaid();
+      }
+    }, 4000);
+
+    return () => {
+      window.clearInterval(poll);
+      supabase.removeChannel(channel);
+    };
+  }, [pendingOrderId, checkoutState, clear, router]);
+
+  useEffect(() => {
+    if (checkoutState !== "awaiting_pix") return;
+
+    const countdown = window.setInterval(() => {
+      setPixCountdown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearInterval(countdown);
+  }, [checkoutState, pendingOrderId]);
+
+  const isFormValid =
     cart.length > 0 &&
     hasFirstAndLastName(name) &&
     [10, 11].includes(onlyDigits(phone).length) &&
-    method &&
-    storeOpen &&
-    !loading;
+    storeOpen;
 
-  const generatePix = async () => {
+  const insertOrder = async (extra: Record<string, unknown>) => {
+    const base: Record<string, unknown> = {
+      name: normalizeName(name),
+      phone: formatPhone(phone),
+      items: cart.map((i) => ({ id: i.id, name: i.name, price: Number(i.price), quantity: i.quantity })),
+      note: note.trim(),
+      subtotal: total,
+      discount_amount: discountAmount,
+      total: finalTotal,
+      coupon_code: appliedCoupon?.code || null,
+      promotion_id: appliedCoupon?.id || null,
+      fulfillment: "retirada",
+    };
+    const payload: Record<string, unknown> = { ...base, ...extra };
+
+    for (let attempt = 0; attempt <= optionalOrderColumns.length; attempt += 1) {
+      const { data, error: insertError } = await supabase.from("orders").insert([payload]).select();
+      if (!insertError && data?.[0]) return data[0];
+
+      const missingColumn = getMissingSchemaColumn(insertError?.message || "");
+      if (missingColumn && missingColumn in payload) {
+        delete payload[missingColumn];
+        continue;
+      }
+
+      throw new Error(insertError?.message || "Não foi possível criar o pedido.");
+    }
+
+    throw new Error("Não foi possível criar o pedido.");
+  };
+
+  const handlePixPayment = async () => {
+    setError("");
+    if (!isFormValid) {
+      setError(storeOpen ? "Preencha os dados obrigatórios antes de continuar." : "A loja está fechada no momento.");
+      return;
+    }
+    setCheckoutState("generating");
     try {
-      setPixLoading(true);
-      setPixQr("");
-      setPixCode("");
-      setError("");
-
-      const res = await fetch("/api/pix", {
+      const savedOrder = await insertOrder({ status: "aguardando_pagamento", payment_method: "pix", payment_status: "pendente" });
+      setPendingOrderId(savedOrder.id);
+      const pixRes = await fetch("/api/pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: finalTotal,
-          note: `Pedido Misso Sushi - ${name || "Cliente"}`,
-          payer: { name: normalizeName(name), phone: onlyDigits(phone) },
-        }),
+        body: JSON.stringify({ amount: finalTotal, note: `Missô Sushi #${savedOrder.id}`, payer: { name: normalizeName(name), phone: onlyDigits(phone) } }),
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Erro ao gerar PIX");
-
-      setPixQr(data.qr_code_base64 || "");
-      setPixCode(data.qr_code || "");
-      setPixPaymentId(data.payment_id || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao gerar PIX.");
-    } finally {
-      setPixLoading(false);
+      const pixData = await pixRes.json();
+      if (!pixRes.ok || !pixData.payment_id || (!pixData.qr_code_base64 && !pixData.qr_code)) {
+        throw new Error(pixData.error || pixData.detail || "Não foi possível gerar o PIX.");
+      }
+      await supabase.from("orders").update({ mercado_pago_payment_id: String(pixData.payment_id) }).eq("id", savedOrder.id);
+      setPixQr(pixData.qr_code_base64 || "");
+      setPixCode(pixData.qr_code || "");
+      setPixCountdown(PIX_WAIT_SECONDS);
+      setCheckoutState("awaiting_pix");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível gerar o PIX.");
+      setCheckoutState("form");
     }
+  };
+
+  const handleCardOrder = async () => {
+    setError("");
+    if (!isFormValid) {
+      setError(storeOpen ? "Preencha os dados obrigatórios antes de continuar." : "A loja está fechada no momento.");
+      return;
+    }
+    setCheckoutState("generating");
+    try {
+      const savedOrder = await insertOrder({ status: "preparando", payment_method: "card", payment_status: "pago" });
+      fetch("/api/whatsapp/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(savedOrder) }).catch(() => {});
+      clear();
+      router.push(`/pedido/${savedOrder.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível enviar o pedido.");
+      setCheckoutState("form");
+    }
+  };
+
+  const handleCopyPix = async () => {
+    if (!pixCode) return;
+    await navigator.clipboard.writeText(pixCode);
+    setShowFeedback(true);
+    setTimeout(() => setShowFeedback(false), 2000);
   };
 
   const handleApplyCoupon = async () => {
     const code = sanitizeCoupon(couponCode);
     setCouponMessage("");
     setAppliedCoupon(null);
-
-    if (!code) {
-      setCouponMessage("Digite um cupom para aplicar.");
-      return;
-    }
-
+    if (!code) { setCouponMessage("Digite um cupom para aplicar."); return; }
     setCouponLoading(true);
-
     try {
-      const { data, error } = await supabase
-        .from("promotions")
-        .select("*")
-        .eq("code", code)
-        .eq("active", true)
-        .maybeSingle();
-
-      if (error || !data) {
-        setCouponMessage("Cupom invalido ou inativo.");
-        return;
-      }
-
-      const promotion = data as Promotion;
-      const discount = calculateDiscount(promotion, total);
-      if (discount <= 0) {
-        setCouponMessage("Este cupom nao gera desconto para este pedido.");
-        return;
-      }
-
-      setCouponCode(code);
-      setAppliedCoupon(promotion);
-      setPixQr("");
-      setPixCode("");
-      setPixPaymentId(null);
-      setCouponMessage(`Cupom aplicado: -${money(discount)}.`);
+      const res = await fetch("/api/coupon/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, subtotal: total }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCouponMessage(data.error || "Cupom inválido ou inativo."); return; }
+      setCouponCode(data.code);
+      setAppliedCoupon(data as Promotion);
+      setCouponMessage(`Cupom aplicado: -${money(data.discount)}.`);
     } finally {
       setCouponLoading(false);
     }
@@ -253,102 +332,97 @@ export default function CheckoutPage() {
     setAppliedCoupon(null);
     setCouponCode("");
     setCouponMessage("");
-    setPixQr("");
-    setPixCode("");
-    setPixPaymentId(null);
   };
 
-  const handleCopyPix = async () => {
-    await navigator.clipboard.writeText(pixCode);
-    setShowFeedback(true);
-    setTimeout(() => setShowFeedback(false), 2000);
-  };
+  // ── PIX aguardando / pago ────────────────────────────────────────────────────
+  if (checkoutState === "awaiting_pix" || checkoutState === "paid") {
+    const isPaid = checkoutState === "paid";
+    return (
+      <main style={styles.page}>
+        <section style={styles.pixState}>
+          {isPaid ? (
+            <div style={styles.pixConfirmedBox}>
+              <p style={styles.eyebrow}>Missô Sushi</p>
+              <h1 style={styles.pixTitle}>Pagamento confirmado!</h1>
+              <p style={styles.pixConfirmedText}>
+                Seu pedido foi liberado para preparo. Vamos abrir o acompanhamento agora.
+              </p>
+            </div>
+          ) : (
+            <div style={styles.pixHeader}>
+              <p style={styles.eyebrow}>Missô Sushi</p>
+              <h1 style={styles.pixTitle}>Pagamento PIX</h1>
+              <p style={styles.muted}>
+                Escaneie o QR Code ou copie o código. O pedido entra automaticamente quando o pagamento for confirmado.
+              </p>
+              <div style={styles.pixStatusBar}>
+                <span style={styles.pixStatusDot} />
+                <span>Atualizando status automaticamente</span>
+                <strong>{formatCountdown(pixCountdown)}</strong>
+              </div>
+            </div>
+          )}
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError("");
+          {!isPaid && (
+            <div style={{ ...styles.pixPanel, ...(isMobile ? styles.pixPanelMobile : {}) }}>
+              <div style={styles.pixQrBox}>
+                {(pixCode || pixQr) && (
+                  <div style={styles.qrImage}>
+                    {pixCode ? (
+                      <QRCodeSVG value={pixCode} size={220} level="M" includeMargin />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={`data:image/png;base64,${pixQr}`} alt="QR Code PIX" width={220} height={220} />
+                    )}
+                  </div>
+                )}
+                <strong style={styles.pixAmount}>{money(finalTotal)}</strong>
+                <span style={styles.pixHint}>
+                  {pixCountdown > 0
+                    ? "Aguardando confirmação do pagamento"
+                    : "Se o PIX expirar, gere um novo pedido"}
+                </span>
+              </div>
 
-    if (!canSubmit) {
-      setError(
-        storeOpen
-          ? "Preencha os dados obrigatorios antes de enviar o pedido."
-          : "A loja esta fechada no momento."
-      );
-      return;
-    }
+              {pixCode && (
+                <div style={styles.pixCodePanel}>
+                  <label htmlFor="pixCode" style={styles.label}>Código copia e cola</label>
+                  <textarea id="pixCode" value={pixCode} readOnly style={styles.codeArea} />
+                  <button type="button" onClick={handleCopyPix} style={styles.copyPixButton}>
+                    <span style={styles.copyPixIcon}>{showFeedback ? "✓" : "⧉"}</span>
+                    <span>{showFeedback ? "Código PIX copiado" : "Copiar código PIX"}</span>
+                  </button>
+                  <p style={styles.pixInfoText}>
+                    Depois do pagamento aprovado, esta tela confirma sozinha.
+                  </p>
+                  {pendingOrderId && (
+                    <Link href={`/pedido/${pendingOrderId}`} style={styles.orderLink}>
+                      Acompanhar pedido →
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      </main>
+    );
+  }
 
-    setLoading(true);
+  // ── Gerando ──────────────────────────────────────────────────────────────────
+  if (checkoutState === "generating") {
+    return (
+      <main style={styles.page}>
+        <section style={styles.emptyState}>
+          <p style={styles.eyebrow}>Missô Sushi</p>
+          <h1 style={styles.title}>{method === "pix" ? "Gerando PIX..." : "Enviando pedido..."}</h1>
+          <p style={styles.muted}>Aguarde um momento.</p>
+        </section>
+      </main>
+    );
+  }
 
-    const orderPayload = {
-      name: normalizeName(name),
-      phone: formatPhone(phone),
-      items: cart.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: Number(item.price),
-        quantity: item.quantity,
-      })),
-      note: note.trim(),
-      subtotal: total,
-      discount_amount: discountAmount,
-      total: finalTotal,
-      coupon_code: appliedCoupon?.code || null,
-      promotion_id: appliedCoupon?.id || null,
-      status: "recebido",
-      payment_method: method,
-      payment_status: "pendente",
-      fulfillment: "retirada",
-      mercado_pago_payment_id: pixPaymentId,
-    };
-
-    try {
-      let { data, error: insertError } = await supabase
-        .from("orders")
-        .insert([orderPayload])
-        .select();
-
-      if (insertError) {
-        const fallbackPayload = {
-          name: orderPayload.name,
-          phone: orderPayload.phone,
-          items: orderPayload.items,
-          note: [
-            orderPayload.note,
-            "Retirada no balcao",
-            appliedCoupon ? `Cupom: ${appliedCoupon.code} (-${money(discountAmount)})` : "",
-            `Pagamento: ${method.toUpperCase()} - pendente`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-          total: orderPayload.total,
-          status: orderPayload.status,
-          payment_method: orderPayload.payment_method,
-        };
-
-        const fallback = await supabase.from("orders").insert([fallbackPayload]).select();
-        data = fallback.data;
-        insertError = fallback.error;
-      }
-
-      if (insertError || !data?.[0]) {
-        throw new Error(insertError?.message || "Nao foi possivel criar o pedido.");
-      }
-
-      fetch("/api/whatsapp/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data[0]),
-      }).catch(() => {});
-
-      clear();
-      router.push(`/pedido/${data[0].id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel enviar o pedido.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ── Carregando / vazio ───────────────────────────────────────────────────────
   if (!cartLoaded) {
     return (
       <main style={styles.page}>
@@ -366,39 +440,35 @@ export default function CheckoutPage() {
       <main style={styles.page}>
         <section style={styles.emptyState}>
           <p style={styles.eyebrow}>Checkout</p>
-          <h1 style={styles.title}>Seu carrinho esta vazio</h1>
-          <p style={styles.muted}>Volte ao cardapio e escolha seus pratos favoritos.</p>
-          <Link href="/" style={styles.primaryLink}>
-            Ver cardapio
-          </Link>
+          <h1 style={styles.title}>Seu carrinho está vazio</h1>
+          <p style={styles.muted}>Volte ao cardápio e escolha seus pratos favoritos.</p>
+          <Link href="/" style={styles.primaryLink}>Ver cardápio</Link>
         </section>
       </main>
     );
   }
 
+  // ── Formulário ───────────────────────────────────────────────────────────────
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
-        <Link href="/" style={styles.backLink}>
-          Voltar ao cardapio
-        </Link>
-          <div>
-            <p style={styles.eyebrow}>Misso Sushi</p>
-            <h1 style={styles.title}>Finalizar pedido</h1>
-            <p style={styles.mutedSmall}>
-              {getTodayBusinessHoursLabel(new Date(), businessHours)}
-            </p>
-          </div>
+        <Link href="/" style={styles.backLink}>Voltar ao cardápio</Link>
+        <div style={styles.headerTitle}>
+          <p style={styles.eyebrow}>Missô Sushi</p>
+          <h1 style={styles.title}>Finalizar pedido</h1>
+        </div>
       </header>
 
-      <form onSubmit={handleSubmit} style={{ ...styles.shell, ...(isTablet ? styles.shellStack : {}) }}>
+      <div style={{ ...styles.shell, ...(isMobile ? styles.shellMobile : {}) }}>
         <section style={styles.mainColumn}>
+          {/* Dados do cliente */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
                 <p style={styles.cardEyebrow}>Cliente</p>
                 <h2 style={styles.cardTitle}>Dados para contato</h2>
               </div>
+              <span style={styles.stepBadge}>1</span>
             </div>
             <div style={{ ...styles.formGrid, ...(isMobile ? styles.formGridMobile : {}) }}>
               <label style={styles.field}>
@@ -428,11 +498,12 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {/* Retirada */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
                 <p style={styles.cardEyebrow}>Retirada</p>
-                <h2 style={styles.cardTitle}>Pedido para retirar no balcao</h2>
+                <h2 style={styles.cardTitle}>Pedido para retirar no balcão</h2>
               </div>
               <span style={styles.pill}>Sem entrega</span>
             </div>
@@ -440,40 +511,13 @@ export default function CheckoutPage() {
             {!storeOpen && (
               <p style={styles.error}>
                 {manualOpen
-                  ? `A loja esta fechada no momento e ${getNextOpeningLabel(
-                      new Date(),
-                      businessHours
-                    )}.`
-                  : `A loja esta fechada manualmente e ${getNextOpeningLabel(
-                      new Date(),
-                      businessHours
-                    )}.`}
+                  ? `A loja está fechada no momento e ${getNextOpeningLabel(new Date(), businessHours)}.`
+                  : `A loja está fechada manualmente e ${getNextOpeningLabel(new Date(), businessHours)}.`}
               </p>
             )}
           </div>
 
-          <div style={styles.card}>
-            <div style={styles.cardHeader}>
-              <div>
-                <p style={styles.cardEyebrow}>Resumo</p>
-                <h2 style={styles.cardTitle}>Itens do pedido</h2>
-              </div>
-              <span style={styles.pill}>{cart.length} itens</span>
-            </div>
-            {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
-            <div style={styles.orderList}>
-              {cart.map((item) => (
-                <div key={item.id} style={styles.orderRow}>
-                  <div>
-                    <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
-                    <p style={styles.mutedSmall}>{money(Number(item.price))} cada</p>
-                  </div>
-                  <strong>{money(item.price * item.quantity)}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
+          {/* Cupom */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
@@ -485,155 +529,196 @@ export default function CheckoutPage() {
             <div style={{ ...styles.couponRow, ...(isMobile ? styles.couponRowMobile : {}) }}>
               <input
                 value={couponCode}
-                onChange={(event) => {
-                  setCouponCode(sanitizeCoupon(event.target.value));
-                  setCouponMessage("");
-                  if (appliedCoupon) {
-                    setAppliedCoupon(null);
-                    setPixQr("");
-                    setPixCode("");
-                    setPixPaymentId(null);
-                  }
-                }}
-                placeholder="CODIGO"
+                onChange={(e) => { setCouponCode(sanitizeCoupon(e.target.value)); setCouponMessage(""); if (appliedCoupon) setAppliedCoupon(null); }}
+                placeholder="CÓDIGO"
                 disabled={couponLoading}
                 style={styles.input}
               />
               {appliedCoupon ? (
-                <button type="button" onClick={handleRemoveCoupon} style={styles.secondaryButton}>
-                  Remover
-                </button>
+                <button type="button" onClick={handleRemoveCoupon} style={styles.secondaryButton}>Remover</button>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleApplyCoupon}
-                  disabled={couponLoading}
-                  style={styles.secondaryButton}
-                >
+                <button type="button" onClick={handleApplyCoupon} disabled={couponLoading} style={styles.secondaryButton}>
                   {couponLoading ? "Aplicando..." : "Aplicar"}
                 </button>
               )}
             </div>
             {couponMessage && (
-              <p style={appliedCoupon ? styles.successText : styles.mutedSmall}>
-                {couponMessage}
-              </p>
+              <p style={appliedCoupon ? styles.successText : styles.mutedSmall}>{couponMessage}</p>
             )}
           </div>
 
+          {/* Observação */}
           <div style={styles.card}>
-            <label htmlFor="note" style={styles.label}>Observacao geral</label>
+            <label htmlFor="note" style={styles.label}>Observação geral</label>
             <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex: sem cebolinha, enviar shoyu extra..." style={styles.textarea} />
           </div>
 
+          {/* Pagamento */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
                 <p style={styles.cardEyebrow}>Pagamento</p>
                 <h2 style={styles.cardTitle}>Escolha uma forma</h2>
               </div>
+              <span style={styles.stepBadge}>2</span>
             </div>
             <div style={styles.methods}>
               {(["pix", "card"] as PaymentMethod[]).map((option) => (
-                <button key={option} type="button" onClick={() => setMethod(option)} style={{ ...styles.methodButton, ...(method === option ? styles.methodButtonActive : {}) }}>
-                  {option === "pix" ? "PIX" : "Cartao"}
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    setMethod(option);
+                    if (option === "pix") {
+                      void handlePixPayment();
+                    } else {
+                      void handleCardOrder();
+                    }
+                  }}
+                  disabled={!isFormValid}
+                  style={{
+                    ...styles.methodButton,
+                    ...(method === option ? styles.methodButtonActive : {}),
+                    ...(!isFormValid ? styles.methodButtonDisabled : {}),
+                  }}
+                >
+                  <span style={styles.methodIcon}>{option === "pix" ? "◆" : "▣"}</span>
+                  <span>{option === "pix" ? "PIX" : "Cartão"}</span>
                 </button>
               ))}
             </div>
-
             {method === "pix" && (
-              <div style={styles.paymentBox}>
-                <button type="button" onClick={generatePix} disabled={pixLoading} style={styles.secondaryButton}>
-                  {pixLoading ? "Gerando PIX..." : "Gerar PIX"}
-                </button>
-                {!pixLoading && pixQr && (
-                  <div style={styles.qrWrap}>
-                    <Image src={`data:image/png;base64,${pixQr}`} alt="QR Code PIX" width={220} height={220} style={styles.qrImage} />
-                    <p style={styles.mutedSmall}>Escaneie o QR Code com o aplicativo do seu banco.</p>
-                  </div>
-                )}
-                {!pixLoading && pixCode && (
-                  <div style={styles.pixCodeBox}>
-                    <label htmlFor="pixCode" style={styles.label}>Codigo copia e cola</label>
-                    <textarea id="pixCode" value={pixCode} readOnly style={styles.codeArea} />
-                    <button type="button" onClick={handleCopyPix} style={styles.secondaryButton}>Copiar codigo PIX</button>
-                    {showFeedback && <p style={styles.successText}>Codigo PIX copiado.</p>}
-                  </div>
-                )}
-              </div>
+              <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
+                Clique em PIX para gerar o QR Code.
+              </p>
+            )}
+            {method === "card" && (
+              <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
+                Clique em Cartão para enviar o pedido.
+              </p>
             )}
           </div>
 
           {error && <p style={styles.error}>{error}</p>}
         </section>
 
-        <aside style={{ ...styles.summaryCard, ...(isTablet ? styles.summaryCardStack : {}) }}>
-          <p style={styles.cardEyebrow}>Total</p>
-          <strong style={styles.total}>{money(finalTotal)}</strong>
-          <div style={styles.divider} />
-          <div style={styles.summaryLine}><span>Subtotal</span><strong>{money(total)}</strong></div>
-          {discountAmount > 0 && (
-            <div style={styles.summaryLine}><span>Desconto</span><strong>-{money(discountAmount)}</strong></div>
-          )}
-          <div style={styles.summaryLine}><span>Recebimento</span><strong>Retirada</strong></div>
-          <div style={styles.summaryLine}><span>Pagamento</span><strong>{method.toUpperCase()}</strong></div>
-          <button type="submit" disabled={!canSubmit} style={{ ...styles.checkoutButton, ...(!canSubmit ? styles.checkoutButtonDisabled : {}) }}>
-            {loading ? "Enviando..." : "Enviar pedido"}
-          </button>
+        <aside style={styles.summaryColumn}>
+          <div style={styles.summaryCard}>
+            <div style={styles.cardHeader}>
+              <div>
+                <p style={styles.cardEyebrow}>Resumo</p>
+                <h2 style={styles.cardTitle}>Seu pedido</h2>
+              </div>
+              <span style={styles.summaryPill}>{itemCount} itens</span>
+            </div>
+            {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
+            <div style={styles.orderList}>
+              {cart.map((item) => (
+                <div key={item.id} style={styles.summaryOrderRow}>
+                  <div>
+                    <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
+                    <p style={styles.summaryMuted}>{money(Number(item.price))} cada</p>
+                  </div>
+                  <strong>{money(item.price * item.quantity)}</strong>
+                </div>
+              ))}
+            </div>
+            <div style={styles.summaryTotalBox}>
+              {discountAmount > 0 && (
+                <>
+                  <div style={styles.summaryTotalLine}>
+                    <span>Subtotal</span>
+                    <strong>{money(total)}</strong>
+                  </div>
+                  <div style={styles.summaryTotalLine}>
+                    <span>Desconto</span>
+                    <strong style={styles.discountText}>-{money(discountAmount)}</strong>
+                  </div>
+                </>
+              )}
+              <div style={styles.summaryGrandTotalLine}>
+                <span>Total</span>
+                <strong>{money(finalTotal)}</strong>
+              </div>
+            </div>
+          </div>
         </aside>
-      </form>
+      </div>
     </main>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { minHeight: "100vh", background: "#f7f4ef", color: "#1c1a17", padding: "28px 20px 56px" },
+  page: { minHeight: "100vh", background: "#f5f1ea", color: "#171512", padding: "26px 20px 56px" },
   pageMobile: { padding: "20px 14px 42px" },
-  header: { maxWidth: 1120, margin: "0 auto 24px", display: "flex", justifyContent: "space-between", gap: 16, alignItems: "end" },
-  headerMobile: { display: "grid", alignItems: "start", justifyContent: "stretch" },
-  backLink: { color: "#9f1d2f", textDecoration: "none", fontWeight: 800 },
-  eyebrow: { color: "#9f1d2f", fontSize: 13, fontWeight: 850, textTransform: "uppercase" },
-  title: { marginTop: 6, fontSize: "clamp(34px, 5vw, 56px)", lineHeight: 1, fontWeight: 850 },
-  shell: { maxWidth: 1120, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 360px)", gap: 18, alignItems: "start" },
-  shellStack: { gridTemplateColumns: "1fr" },
-  mainColumn: { display: "grid", gap: 16 },
-  card: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 8, padding: 20, boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)" },
-  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16, marginBottom: 16 },
-  cardEyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
-  cardTitle: { marginTop: 4, fontSize: 24, lineHeight: 1.1 },
-  pill: { borderRadius: 999, background: "#f0ebe2", padding: "7px 10px", color: "#625b53", fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" },
+  header: { maxWidth: 1180, margin: "0 auto 22px", position: "relative", display: "grid", justifyItems: "center", textAlign: "center", paddingTop: 22 },
+  headerMobile: { paddingTop: 46 },
+  headerTitle: { textAlign: "center" },
+  backLink: { position: "absolute", left: 0, top: 18, color: "#8f1728", textDecoration: "none", fontSize: 14, fontWeight: 850, background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 999, padding: "9px 13px" },
+  eyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
+  title: { marginTop: 8, fontSize: "clamp(38px, 5vw, 54px)", lineHeight: 0.98, fontWeight: 850 },
+  shell: { maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 378px", gap: 20, alignItems: "start" },
+  shellMobile: { gridTemplateColumns: "1fr" },
+  mainColumn: { display: "grid", gap: 14 },
+  summaryColumn: { position: "sticky", top: 20 },
+  card: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.07)", borderRadius: 8, padding: 22, boxShadow: "0 10px 24px rgba(28, 26, 23, 0.045)" },
+  summaryCard: { background: "#171512", color: "#fffdf8", border: "1px solid rgba(255, 253, 248, 0.08)", borderRadius: 8, padding: 22, boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)" },
+  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16, marginBottom: 18 },
+  cardEyebrow: { color: "#9f1d2f", fontSize: 11, fontWeight: 850, textTransform: "uppercase", letterSpacing: 0 },
+  cardTitle: { marginTop: 5, fontSize: 23, lineHeight: 1.12 },
+  stepBadge: { display: "grid", placeItems: "center", width: 30, height: 30, borderRadius: 999, background: "#1c1a17", color: "#fffdf8", fontSize: 13, fontWeight: 850 },
+  pill: { borderRadius: 999, background: "#eee8df", padding: "7px 10px", color: "#5d554c", fontSize: 13, fontWeight: 850, whiteSpace: "nowrap" },
+  summaryPill: { borderRadius: 999, background: "rgba(255, 253, 248, 0.12)", padding: "7px 10px", color: "#fffdf8", fontSize: 13, fontWeight: 850, whiteSpace: "nowrap" },
   formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   formGridMobile: { gridTemplateColumns: "1fr" },
   couponRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center" },
   couponRowMobile: { gridTemplateColumns: "1fr" },
   field: { display: "grid", gap: 7 },
-  label: { display: "block", marginBottom: 8, fontWeight: 850 },
-  input: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.14)", borderRadius: 8, padding: 12, background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f" },
-  textarea: { width: "100%", minHeight: 110, resize: "vertical", border: "1px solid rgba(28, 26, 23, 0.14)", borderRadius: 8, padding: 12, background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f" },
+  label: { display: "block", marginBottom: 8, fontSize: 14, fontWeight: 850 },
+  input: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
+  textarea: { width: "100%", minHeight: 96, resize: "vertical", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
   methods: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 },
-  methodButton: { border: "1px solid rgba(28, 26, 23, 0.12)", background: "#fff", borderRadius: 999, padding: 14, color: "#1c1a17", cursor: "pointer", fontWeight: 850 },
+  methodButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 15, color: "#1c1a17", cursor: "pointer", fontWeight: 850, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: "0 6px 16px rgba(28, 26, 23, 0.04)" },
   methodButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
-  orderList: { display: "grid", gap: 12 },
-  orderRow: { display: "flex", justifyContent: "space-between", gap: 18, paddingBottom: 12, borderBottom: "1px solid rgba(28, 26, 23, 0.08)" },
+  methodButtonDisabled: { opacity: 0.45, cursor: "not-allowed" },
+  methodIcon: { fontSize: 15, lineHeight: 1 },
+  orderList: { display: "grid", gap: 13 },
+  orderRow: { display: "flex", justifyContent: "space-between", gap: 18, paddingBottom: 13, borderBottom: "1px solid rgba(28, 26, 23, 0.08)" },
   itemName: { display: "block", lineHeight: 1.35 },
+  totalBox: { display: "grid", gap: 10, marginTop: 18, padding: "16px 0 0", borderTop: "1px solid rgba(28, 26, 23, 0.1)" },
+  totalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#625b53", fontSize: 15 },
+  grandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#1c1a17", fontSize: 22, fontWeight: 850 },
+  summaryMuted: { marginTop: 4, color: "rgba(255, 253, 248, 0.68)", fontSize: 13, lineHeight: 1.4 },
+  summaryOrderRow: { display: "flex", justifyContent: "space-between", gap: 18, paddingBottom: 13, borderBottom: "1px solid rgba(255, 253, 248, 0.12)" },
+  summaryTotalBox: { display: "grid", gap: 10, marginTop: 18, padding: "0" },
+  summaryTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255, 253, 248, 0.78)", fontSize: 15 },
+  summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },
+  discountText: { color: "#0f7a4a" },
   muted: { color: "#625b53", lineHeight: 1.55 },
   mutedSmall: { marginTop: 4, color: "#766e64", fontSize: 13, lineHeight: 1.4 },
   noticeError: { borderRadius: 8, background: "#fee2e2", color: "#991b1b", padding: 12, marginBottom: 12, fontSize: 13, fontWeight: 800, lineHeight: 1.4 },
-  paymentBox: { marginTop: 18, borderTop: "1px solid rgba(28, 26, 23, 0.08)", paddingTop: 18 },
-  qrWrap: { marginTop: 14, display: "grid", justifyItems: "start", gap: 10 },
-  qrImage: { borderRadius: 8, border: "1px solid rgba(28, 26, 23, 0.08)" },
-  pixCodeBox: { marginTop: 16 },
-  codeArea: { width: "100%", minHeight: 88, resize: "vertical", border: "1px solid rgba(28, 26, 23, 0.14)", borderRadius: 8, padding: 12, color: "#514a43", background: "#f7f4ef" },
+  qrImage: { display: "grid", placeItems: "center", width: 238, height: 238, borderRadius: 8, border: "1px solid rgba(28, 26, 23, 0.08)", background: "#fff" },
+  codeArea: { width: "100%", minHeight: 96, resize: "none", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: 12, color: "#514a43", background: "#fff", lineHeight: 1.45 },
   secondaryButton: { marginTop: 10, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", padding: "12px 16px", cursor: "pointer", fontWeight: 850 },
+  copyPixButton: { width: "100%", marginTop: 12, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", padding: "14px 18px", cursor: "pointer", fontWeight: 850, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: "0 14px 26px rgba(28, 26, 23, 0.18)" },
+  copyPixIcon: { width: 24, height: 24, borderRadius: 999, background: "rgba(255, 253, 248, 0.14)", display: "grid", placeItems: "center", fontSize: 14, lineHeight: 1 },
   successText: { marginTop: 8, color: "#0f7a4a", fontWeight: 850 },
   error: { borderRadius: 8, background: "#fee2e2", color: "#991b1b", padding: 12, fontWeight: 800 },
-  summaryCard: { position: "sticky", top: 24, background: "#1c1a17", color: "#fffdf8", borderRadius: 8, padding: 22, boxShadow: "0 18px 45px rgba(28, 26, 23, 0.18)" },
-  summaryCardStack: { position: "static", order: -1 },
-  total: { display: "block", margin: "10px 0", fontSize: 38, lineHeight: 1 },
-  divider: { height: 1, background: "rgba(255, 253, 248, 0.16)", margin: "18px 0" },
-  summaryLine: { display: "flex", justifyContent: "space-between", marginTop: 10, color: "#d8d0c4", gap: 12 },
-  checkoutButton: { width: "100%", marginTop: 20, border: "none", borderRadius: 999, background: "#9f1d2f", color: "#fff", padding: 15, cursor: "pointer", fontWeight: 850, fontSize: 16 },
-  checkoutButtonDisabled: { opacity: 0.45, cursor: "not-allowed" },
   emptyState: { maxWidth: 640, margin: "0 auto", minHeight: "70vh", display: "grid", alignContent: "center", justifyItems: "start" },
+  pixState: { maxWidth: 860, margin: "0 auto", minHeight: "78vh", display: "grid", alignContent: "center", justifyItems: "center", textAlign: "center" },
+  pixHeader: { maxWidth: 620, display: "grid", justifyItems: "center", gap: 10 },
+  pixTitle: { marginTop: 8, fontSize: "clamp(34px, 7vw, 52px)", lineHeight: 1.02, fontWeight: 850 },
+  pixPanel: { width: "100%", marginTop: 26, display: "grid", gridTemplateColumns: "minmax(260px, 320px) minmax(0, 1fr)", gap: 18, alignItems: "stretch", textAlign: "left" },
+  pixPanelMobile: { gridTemplateColumns: "1fr", textAlign: "left" },
+  pixQrBox: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 8, padding: 20, display: "grid", justifyItems: "center", alignContent: "center", gap: 10 },
+  pixAmount: { marginTop: 4, fontSize: 24, color: "#1c1a17" },
+  pixHint: { color: "#766e64", fontSize: 13, fontWeight: 800 },
+  pixCodePanel: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 8, padding: 20, display: "grid", alignContent: "center" },
+  pixStatusBar: { marginTop: 4, borderRadius: 999, background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", padding: "9px 12px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, color: "#514a43", fontSize: 13, fontWeight: 850, boxShadow: "0 10px 24px rgba(28, 26, 23, 0.06)" },
+  pixStatusDot: { width: 9, height: 9, borderRadius: 999, background: "#16a34a", boxShadow: "0 0 0 5px rgba(22, 163, 74, 0.12)" },
+  pixInfoText: { marginTop: 10, color: "#766e64", fontSize: 13, lineHeight: 1.4, textAlign: "center" },
+  pixConfirmedBox: { maxWidth: 600, borderRadius: 8, background: "#fffdf8", border: "1px solid rgba(22, 163, 74, 0.22)", padding: 28, boxShadow: "0 18px 45px rgba(22, 163, 74, 0.1)" },
+  pixConfirmedText: { marginTop: 12, color: "#0f7a4a", fontWeight: 850, lineHeight: 1.5 },
+  orderLink: { marginTop: 14, color: "#625b53", fontWeight: 800, textDecoration: "none", textAlign: "center" },
   primaryLink: { marginTop: 22, display: "inline-flex", background: "#1c1a17", color: "#fffdf8", textDecoration: "none", borderRadius: 999, padding: "13px 18px", fontWeight: 850 },
 };

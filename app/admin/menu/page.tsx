@@ -94,6 +94,7 @@ export default function AdminMenuPage() {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [dragged, setDragged] = useState<DragState | null>(null);
+  const [dropTarget, setDropTarget] = useState<DragState | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const pathname = usePathname();
   const canReorder = !search.trim() && !filterCategory;
@@ -145,12 +146,16 @@ export default function AdminMenuPage() {
     setSavingOrder(true);
 
     const updates = await Promise.all(
-      orderedCategories.map((category, index) =>
+      orderedCategories.flatMap((category, index) => [
         supabase
           .from("menu_categories")
           .update({ sort_order: index })
-          .eq("slug", category)
-      )
+          .eq("slug", category),
+        supabase
+          .from("menu")
+          .update({ category_order: index })
+          .eq("category", category),
+      ])
     );
 
     setSavingOrder(false);
@@ -194,35 +199,50 @@ export default function AdminMenuPage() {
   const handleCategoryDrop = async (targetCategory: string) => {
     if (!canReorder || dragged?.type !== "category" || dragged.category === targetCategory) {
       setDragged(null);
+      setDropTarget(null);
       return;
     }
 
     const orderedCategorySlugs = getOrderedCategorySlugs(items, categories);
     const fromIndex = orderedCategorySlugs.indexOf(dragged.category);
     const toIndex = orderedCategorySlugs.indexOf(targetCategory);
-    if (fromIndex === -1 || toIndex === -1) return;
+    if (fromIndex === -1 || toIndex === -1) {
+      setDragged(null);
+      setDropTarget(null);
+      return;
+    }
 
     const nextCategories = moveValue(orderedCategorySlugs, fromIndex, toIndex);
     const nextCategoryRows = categories.map((category) => ({
       ...category,
       sort_order: nextCategories.indexOf(category.slug),
     }));
-    const nextItems = items.map((item) => ({ ...item }));
+    const categoryOrderMap = new Map(nextCategories.map((category, index) => [category, index]));
+    const nextItems = items.map((item) => ({
+      ...item,
+      category_order: categoryOrderMap.get(item.category) ?? item.category_order,
+    }));
 
     setCategories(sortCategories(nextCategoryRows));
     setItems(nextItems);
     setDragged(null);
+    setDropTarget(null);
     await persistCategoryOrder(nextCategories);
   };
 
   const handleItemDrop = async (targetItem: MenuItem, targetCategory: string) => {
     if (!canReorder || dragged?.type !== "item" || dragged.itemId === targetItem.id) {
       setDragged(null);
+      setDropTarget(null);
       return;
     }
 
     const draggedItem = items.find((item) => item.id === dragged.itemId);
-    if (!draggedItem) return;
+    if (!draggedItem) {
+      setDragged(null);
+      setDropTarget(null);
+      return;
+    }
 
     const orderedCategorySlugs = getOrderedCategorySlugs(items, categories);
     const categoryOrderMap = new Map(orderedCategorySlugs.map((category, index) => [category, index]));
@@ -263,6 +283,7 @@ export default function AdminMenuPage() {
 
     setItems(nextItems);
     setDragged(null);
+    setDropTarget(null);
     await persistItemOrder(nextItems);
   };
 
@@ -345,11 +366,45 @@ export default function AdminMenuPage() {
           currentItem.id === item.id ? item : currentItem
         )
       );
-      toast.error("Nao foi possivel alterar o status do item.");
+      toast.error("Não foi possível alterar o status do item.");
       return;
     }
 
     toast.success(nextActive ? "Item ativado." : "Item pausado.");
+  };
+
+  const toggleCategoryActive = async (category: MenuCategory) => {
+    const nextActive = category.active === false;
+    const previousCategories = categories;
+
+    setCategories((current) =>
+      sortCategories(
+        current.map((currentCategory) =>
+          currentCategory.slug === category.slug
+            ? { ...currentCategory, active: nextActive }
+            : currentCategory
+        )
+      )
+    );
+
+    const { error } = await supabase
+      .from("menu_categories")
+      .update({ active: nextActive })
+      .eq("slug", category.slug);
+
+    if (error) {
+      setCategories(previousCategories);
+      toast.error("Não foi possível alterar o status da categoria.");
+      return;
+    }
+
+    if (editingCategory?.slug === category.slug) {
+      setEditingCategory((current) =>
+        current ? { ...current, active: nextActive } : current
+      );
+    }
+
+    toast.success(nextActive ? "Categoria ativada." : "Categoria pausada.");
   };
 
   return (
@@ -426,7 +481,7 @@ export default function AdminMenuPage() {
               <p style={styles.cardEyebrow}>Categorias</p>
               <h2 style={styles.categoryManagerTitle}>Editar categorias</h2>
               <p style={styles.categoryManagerText}>
-                Altere nomes, crie novas categorias e oculte grupos do cardapio publico.
+                Altere nomes, crie novas categorias e oculte grupos do cardápio público.
               </p>
             </div>
             <div style={styles.categorySummarySide}>
@@ -450,7 +505,7 @@ export default function AdminMenuPage() {
                 style={styles.categoryToggleButton}
                 aria-expanded={categoryManagerOpen}
               >
-                {categoryManagerOpen ? "Fechar edicao" : "Editar categorias"}
+                {categoryManagerOpen ? "Fechar edição" : "Editar categorias"}
                 <span style={styles.categoryToggleIcon}>
                   {categoryManagerOpen ? "↑" : "↓"}
                 </span>
@@ -466,7 +521,7 @@ export default function AdminMenuPage() {
                   <input
                     value={newCategoryName}
                     onChange={(event) => setNewCategoryName(event.target.value)}
-                    placeholder="Ex: Promocoes"
+                    placeholder="Ex: Promoções"
                     style={styles.input}
                   />
                 </label>
@@ -477,10 +532,65 @@ export default function AdminMenuPage() {
 
               <div style={styles.categoryEditorList}>
                 {categoryOptions.map((category) => (
-                  <div key={category.slug} style={{ ...styles.categoryEditorRow, ...(isMobile ? styles.categoryEditorRowMobile : {}) }}>
+                  <div
+                    key={category.slug}
+                    draggable={canReorder}
+                    onDragStart={() => canReorder && setDragged({ type: "category", category: category.slug })}
+                    onDragEnd={() => {
+                      setDragged(null);
+                      setDropTarget(null);
+                    }}
+                    onDragEnter={() =>
+                      canReorder && setDropTarget({ type: "category", category: category.slug })
+                    }
+                    onDragOver={(event) => canReorder && event.preventDefault()}
+                    onDrop={() => handleCategoryDrop(category.slug)}
+                    style={{
+                      ...styles.categoryEditorRow,
+                      ...(isMobile ? styles.categoryEditorRowMobile : {}),
+                      ...(dropTarget?.type === "category" &&
+                      dropTarget.category === category.slug &&
+                      dragged?.type === "category" &&
+                      dragged.category !== category.slug
+                        ? styles.dragDropTarget
+                        : {}),
+                      ...(dragged?.type === "category" && dragged.category === category.slug
+                        ? styles.draggingRow
+                        : {}),
+                      opacity:
+                        dragged?.type === "category" && dragged.category === category.slug
+                          ? 0.55
+                          : 1,
+                    }}
+                  >
                     <div style={styles.categoryOrderBadge}>{category.sort_order + 1}</div>
                     <div style={styles.categoryEditMain}>
+                      <span style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}>
+                        ::
+                      </span>
                       <strong style={styles.categoryListName}>{category.name}</strong>
+                    </div>
+                    <div style={{ ...styles.categoryToggleCell, ...(isMobile ? styles.fullWidthMobile : {}) }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleCategoryActive(category)}
+                        style={{
+                          ...styles.itemSwitch,
+                          ...(category.active !== false ? styles.itemSwitchActive : styles.itemSwitchPaused),
+                        }}
+                        aria-label={`${category.active !== false ? "Pausar" : "Ativar"} ${category.name}`}
+                        title={category.active !== false ? "Ativo" : "Pausado"}
+                      >
+                        <span
+                          style={{
+                            ...styles.itemSwitchThumb,
+                            ...(category.active !== false ? styles.itemSwitchThumbActive : {}),
+                          }}
+                        />
+                      </button>
+                      <span style={styles.itemSwitchLabel}>
+                        {category.active !== false ? "Ativo" : "Pausado"}
+                      </span>
                     </div>
                     <button
                       type="button"
@@ -493,7 +603,7 @@ export default function AdminMenuPage() {
                 ))}
               </div>
               <p style={styles.categoryManagerHint}>
-                Para mudar a ordem, arraste os blocos de categoria na lista de pratos abaixo.
+                Arraste as categorias por esta lista para mudar a ordem no cardápio.
               </p>
             </div>
           )}
@@ -502,7 +612,10 @@ export default function AdminMenuPage() {
         {!canReorder && (
           <p style={styles.notice}>Limpe a busca e o filtro para reorganizar categorias e itens.</p>
         )}
-        {savingOrder && <p style={styles.noticeStrong}>Salvando nova ordem...</p>}
+        {dragged && !savingOrder && (
+          <p style={styles.noticeStrong}>Solte no novo lugar para salvar a ordem.</p>
+        )}
+        {savingOrder && <p style={styles.noticeStrong}>Ordem alterada. Salvando...</p>}
 
         <section style={styles.categoryList}>
           {orderedCategories.map((category) => {
@@ -515,11 +628,27 @@ export default function AdminMenuPage() {
                 key={category}
                 draggable={canReorder}
                 onDragStart={() => canReorder && setDragged({ type: "category", category })}
+                onDragEnd={() => {
+                  setDragged(null);
+                  setDropTarget(null);
+                }}
+                onDragEnter={() =>
+                  canReorder && setDropTarget({ type: "category", category })
+                }
                 onDragOver={(event) => canReorder && event.preventDefault()}
                 onDrop={() => handleCategoryDrop(category)}
                   style={{
                     ...styles.categoryCard,
                     ...(isMobile ? styles.categoryCardMobile : {}),
+                    ...(dropTarget?.type === "category" &&
+                    dropTarget.category === category &&
+                    dragged?.type === "category" &&
+                    dragged.category !== category
+                      ? styles.dragDropTarget
+                      : {}),
+                    ...(dragged?.type === "category" && dragged.category === category
+                      ? styles.draggingRow
+                      : {}),
                     opacity:
                     dragged?.type === "category" && dragged.category === category ? 0.55 : 1,
                 }}
@@ -556,6 +685,15 @@ export default function AdminMenuPage() {
                         event.stopPropagation();
                         setDragged({ type: "item", itemId: item.id });
                       }}
+                      onDragEnd={() => {
+                        setDragged(null);
+                        setDropTarget(null);
+                      }}
+                      onDragEnter={(event) => {
+                        event.stopPropagation();
+                        if (!canReorder) return;
+                        setDropTarget({ type: "item", itemId: item.id });
+                      }}
                       onDragOver={(event) => canReorder && event.preventDefault()}
                       onDrop={(event) => {
                         event.stopPropagation();
@@ -565,6 +703,15 @@ export default function AdminMenuPage() {
                         ...styles.itemCard,
                         ...(isMobile ? styles.itemCardMobile : {}),
                         ...(!itemActive ? styles.itemCardPaused : {}),
+                        ...(dropTarget?.type === "item" &&
+                        dropTarget.itemId === item.id &&
+                        dragged?.type === "item" &&
+                        dragged.itemId !== item.id
+                          ? styles.dragDropTarget
+                          : {}),
+                        ...(dragged?.type === "item" && dragged.itemId === item.id
+                          ? styles.draggingRow
+                          : {}),
                         opacity: dragged?.type === "item" && dragged.itemId === item.id ? 0.55 : 1,
                       }}
                     >
@@ -716,7 +863,6 @@ function CategoryEditModal({
   onDelete: (category: MenuCategory) => void;
 }) {
   const [name, setName] = useState(category.name);
-  const [active, setActive] = useState(category.active);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -727,7 +873,7 @@ function CategoryEditModal({
     if (!canSave) return;
 
     setSaving(true);
-    const payload = { name: name.trim(), active };
+    const payload = { name: name.trim() };
     const { data, error } = await supabase
       .from("menu_categories")
       .update(payload)
@@ -738,7 +884,7 @@ function CategoryEditModal({
     setSaving(false);
 
     if (error) {
-      toast.error("Nao foi possivel salvar a categoria.");
+      toast.error("Não foi possível salvar a categoria.");
       return;
     }
 
@@ -761,7 +907,7 @@ function CategoryEditModal({
 
       if (deleteItemsError) {
         setDeleting(false);
-        toast.error("Nao foi possivel excluir os itens desta categoria.");
+        toast.error("Não foi possível excluir os itens desta categoria.");
         return;
       }
     }
@@ -774,7 +920,7 @@ function CategoryEditModal({
     setDeleting(false);
 
     if (error) {
-      toast.error("Nao foi possivel excluir a categoria.");
+      toast.error("Não foi possível excluir a categoria.");
       return;
     }
 
@@ -817,41 +963,9 @@ function CategoryEditModal({
             <span>Itens nesta categoria</span>
             <strong>{itemCount}</strong>
           </div>
-
-          <div style={styles.categoryStatusPanel}>
-            <span style={styles.label}>Status no cardapio</span>
-            <div style={styles.categoryStatusActions}>
-              <button
-                type="button"
-                onClick={() => {
-                  setActive(true);
-                  setConfirmDelete(false);
-                }}
-                style={{
-                  ...styles.statusChoice,
-                  ...(active ? styles.statusChoiceActive : {}),
-                }}
-              >
-                Ativo
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActive(false);
-                  setConfirmDelete(false);
-                }}
-                style={{
-                  ...styles.statusChoice,
-                  ...(!active ? styles.statusChoiceDanger : {}),
-                }}
-              >
-                Pausado
-              </button>
-            </div>
-          </div>
           {itemCount > 0 && (
             <p style={styles.notice}>
-              Ao excluir esta categoria, {itemCount} itens tambem serao excluidos.
+              Ao excluir esta categoria, {itemCount} itens também serão excluídos.
             </p>
           )}
         </div>
@@ -870,7 +984,7 @@ function CategoryEditModal({
             {deleting
               ? "Excluindo..."
               : confirmDelete
-              ? "Confirmar exclusao"
+              ? "Confirmar exclusão"
               : "Excluir categoria"}
           </button>
           <button
@@ -882,7 +996,7 @@ function CategoryEditModal({
               ...(!canSave ? styles.primaryButtonDisabled : {}),
             }}
           >
-            {saving ? "Salvando..." : "Salvar alteracoes"}
+            {saving ? "Salvando..." : "Salvar alterações"}
           </button>
         </div>
       </div>
@@ -1422,13 +1536,14 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryEditorRow: {
     display: "grid",
-    gridTemplateColumns: "42px minmax(0, 1fr) auto",
+    gridTemplateColumns: "42px minmax(0, 1fr) auto auto",
     alignItems: "center",
     gap: 12,
     border: "1px solid rgba(255, 253, 248, 0.1)",
     borderRadius: 8,
     background: "#fffdf8",
     padding: 10,
+    transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border 140ms ease",
   },
   categoryEditorRowMobile: {
     gridTemplateColumns: "38px minmax(0, 1fr)",
@@ -1446,13 +1561,20 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryEditMain: {
     minWidth: 0,
-    display: "grid",
-    gap: 6,
+    display: "flex",
+    alignItems: "center",
+    gap: 9,
   },
   categoryListName: {
     color: "#1c1a17",
     fontSize: 16,
     lineHeight: 1.25,
+  },
+  categoryToggleCell: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
   },
   categoryNameInput: {
     width: "100%",
@@ -1524,6 +1646,7 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 8,
     padding: 18,
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
+    transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border 140ms ease",
   },
   categoryCardMobile: {
     padding: 14,
@@ -1586,6 +1709,19 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 8,
     padding: 12,
     background: "#fff",
+    transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border 140ms ease",
+  },
+  draggingRow: {
+    border: "1px solid rgba(159, 29, 47, 0.38)",
+    background: "#fff7f0",
+    boxShadow: "0 12px 30px rgba(159, 29, 47, 0.16)",
+    transform: "scale(0.985)",
+  },
+  dragDropTarget: {
+    border: "1px solid rgba(159, 29, 47, 0.72)",
+    background: "#fff2e8",
+    boxShadow: "inset 4px 0 0 #9f1d2f, 0 12px 28px rgba(159, 29, 47, 0.14)",
+    transform: "translateY(-2px)",
   },
   itemCardPaused: {
     background: "#f7f4ef",

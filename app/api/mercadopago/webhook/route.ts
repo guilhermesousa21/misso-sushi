@@ -13,7 +13,7 @@ const statusMap: Record<string, string> = {
 export async function POST(request: Request) {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
   if (!token) {
-    return NextResponse.json({ error: "Token nao configurado" }, { status: 500 });
+    return NextResponse.json({ error: "Token não configurado" }, { status: 500 });
   }
 
   const body = await request.json();
@@ -29,10 +29,27 @@ export async function POST(request: Request) {
   const result = await payment.get({ id: String(paymentId) });
   const payment_status = statusMap[String(result.status)] || "pendente";
 
-  await supabase
+  const update: Record<string, string> = { payment_status };
+
+  // Quando aprovado: libera o pedido para a cozinha e notifica via WhatsApp
+  if (payment_status === "pago") {
+    update.status = "preparando";
+  }
+
+  const { data: orders } = await supabase
     .from("orders")
-    .update({ payment_status })
-    .eq("mercado_pago_payment_id", String(paymentId));
+    .update(update)
+    .eq("mercado_pago_payment_id", String(paymentId))
+    .select();
+
+  if (payment_status === "pago" && orders?.[0]) {
+    const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    fetch(`${origin}/api/whatsapp/order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orders[0]),
+    }).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true, payment_status });
 }

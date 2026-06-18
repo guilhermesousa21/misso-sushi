@@ -49,21 +49,22 @@ type Order = {
   coupon_code?: string | null;
   created_at: string;
   payment_method?: string | null;
+  payment_status?: string | null;
 };
 
-type RangePreset = "7d" | "30d" | "90d" | "all";
+type RangePreset = "today" | "7d" | "30d" | "90d" | "custom";
 
 const paymentLabels: Record<string, string> = {
   pix: "PIX",
   card: "Cartão",
-  pending: "Não informado",
 };
 
 const rangeLabels: Record<RangePreset, string> = {
+  today: "Hoje",
   "7d": "7 dias",
   "30d": "30 dias",
   "90d": "90 dias",
-  all: "Tudo",
+  custom: "Período",
 };
 
 const money = (value: number) =>
@@ -81,22 +82,44 @@ const normalize = (value: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-const toDateKey = (value: string) => {
-  const date = new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+const parseSupabaseDate = (value: string) => {
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  return new Date(hasTimezone ? value : `${value}Z`);
+};
+
+const toDateKey = (value: string | Date) => {
+  const date = typeof value === "string" ? parseSupabaseDate(value) : value;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
   return `${year}-${month}-${day}`;
 };
 
-const formatDate = (value: string) =>
-  new Date(value).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-  });
+const getRangeStart = (range: RangePreset) => {
+  if (range === "custom") return "";
+  if (range === "today") return toDateKey(new Date());
+
+  const start = new Date();
+  start.setDate(start.getDate() - Number(range.replace("d", "")) + 1);
+  return toDateKey(start);
+};
+
+const formatDateKey = (value: string) => {
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${day}/${month}`;
+};
 
 const formatDateTime = (value: string) =>
-  new Date(value).toLocaleString("pt-BR", {
+  parseSupabaseDate(value).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -113,7 +136,7 @@ const calcTotal = (order: Order) =>
 
 const calcDiscount = (order: Order) => Number(order.discount_amount || 0);
 
-const getPayment = (order: Order) => order.payment_method || "pending";
+const getPayment = (order: Order) => order.payment_method || "";
 
 export default function FaturamentoPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -121,7 +144,8 @@ export default function FaturamentoPage() {
   const isTablet = useMediaQuery("(max-width: 1040px)");
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<RangePreset>("30d");
-  const [paymentFilter, setPaymentFilter] = useState("todos");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
   const pathname = usePathname();
 
@@ -132,17 +156,20 @@ export default function FaturamentoPage() {
       const { data, error } = await supabase
         .from("orders")
         .select("*")
+        .eq("payment_status", "pago")
         .order("created_at", { ascending: false });
 
       if (mounted) {
         if (!error && data) {
           setOrders(
-            data.map((order) => ({
-              ...(order as Order),
-              items: Array.isArray((order as Order).items)
-                ? (order as Order).items
-                : [],
-            }))
+            data
+              .filter((order) => (order as Order).payment_status === "pago")
+              .map((order) => ({
+                ...(order as Order),
+                items: Array.isArray((order as Order).items)
+                  ? (order as Order).items
+                  : [],
+              }))
           );
         }
         setLoading(false);
@@ -157,18 +184,13 @@ export default function FaturamentoPage() {
   }, []);
 
   const filteredOrders = useMemo(() => {
-    const now = new Date();
-    const start = new Date(now);
-    if (range !== "all") {
-      start.setDate(now.getDate() - Number(range.replace("d", "")) + 1);
-      start.setHours(0, 0, 0, 0);
-    }
+    const rangeStart = range === "custom" ? dateFrom : getRangeStart(range);
+    const rangeEnd = range === "custom" ? dateTo : range === "today" ? toDateKey(new Date()) : "";
 
     return orders.filter((order) => {
-      const createdAt = new Date(order.created_at);
-      const inRange = range === "all" || createdAt >= start;
-      const byPayment =
-        paymentFilter === "todos" || getPayment(order) === paymentFilter;
+      const orderDate = toDateKey(order.created_at);
+      const inRangeStart = !rangeStart || orderDate >= rangeStart;
+      const inRangeEnd = !rangeEnd || orderDate <= rangeEnd;
       const query = normalize(search.trim());
       const bySearch =
         !query ||
@@ -176,9 +198,9 @@ export default function FaturamentoPage() {
         normalize(order.name || "").includes(query) ||
         normalize(order.phone || "").includes(query);
 
-      return inRange && byPayment && bySearch;
+      return inRangeStart && inRangeEnd && bySearch;
     });
-  }, [orders, paymentFilter, range, search]);
+  }, [dateFrom, dateTo, orders, range, search]);
 
   const analytics = useMemo(() => {
     const totalRevenue = filteredOrders.reduce(
@@ -250,7 +272,7 @@ export default function FaturamentoPage() {
 
   const dailyLabels = Object.keys(analytics.revenueByDay).sort();
   const chartDataBar = {
-    labels: dailyLabels.map((day) => formatDate(`${day}T00:00:00`)),
+    labels: dailyLabels.map((day) => formatDateKey(day)),
     datasets: [
       {
         label: "Faturamento",
@@ -304,8 +326,6 @@ export default function FaturamentoPage() {
     },
   };
 
-  const paymentOptions = ["pix", "card"];
-
   return (
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
       <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}) }}>
@@ -352,43 +372,64 @@ export default function FaturamentoPage() {
         </header>
 
         <section
-          style={{ ...styles.toolbar, ...(isTablet ? styles.toolbarStack : {}) }}
+          style={{
+            ...styles.toolbar,
+            ...(range === "custom" ? styles.toolbarCustom : {}),
+            ...(isTablet ? styles.toolbarStack : {}),
+          }}
           aria-label="Filtros de faturamento"
         >
-          <div style={{ ...styles.segmented, ...(isMobile ? styles.segmentedMobile : {}) }}>
-            {(Object.keys(rangeLabels) as RangePreset[]).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setRange(option)}
-                style={{
-                  ...styles.segmentButton,
-                  ...(range === option ? styles.segmentButtonActive : {}),
-                }}
-              >
-                {rangeLabels[option]}
-              </button>
-            ))}
-          </div>
-          <select
-            value={paymentFilter}
-            onChange={(event) => setPaymentFilter(event.target.value)}
-            style={styles.select}
-            aria-label="Filtrar por pagamento"
-          >
-            <option value="todos">Todos os pagamentos</option>
-            {paymentOptions.map((payment) => (
-              <option key={payment} value={payment}>
-                {paymentLabels[payment] || payment}
-              </option>
-            ))}
-          </select>
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar cliente, telefone ou pedido"
-            style={styles.input}
-          />
+          <label style={styles.periodField}>
+            <span style={styles.fieldLabel}>Período</span>
+            <div style={{ ...styles.segmented, ...(isMobile ? styles.segmentedMobile : {}) }}>
+              {(Object.keys(rangeLabels) as RangePreset[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setRange(option)}
+                  style={{
+                    ...styles.segmentButton,
+                    ...(range === option ? styles.segmentButtonActive : {}),
+                  }}
+                >
+                  {rangeLabels[option]}
+                </button>
+              ))}
+            </div>
+          </label>
+          {range === "custom" && (
+            <>
+              <label style={styles.dateField}>
+                <span style={styles.fieldLabel}>Início</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(event) => setDateFrom(event.target.value)}
+                  style={styles.input}
+                  aria-label="Data inicial"
+                />
+              </label>
+              <label style={styles.dateField}>
+                <span style={styles.fieldLabel}>Fim</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(event) => setDateTo(event.target.value)}
+                  style={styles.input}
+                  aria-label="Data final"
+                />
+              </label>
+            </>
+          )}
+          <label style={styles.dateField}>
+            <span style={styles.fieldLabel}>Busca</span>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar cliente, telefone ou pedido"
+              style={styles.input}
+            />
+          </label>
         </section>
 
         <section style={styles.metrics}>
@@ -413,7 +454,7 @@ export default function FaturamentoPage() {
             detail={
               Object.keys(analytics.couponTotals).length > 0
                 ? `${Object.keys(analytics.couponTotals).length} cupons usados`
-                : "Nenhum cupom no periodo"
+                : "Nenhum cupom no período"
             }
           />
         </section>
@@ -685,22 +726,26 @@ const styles: Record<string, CSSProperties> = {
   },
   toolbar: {
     display: "grid",
-    gridTemplateColumns: "minmax(280px, 1.2fr) minmax(180px, 240px) minmax(240px, 1fr)",
+    gridTemplateColumns: "minmax(300px, 1.2fr) minmax(240px, 1fr)",
     gap: 10,
     marginBottom: 14,
-    alignItems: "center",
+    alignItems: "end",
+  },
+  toolbarCustom: {
+    gridTemplateColumns: "minmax(300px, 1.2fr) minmax(140px, 180px) minmax(140px, 180px) minmax(240px, 1fr)",
   },
   toolbarStack: {
     gridTemplateColumns: "1fr",
   },
   segmented: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
     gap: 4,
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.1)",
     borderRadius: 8,
     padding: 4,
+    minHeight: 48,
   },
   segmentedMobile: {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
@@ -722,10 +767,27 @@ const styles: Record<string, CSSProperties> = {
     width: "100%",
     border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 8,
-    padding: 12,
+    padding: "12px 13px",
     background: "#fffdf8",
     color: "#1c1a17",
     outlineColor: "#9f1d2f",
+    minHeight: 48,
+  },
+  periodField: {
+    display: "grid",
+    gap: 6,
+    minWidth: 0,
+  },
+  dateField: {
+    display: "grid",
+    gap: 6,
+    minWidth: 0,
+  },
+  fieldLabel: {
+    color: "#766e64",
+    fontSize: 12,
+    fontWeight: 850,
+    textTransform: "uppercase",
   },
   select: {
     width: "100%",

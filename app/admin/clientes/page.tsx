@@ -39,16 +39,19 @@ export default function AdminCustomersPage() {
       const { data } = await supabase
         .from("orders")
         .select("*")
+        .eq("payment_status", "pago")
         .order("created_at", { ascending: false });
 
       if (mounted) {
         setOrders(
-          (data || []).map((order) => ({
-            ...(order as AdminOrder),
-            items: Array.isArray((order as AdminOrder).items)
-              ? (order as AdminOrder).items
-              : [],
-          }))
+          (data || [])
+            .filter((order) => (order as AdminOrder).payment_status === "pago")
+            .map((order) => ({
+              ...(order as AdminOrder),
+              items: Array.isArray((order as AdminOrder).items)
+                ? (order as AdminOrder).items
+                : [],
+            }))
         );
         setLoading(false);
       }
@@ -123,7 +126,7 @@ export default function AdminCustomersPage() {
         <Metric label="Clientes" value={number(customers.length)} detail="Com pedidos registrados" />
         <Metric label="Recorrentes" value={number(metrics.repeatCustomers)} detail="Mais de um pedido" />
         <Metric label="Receita da base" value={money(metrics.totalSpent)} detail="Dentro dos filtros" />
-        <Metric label="Media por cliente" value={money(metrics.averageValue)} detail="Valor acumulado medio" />
+        <Metric label="Média por cliente" value={money(metrics.averageValue)} detail="Valor acumulado médio" />
       </section>
 
       <section style={{ ...styles.toolbar, ...(isTablet ? styles.toolbarStack : {}) }}>
@@ -148,7 +151,7 @@ export default function AdminCustomersPage() {
         <div style={styles.cardHeader}>
           <div>
             <p style={styles.cardEyebrow}>Base</p>
-            <h2 style={styles.cardTitle}>Historico por cliente</h2>
+            <h2 style={styles.cardTitle}>Histórico por cliente</h2>
           </div>
         </div>
 
@@ -156,7 +159,7 @@ export default function AdminCustomersPage() {
           <article key={customer.key} style={localStyles.customerRow}>
             <div>
               <strong>{customer.name}</strong>
-              <p style={styles.mutedSmall}>{customer.phone || "Telefone nao informado"}</p>
+              <p style={styles.mutedSmall}>{customer.phone || "Telefone não informado"}</p>
               <p style={styles.mutedSmall}>Ultimo pedido: {formatDateTime(customer.lastOrder)}</p>
             </div>
             <div style={localStyles.customerStats}>

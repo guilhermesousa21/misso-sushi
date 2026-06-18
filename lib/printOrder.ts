@@ -193,8 +193,8 @@ export function printOrder(order: PrintableOrder) {
 
           <section class="section">
             <div class="line"><strong>Cliente</strong><span>${escapeHtml(order.name || "Cliente")}</span></div>
-            <div class="line"><strong>Telefone</strong><span>${escapeHtml(order.phone || "Nao informado")}</span></div>
-            <div class="line"><strong>Retirada</strong><span>Balcao</span></div>
+            <div class="line"><strong>Telefone</strong><span>${escapeHtml(order.phone || "Não informado")}</span></div>
+            <div class="line"><strong>Retirada</strong><span>Balcão</span></div>
             <div class="line"><strong>Status</strong><span>${escapeHtml(order.status || "recebido")}</span></div>
           </section>
 
@@ -205,7 +205,7 @@ export function printOrder(order: PrintableOrder) {
 
           ${
             order.note
-              ? `<section class="section"><strong>Observacoes</strong><p class="note">${escapeHtml(order.note)}</p></section>`
+              ? `<section class="section"><strong>Observações</strong><p class="note">${escapeHtml(order.note)}</p></section>`
               : ""
           }
 

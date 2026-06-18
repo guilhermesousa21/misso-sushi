@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import {
   getBusinessHours,
+  getNextOpeningLabel,
+  getTodayBusinessHoursLabel,
+  isWithinBusinessHours,
   type BusinessHours,
   weeklyBusinessHours,
 } from "../../../lib/storeHours";
@@ -28,6 +31,10 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [message, setMessage] = useState("");
+  const [now, setNow] = useState(() => new Date());
+
+  const withinBusinessHours = isWithinBusinessHours(now, settings.business_hours);
+  const storeOpenNow = settings.is_open && withinBusinessHours;
 
   useEffect(() => {
     async function fetchSettings() {
@@ -49,6 +56,14 @@ export default function AdminSettingsPage() {
     fetchSettings();
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
@@ -68,12 +83,12 @@ export default function AdminSettingsPage() {
     setSaving(false);
 
     if (error) {
-      setMessage("Crie a tabela store_settings no Supabase para salvar estas configuracoes.");
+      setMessage("Crie a tabela store_settings no Supabase para salvar estas configurações.");
       return;
     }
 
     if (data?.[0]) setSettings({ ...(data[0] as StoreSettings) });
-    setMessage("Configuracoes salvas.");
+    setMessage("Configurações salvas.");
   }
 
   async function updateStoreStatus(isOpen: boolean) {
@@ -100,7 +115,7 @@ export default function AdminSettingsPage() {
 
     if (error) {
       setSettings(previousSettings);
-      setMessage("Nao foi possivel atualizar o status da loja.");
+      setMessage("Não foi possível atualizar o status da loja.");
       return;
     }
 
@@ -114,7 +129,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <AdminShell eyebrow="Operacao" title="Configuracoes">
+    <AdminShell eyebrow="Operação" title="Configurações">
       <form onSubmit={handleSubmit} style={baseStyles.card}>
         <div style={baseStyles.cardHeader}>
           <div>
@@ -126,22 +141,40 @@ export default function AdminSettingsPage() {
         <section
           style={{
             ...styles.statusPanel,
-            ...(settings.is_open ? styles.statusPanelOpen : styles.statusPanelClosed),
+            ...(storeOpenNow ? styles.statusPanelOpen : styles.statusPanelClosed),
           }}
         >
-          <div>
-            <span style={styles.statusEyebrow}>Status atual</span>
+          <div style={styles.statusContent}>
+            <div style={styles.statusMeta}>
+              <span
+                style={{
+                  ...styles.statusDot,
+                  ...(storeOpenNow ? styles.statusDotOpen : styles.statusDotClosed),
+                }}
+              />
+              <span style={styles.statusEyebrow}>Status atual</span>
+              <span
+                style={{
+                  ...styles.statusBadge,
+                  ...(storeOpenNow ? styles.statusBadgeOpen : styles.statusBadgeClosed),
+                }}
+              >
+                {storeOpenNow ? "Recebendo pedidos" : "Pedidos pausados"}
+              </span>
+            </div>
             <strong style={styles.statusTitle}>
               {savingStatus
                 ? "Atualizando status..."
-                : settings.is_open
+                : storeOpenNow
                 ? "Loja aberta"
                 : "Loja fechada"}
             </strong>
             <p style={styles.statusText}>
-              {settings.is_open
-                ? "Clientes podem enviar pedidos dentro dos horarios cadastrados."
-                : "Pedidos ficam bloqueados ate voce reabrir manualmente."}
+              {storeOpenNow
+                ? `Clientes podem enviar pedidos agora. ${getTodayBusinessHoursLabel(now, settings.business_hours)}.`
+                : !settings.is_open
+                ? "Pedidos ficam bloqueados até você reabrir manualmente."
+                : `Fechada pelo horário cadastrado. ${getNextOpeningLabel(now, settings.business_hours)}.`}
             </p>
           </div>
           <div style={styles.statusSwitch} role="group" aria-label="Status da loja">
@@ -151,7 +184,7 @@ export default function AdminSettingsPage() {
               disabled={savingStatus}
               style={{
                 ...styles.statusOption,
-                ...(settings.is_open ? styles.statusOptionOpenActive : {}),
+                ...(storeOpenNow ? styles.statusOptionOpenActive : {}),
                 ...(savingStatus ? styles.statusOptionDisabled : {}),
               }}
             >
@@ -163,7 +196,7 @@ export default function AdminSettingsPage() {
               disabled={savingStatus}
               style={{
                 ...styles.statusOption,
-                ...(!settings.is_open ? styles.statusOptionClosedActive : {}),
+                ...(!storeOpenNow ? styles.statusOptionClosedActive : {}),
                 ...(savingStatus ? styles.statusOptionDisabled : {}),
               }}
             >
@@ -174,7 +207,7 @@ export default function AdminSettingsPage() {
 
         <div style={styles.formGrid}>
           <label style={styles.field}>
-            <span style={styles.label}>Tempo medio</span>
+            <span style={styles.label}>Tempo médio</span>
             <input
               value={settings.average_time}
               onChange={(event) => setSettings({ ...settings, average_time: event.target.value })}
@@ -184,7 +217,7 @@ export default function AdminSettingsPage() {
         </div>
 
         <section style={styles.scheduleBox}>
-          <span style={styles.label}>Horarios de atendimento</span>
+          <span style={styles.label}>Horários de atendimento</span>
           <div style={styles.scheduleGrid}>
             {[2, 3, 4, 5, 6, 0, 1].map((day) => {
               const hours = settings.business_hours[day];
@@ -225,14 +258,14 @@ export default function AdminSettingsPage() {
             })}
           </div>
           <p style={styles.hint}>
-            Fora desses horarios o cliente nao consegue enviar pedido. Use 00:00 como fechamento da meia-noite.
+            Fora desses horários o cliente não consegue enviar pedido. Use 00:00 como fechamento da meia-noite.
           </p>
         </section>
 
         {message && <p style={styles.message}>{message}</p>}
 
         <button type="submit" disabled={saving} style={baseStyles.primaryLink}>
-          {saving ? "Salvando..." : "Salvar configuracoes"}
+          {saving ? "Salvando..." : "Salvar configurações"}
         </button>
       </form>
     </AdminShell>
@@ -249,22 +282,48 @@ const styles: Record<string, CSSProperties> = {
   field: { display: "grid", gap: 7 },
   label: { color: "#514a43", fontSize: 13, fontWeight: 850 },
   statusPanel: {
-    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(28, 26, 23, 0.08)",
     borderRadius: 8,
-    padding: 16,
+    padding: 18,
     marginBottom: 16,
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) auto",
     gap: 16,
     alignItems: "center",
+    background: "#fffdf8",
+    boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
   },
   statusPanelOpen: {
-    background: "#ecfdf5",
     borderColor: "rgba(15, 122, 74, 0.18)",
   },
   statusPanelClosed: {
-    background: "#fee2e2",
-    borderColor: "rgba(153, 27, 27, 0.18)",
+    borderColor: "rgba(153, 27, 27, 0.16)",
+  },
+  statusContent: {
+    display: "grid",
+    gap: 7,
+  },
+  statusMeta: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    display: "inline-block",
+  },
+  statusDotOpen: {
+    background: "#0f7a4a",
+    boxShadow: "0 0 0 4px rgba(15, 122, 74, 0.12)",
+  },
+  statusDotClosed: {
+    background: "#991b1b",
+    boxShadow: "0 0 0 4px rgba(153, 27, 27, 0.1)",
   },
   statusEyebrow: {
     display: "block",
@@ -275,41 +334,55 @@ const styles: Record<string, CSSProperties> = {
   },
   statusTitle: {
     display: "block",
-    marginTop: 4,
-    fontSize: 24,
+    fontSize: 26,
     lineHeight: 1.1,
   },
   statusText: {
-    marginTop: 6,
     color: "#514a43",
     lineHeight: 1.45,
+  },
+  statusBadge: {
+    borderRadius: 999,
+    padding: "5px 8px",
+    fontSize: 12,
+    fontWeight: 850,
+  },
+  statusBadgeOpen: {
+    background: "#ecfdf5",
+    color: "#0f7a4a",
+  },
+  statusBadgeClosed: {
+    background: "#fff1f1",
+    color: "#991b1b",
   },
   statusSwitch: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
-    gap: 4,
-    border: "1px solid rgba(28, 26, 23, 0.12)",
+    gap: 6,
+    border: "1px solid rgba(28, 26, 23, 0.1)",
     borderRadius: 999,
-    background: "#fffdf8",
-    padding: 4,
-    minWidth: 210,
+    background: "#f7f4ef",
+    padding: 5,
+    minWidth: 226,
   },
   statusOption: {
     border: "none",
     borderRadius: 999,
     background: "transparent",
     color: "#514a43",
-    padding: "10px 14px",
+    padding: "11px 16px",
     cursor: "pointer",
     fontWeight: 850,
   },
   statusOptionOpenActive: {
     background: "#0f7a4a",
     color: "#fff",
+    boxShadow: "0 8px 18px rgba(15, 122, 74, 0.18)",
   },
   statusOptionClosedActive: {
     background: "#991b1b",
     color: "#fff",
+    boxShadow: "0 8px 18px rgba(153, 27, 27, 0.16)",
   },
   statusOptionDisabled: {
     opacity: 0.62,

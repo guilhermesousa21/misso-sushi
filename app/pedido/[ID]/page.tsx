@@ -2,20 +2,22 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 
 type Order = {
   id: number;
   status: string;
   created_at: string;
+  payment_status?: string | null;
 };
 
 const steps = [
-  { key: "recebido", label: "Pedido recebido" },
-  { key: "preparando", label: "Em preparo" },
-  { key: "pronto", label: "Pronto para retirada" },
-  { key: "retirado", label: "Retirado" },
+  { key: "aguardando_pagamento", label: "Aguardando pagamento", doneText: "Pago" },
+  { key: "recebido", label: "Pedido recebido", doneText: "Recebido" },
+  { key: "preparando", label: "Em preparo", doneText: "Preparando" },
+  { key: "pronto", label: "Pronto para retirada", doneText: "Pronto" },
+  { key: "retirado", label: "Retirado", doneText: "Retirado" },
 ];
 
 const statusIndex = (status: string) =>
@@ -24,19 +26,35 @@ const statusIndex = (status: string) =>
     steps.findIndex((step) => step.key === status)
   );
 
+const isPaymentConfirmed = (order: Order) =>
+  (order.payment_status || "").trim().toLowerCase() === "pago";
+
+const getCustomerStatus = (order: Order) => {
+  if (!isPaymentConfirmed(order)) {
+    return "aguardando_pagamento";
+  }
+
+  if (["aguardando_pagamento", "recebido"].includes(order.status)) {
+    return "preparando";
+  }
+
+  return order.status;
+};
+
 export default function PedidoPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ ID: string }>;
 }) {
   const [order, setOrder] = useState<Order | null>(null);
+  const { ID: orderId } = use(params);
 
   useEffect(() => {
     async function loadOrder() {
       const { data } = await supabase
         .from("orders")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", orderId)
         .single();
 
       if (data) setOrder(data);
@@ -45,12 +63,12 @@ export default function PedidoPage({
     loadOrder();
 
     const channel = supabase
-      .channel(`pedido-${params.id}`)
+      .channel(`pedido-${orderId}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
         (payload) => {
-          if (payload.new.id === Number(params.id)) {
+          if (payload.new.id === Number(orderId)) {
             setOrder(payload.new as Order);
           }
         }
@@ -60,21 +78,23 @@ export default function PedidoPage({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [params.id]);
+  }, [orderId]);
 
   if (!order) {
     return (
       <main style={styles.page}>
         <section style={styles.panel}>
           <p style={styles.eyebrow}>Missô Sushi</p>
-          <h1 style={styles.title}>Carregando pedido...</h1>
-          <p style={styles.muted}>Estamos buscando o status mais recente.</p>
+          <h1 style={styles.title}>Abrindo seu pedido...</h1>
+          <p style={styles.muted}>Estamos conferindo o pagamento e o status da retirada.</p>
         </section>
       </main>
     );
   }
 
-  const current = statusIndex(order.status);
+  const isPaid = isPaymentConfirmed(order);
+  const customerStatus = getCustomerStatus(order);
+  const current = statusIndex(customerStatus);
 
   return (
     <main style={styles.page}>
@@ -91,19 +111,25 @@ export default function PedidoPage({
         <div style={styles.statusCard}>
           <span style={styles.statusLabel}>Status atual</span>
           <strong style={styles.statusValue}>
-            {steps[current]?.label || order.status}
+            {steps[current]?.label || customerStatus}
           </strong>
         </div>
 
         <div style={styles.timeline}>
-          {steps.map((step, index) => (
-            <StatusStep
-              key={step.key}
-              active={index <= current}
-              current={index === current}
-              text={step.label}
-            />
-          ))}
+          {steps.map((step, index) => {
+            const isPaymentStep = step.key === "aguardando_pagamento";
+            const active = isPaymentStep ? isPaid : index <= current;
+
+            return (
+              <StatusStep
+                key={step.key}
+                active={active}
+                current={isPaymentStep ? !isPaid : index === current}
+                text={isPaymentStep && isPaid ? "Pagamento confirmado" : step.label}
+                statusText={active ? step.doneText : "Aguardando"}
+              />
+            );
+          })}
         </div>
       </section>
     </main>
@@ -113,25 +139,74 @@ export default function PedidoPage({
 function StatusStep({
   active,
   current,
+  statusText,
   text,
 }: {
   active: boolean;
   current: boolean;
+  statusText: string;
   text: string;
 }) {
   return (
     <div style={styles.step}>
       <span
+        className={
+          current && active
+            ? "current-done-dot"
+            : current && !active
+              ? "pending-payment-dot"
+              : undefined
+        }
         style={{
           ...styles.stepDot,
           ...(active ? styles.stepDotActive : {}),
-          ...(current ? styles.stepDotCurrent : {}),
+          ...(current && active ? styles.stepDotCurrentDone : {}),
+          ...(current && !active ? styles.stepDotCurrentPending : {}),
         }}
       />
       <div>
         <strong style={styles.stepTitle}>{text}</strong>
-        <p style={styles.stepText}>{active ? "Concluído" : "Aguardando"}</p>
+        <p style={styles.stepText}>{statusText}</p>
       </div>
+      <style jsx global>{`
+        @keyframes pendingPaymentPulse {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(153, 27, 27, 0.2);
+          }
+          50% {
+            transform: scale(1.06);
+            box-shadow: 0 0 0 7px rgba(153, 27, 27, 0.1);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(153, 27, 27, 0);
+          }
+        }
+
+        .pending-payment-dot {
+          animation: pendingPaymentPulse 2.2s ease-in-out infinite;
+        }
+
+        @keyframes currentDonePulse {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.22);
+          }
+          50% {
+            transform: scale(1.06);
+            box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.12);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+          }
+        }
+
+        .current-done-dot {
+          animation: currentDonePulse 2.4s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
@@ -212,15 +287,21 @@ const styles: Record<string, CSSProperties> = {
     height: 20,
     borderRadius: 999,
     marginTop: 2,
-    border: "2px solid #d8d0c4",
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderColor: "#d8d0c4",
     background: "#fffdf8",
   },
   stepDotActive: {
-    background: "#9f1d2f",
-    borderColor: "#9f1d2f",
+    background: "#16a34a",
+    borderColor: "#16a34a",
   },
-  stepDotCurrent: {
-    boxShadow: "0 0 0 5px rgba(159, 29, 47, 0.14)",
+  stepDotCurrentDone: {
+    boxShadow: "0 0 0 5px rgba(22, 163, 74, 0.16)",
+  },
+  stepDotCurrentPending: {
+    background: "#991b1b",
+    borderColor: "#991b1b",
   },
   stepTitle: {
     display: "block",
