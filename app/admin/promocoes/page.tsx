@@ -167,15 +167,15 @@ export default function AdminPromotionsPage() {
 
   return (
     <AdminShell eyebrow="Marketing" title="Promoções">
-      <section style={localStyles.metrics}>
+      <section style={{ ...localStyles.metrics, ...(isMobile ? localStyles.metricsMobile : {}) }}>
         <Metric label="Cupons" value={String(promotions.length)} />
         <Metric label="Ativos" value={String(activePromotions)} />
         <Metric label="Pausados" value={String(pausedPromotions)} />
       </section>
 
       <section style={{ ...localStyles.layout, ...(isTablet ? localStyles.layoutStack : {}) }}>
-        <form onSubmit={handleSubmit} style={localStyles.createPanel}>
-          <div style={localStyles.panelHeader}>
+        <form onSubmit={handleSubmit} style={{ ...localStyles.createPanel, ...(isMobile ? localStyles.panelMobile : {}) }}>
+          <div style={{ ...localStyles.panelHeader, ...(isMobile ? localStyles.panelHeaderMobile : {}) }}>
             <div>
               <p style={styles.cardEyebrow}>Novo cupom</p>
               <h2 style={localStyles.panelTitle}>Criar promoção</h2>
@@ -260,8 +260,8 @@ export default function AdminPromotionsPage() {
           </button>
         </form>
 
-        <article style={localStyles.listPanel}>
-          <div style={localStyles.panelHeader}>
+        <article style={{ ...localStyles.listPanel, ...(isMobile ? localStyles.panelMobile : {}) }}>
+          <div style={{ ...localStyles.panelHeader, ...(isMobile ? localStyles.panelHeaderMobile : {}) }}>
             <div>
               <p style={styles.cardEyebrow}>Cupons</p>
               <h2 style={localStyles.panelTitle}>Gerenciar cupons</h2>
@@ -303,7 +303,7 @@ export default function AdminPromotionsPage() {
                     </p>
                     <strong style={localStyles.discountValue}>{discount} de desconto</strong>
                   </div>
-                  <div style={localStyles.couponActions}>
+                  <div style={{ ...localStyles.couponActions, ...(isMobile ? localStyles.couponActionsMobile : {}) }}>
                     <button
                       type="button"
                       onClick={() => setEditingPromotion(promotion)}
@@ -489,6 +489,10 @@ const localStyles: Record<string, CSSProperties> = {
     gap: 12,
     marginBottom: 16,
   },
+  metricsMobile: {
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: 8,
+  },
   metricCard: {
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.08)",
@@ -515,6 +519,9 @@ const localStyles: Record<string, CSSProperties> = {
     padding: 20,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.16)",
   },
+  panelMobile: {
+    padding: 14,
+  },
   listPanel: {
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.08)",
@@ -528,6 +535,10 @@ const localStyles: Record<string, CSSProperties> = {
     alignItems: "start",
     gap: 14,
     marginBottom: 16,
+  },
+  panelHeaderMobile: {
+    display: "grid",
+    gap: 8,
   },
   panelTitle: {
     marginTop: 4,
@@ -695,6 +706,9 @@ const localStyles: Record<string, CSSProperties> = {
     alignItems: "center",
     justifyContent: "end",
     gap: 10,
+  },
+  couponActionsMobile: {
+    justifyContent: "space-between",
   },
   editButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",

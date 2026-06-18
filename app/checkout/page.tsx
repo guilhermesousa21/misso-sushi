@@ -110,6 +110,7 @@ export default function CheckoutPage() {
 
   const [storeOpen, setStoreOpen] = useState(true);
   const [manualOpen, setManualOpen] = useState(true);
+  const [averageTime, setAverageTime] = useState("35 a 50 min");
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [cartNotice, setCartNotice] = useState("");
@@ -122,13 +123,14 @@ export default function CheckoutPage() {
     async function fetchStoreStatus() {
       const { data } = await supabase
         .from("store_settings")
-        .select("is_open,business_hours")
+        .select("is_open,average_time,business_hours")
         .limit(1)
         .maybeSingle();
       const manuallyOpen = data?.is_open !== false;
       const savedBusinessHours = getBusinessHours(data?.business_hours);
       setBusinessHours(savedBusinessHours);
       setManualOpen(manuallyOpen);
+      setAverageTime(data?.average_time || "35 a 50 min");
       setStoreOpen(manuallyOpen && isWithinBusinessHours(new Date(), savedBusinessHours));
     }
     fetchStoreStatus();
@@ -219,6 +221,19 @@ export default function CheckoutPage() {
     hasFirstAndLastName(name) &&
     [10, 11].includes(onlyDigits(phone).length) &&
     storeOpen;
+  const nextOpening = getNextOpeningLabel(new Date(), businessHours);
+  const storeStatusMessage = storeOpen
+    ? `Loja aberta para retirada. Tempo médio: ${averageTime}.`
+    : manualOpen
+      ? `A loja está fechada pelo horário cadastrado e ${nextOpening}.`
+      : `A loja está pausada no momento e ${nextOpening}.`;
+  const formHelp = !storeOpen
+    ? "Os pedidos estão bloqueados até a loja reabrir."
+    : !hasFirstAndLastName(name)
+      ? "Informe nome e sobrenome para continuar."
+      : ![10, 11].includes(onlyDigits(phone).length)
+        ? "Informe um telefone com DDD."
+        : "Tudo certo para enviar o pedido.";
 
   const insertOrder = async (extra: Record<string, unknown>) => {
     const base: Record<string, unknown> = {
@@ -393,7 +408,9 @@ export default function CheckoutPage() {
                     <span>{showFeedback ? "Código PIX copiado" : "Copiar código PIX"}</span>
                   </button>
                   <p style={styles.pixInfoText}>
-                    Depois do pagamento aprovado, esta tela confirma sozinha.
+                    {pixCountdown > 0
+                      ? "Depois do pagamento aprovado, esta tela confirma sozinha."
+                      : "Se o tempo acabou, volte ao cardápio e gere um novo pedido PIX."}
                   </p>
                   {pendingOrderId && (
                     <Link href={`/pedido/${pendingOrderId}`} style={styles.orderLink}>
@@ -413,10 +430,17 @@ export default function CheckoutPage() {
   if (checkoutState === "generating") {
     return (
       <main style={styles.page}>
-        <section style={styles.emptyState}>
+        <section style={styles.progressState}>
           <p style={styles.eyebrow}>Missô Sushi</p>
           <h1 style={styles.title}>{method === "pix" ? "Gerando PIX..." : "Enviando pedido..."}</h1>
-          <p style={styles.muted}>Aguarde um momento.</p>
+          <p style={styles.muted}>
+            {method === "pix"
+              ? "Estamos criando seu QR Code e reservando o pedido."
+              : "Estamos registrando seu pedido para a cozinha."}
+          </p>
+          <div style={styles.progressBar}>
+            <span style={styles.progressFill} />
+          </div>
         </section>
       </main>
     );
@@ -456,6 +480,9 @@ export default function CheckoutPage() {
         <div style={styles.headerTitle}>
           <p style={styles.eyebrow}>Missô Sushi</p>
           <h1 style={styles.title}>Finalizar pedido</h1>
+          <p style={{ ...styles.storeStatus, ...(storeOpen ? styles.storeStatusOpen : styles.storeStatusClosed) }}>
+            {storeStatusMessage}
+          </p>
         </div>
       </header>
 
@@ -496,6 +523,7 @@ export default function CheckoutPage() {
                 />
               </label>
             </div>
+            <p style={{ ...styles.formHelp, ...(isFormValid ? styles.formHelpOk : {}) }}>{formHelp}</p>
           </div>
 
           {/* Retirada */}
@@ -508,6 +536,10 @@ export default function CheckoutPage() {
               <span style={styles.pill}>Sem entrega</span>
             </div>
             <p style={styles.muted}>Acompanhe o status pelo link do pedido e retire quando estiver pronto.</p>
+            <div style={styles.operationalInfoGrid}>
+              <span>Tempo médio</span>
+              <strong>{averageTime}</strong>
+            </div>
             {!storeOpen && (
               <p style={styles.error}>
                 {manualOpen
@@ -587,6 +619,7 @@ export default function CheckoutPage() {
                 </button>
               ))}
             </div>
+            {!isFormValid && <p style={styles.paymentWarning}>{formHelp}</p>}
             {method === "pix" && (
               <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
                 Clique em PIX para gerar o QR Code.
@@ -657,6 +690,9 @@ const styles: Record<string, CSSProperties> = {
   backLink: { position: "absolute", left: 0, top: 18, color: "#8f1728", textDecoration: "none", fontSize: 14, fontWeight: 850, background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 999, padding: "9px 13px" },
   eyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
   title: { marginTop: 8, fontSize: "clamp(38px, 5vw, 54px)", lineHeight: 0.98, fontWeight: 850 },
+  storeStatus: { marginTop: 12, borderRadius: 999, padding: "9px 12px", fontSize: 13, fontWeight: 850, lineHeight: 1.35 },
+  storeStatusOpen: { background: "#ecfdf5", color: "#0f7a4a" },
+  storeStatusClosed: { background: "#fee2e2", color: "#991b1b" },
   shell: { maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 378px", gap: 20, alignItems: "start" },
   shellMobile: { gridTemplateColumns: "1fr" },
   mainColumn: { display: "grid", gap: 14 },
@@ -671,6 +707,9 @@ const styles: Record<string, CSSProperties> = {
   summaryPill: { borderRadius: 999, background: "rgba(255, 253, 248, 0.12)", padding: "7px 10px", color: "#fffdf8", fontSize: 13, fontWeight: 850, whiteSpace: "nowrap" },
   formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   formGridMobile: { gridTemplateColumns: "1fr" },
+  formHelp: { marginTop: 12, color: "#991b1b", fontSize: 13, fontWeight: 850, lineHeight: 1.4 },
+  formHelpOk: { color: "#0f7a4a" },
+  operationalInfoGrid: { marginTop: 12, display: "flex", justifyContent: "space-between", gap: 12, borderRadius: 8, background: "#f0ebe2", color: "#514a43", padding: "12px 14px", fontWeight: 850 },
   couponRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center" },
   couponRowMobile: { gridTemplateColumns: "1fr" },
   field: { display: "grid", gap: 7 },
@@ -682,6 +721,7 @@ const styles: Record<string, CSSProperties> = {
   methodButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
   methodButtonDisabled: { opacity: 0.45, cursor: "not-allowed" },
   methodIcon: { fontSize: 15, lineHeight: 1 },
+  paymentWarning: { marginTop: 12, borderRadius: 8, background: "#fff1f1", color: "#991b1b", padding: 12, fontSize: 13, fontWeight: 850, lineHeight: 1.4 },
   orderList: { display: "grid", gap: 13 },
   orderRow: { display: "flex", justifyContent: "space-between", gap: 18, paddingBottom: 13, borderBottom: "1px solid rgba(28, 26, 23, 0.08)" },
   itemName: { display: "block", lineHeight: 1.35 },
@@ -705,6 +745,9 @@ const styles: Record<string, CSSProperties> = {
   successText: { marginTop: 8, color: "#0f7a4a", fontWeight: 850 },
   error: { borderRadius: 8, background: "#fee2e2", color: "#991b1b", padding: 12, fontWeight: 800 },
   emptyState: { maxWidth: 640, margin: "0 auto", minHeight: "70vh", display: "grid", alignContent: "center", justifyItems: "start" },
+  progressState: { maxWidth: 640, margin: "0 auto", minHeight: "70vh", display: "grid", alignContent: "center", justifyItems: "start", gap: 12 },
+  progressBar: { width: "min(360px, 100%)", height: 8, borderRadius: 999, overflow: "hidden", background: "#e7ded2" },
+  progressFill: { display: "block", width: "62%", height: "100%", borderRadius: 999, background: "#9f1d2f" },
   pixState: { maxWidth: 860, margin: "0 auto", minHeight: "78vh", display: "grid", alignContent: "center", justifyItems: "center", textAlign: "center" },
   pixHeader: { maxWidth: 620, display: "grid", justifyItems: "center", gap: 10 },
   pixTitle: { marginTop: 8, fontSize: "clamp(34px, 7vw, 52px)", lineHeight: 1.02, fontWeight: 850 },
@@ -720,5 +763,6 @@ const styles: Record<string, CSSProperties> = {
   pixConfirmedBox: { maxWidth: 600, borderRadius: 8, background: "#fffdf8", border: "1px solid rgba(22, 163, 74, 0.22)", padding: 28, boxShadow: "0 18px 45px rgba(22, 163, 74, 0.1)" },
   pixConfirmedText: { marginTop: 12, color: "#0f7a4a", fontWeight: 850, lineHeight: 1.5 },
   orderLink: { marginTop: 14, color: "#625b53", fontWeight: 800, textDecoration: "none", textAlign: "center" },
+  newOrderLink: { marginTop: 10, display: "inline-flex", justifyContent: "center", color: "#fffdf8", background: "#1c1a17", borderRadius: 999, padding: "12px 16px", fontWeight: 850, textDecoration: "none" },
   primaryLink: { marginTop: 22, display: "inline-flex", background: "#1c1a17", color: "#fffdf8", textDecoration: "none", borderRadius: 999, padding: "13px 18px", fontWeight: 850 },
 };

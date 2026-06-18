@@ -72,6 +72,7 @@ export default function AdminOrdersPage() {
   const [dateRange, setDateRange] = useState<DateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const isMobile = useMediaQuery("(max-width: 760px)");
   const isTablet = useMediaQuery("(max-width: 1040px)");
 
   useEffect(() => {
@@ -162,26 +163,26 @@ export default function AdminOrdersPage() {
       title="Pedidos"
       action={<span style={styles.pill}>{loading ? "Carregando" : `${number(filteredOrders.length)} pedidos`}</span>}
     >
-      <section style={localStyles.summaryGrid}>
-        <div style={localStyles.summaryCard}>
+      <section style={{ ...localStyles.summaryGrid, ...(isMobile ? localStyles.summaryGridMobile : {}) }}>
+        <div style={{ ...localStyles.summaryCard, ...(isMobile ? localStyles.summaryCardMobile : {}) }}>
           <span style={localStyles.summaryLabel}>Pedidos filtrados</span>
           <strong style={localStyles.summaryValue}>{number(filteredOrders.length)}</strong>
         </div>
-        <div style={localStyles.summaryCard}>
+        <div style={{ ...localStyles.summaryCard, ...(isMobile ? localStyles.summaryCardMobile : {}) }}>
           <span style={localStyles.summaryLabel}>Total no filtro</span>
           <strong style={localStyles.summaryValue}>{money(summary.total)}</strong>
         </div>
-        <div style={localStyles.summaryCard}>
+        <div style={{ ...localStyles.summaryCard, ...(isMobile ? localStyles.summaryCardMobile : {}) }}>
           <span style={localStyles.summaryLabel}>Ticket médio</span>
           <strong style={localStyles.summaryValue}>{money(summary.average)}</strong>
         </div>
-        <div style={localStyles.summaryCard}>
+        <div style={{ ...localStyles.summaryCard, ...(isMobile ? localStyles.summaryCardMobile : {}) }}>
           <span style={localStyles.summaryLabel}>Período</span>
           <strong style={localStyles.summaryValue}>{dateRangeLabels[dateRange]}</strong>
         </div>
       </section>
 
-      <section style={localStyles.filtersCard}>
+      <section style={{ ...localStyles.filtersCard, ...(isMobile ? localStyles.filtersCardMobile : {}) }}>
         <div style={{ ...localStyles.filtersGrid, ...(isTablet ? localStyles.filtersGridStack : {}) }}>
           <label style={localStyles.field}>
             <span style={localStyles.fieldLabel}>Busca</span>
@@ -233,7 +234,7 @@ export default function AdminOrdersPage() {
         </div>
       </section>
 
-      <section style={localStyles.listPanel}>
+      <section style={{ ...localStyles.listPanel, ...(isMobile ? localStyles.listPanelMobile : {}) }}>
         <div style={localStyles.listHeader}>
           <div>
             <p style={styles.cardEyebrow}>Histórico</p>
@@ -242,8 +243,8 @@ export default function AdminOrdersPage() {
         </div>
 
         {filteredOrders.map((order) => (
-          <article key={order.id} style={localStyles.orderCard}>
-            <div style={localStyles.orderHeader}>
+          <article key={order.id} style={{ ...localStyles.orderCard, ...(isMobile ? localStyles.orderCardMobile : {}) }}>
+            <div style={{ ...localStyles.orderHeader, ...(isMobile ? localStyles.orderHeaderMobile : {}) }}>
               <div style={localStyles.orderTitleBlock}>
                 <div style={localStyles.orderTitleRow}>
                   <strong style={localStyles.orderTitle}>Pedido #{order.id}</strong>
@@ -267,13 +268,16 @@ export default function AdminOrdersPage() {
               )}
             </div>
 
-            {order.note && <p style={localStyles.note}>Obs: {order.note}</p>}
+            <div style={order.note?.trim() ? localStyles.noteBox : localStyles.noteBoxEmpty}>
+              <strong>Observação do cliente</strong>
+              <p>{order.note?.trim() || "Sem observação."}</p>
+            </div>
 
-            <div style={localStyles.actionsBar}>
+            <div style={{ ...localStyles.actionsBar, ...(isMobile ? localStyles.actionsBarMobile : {}) }}>
               <button
                 type="button"
                 onClick={() => printOrder(order)}
-                style={localStyles.actionButton}
+                style={{ ...localStyles.actionButton, ...(isMobile ? localStyles.actionButtonMobile : {}) }}
               >
                 Imprimir
               </button>
@@ -296,6 +300,10 @@ const localStyles: Record<string, CSSProperties> = {
     gap: 12,
     marginBottom: 14,
   },
+  summaryGridMobile: {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 8,
+  },
   summaryCard: {
     background: "#1c1a17",
     borderRadius: 8,
@@ -304,6 +312,10 @@ const localStyles: Record<string, CSSProperties> = {
     minHeight: 96,
     display: "grid",
     alignContent: "space-between",
+  },
+  summaryCardMobile: {
+    minHeight: 78,
+    padding: 12,
   },
   summaryLabel: {
     color: "rgba(255, 253, 248, 0.68)",
@@ -323,6 +335,9 @@ const localStyles: Record<string, CSSProperties> = {
     padding: 14,
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.04)",
     marginBottom: 14,
+  },
+  filtersCardMobile: {
+    padding: 10,
   },
   filtersGrid: {
     display: "grid",
@@ -360,6 +375,9 @@ const localStyles: Record<string, CSSProperties> = {
     padding: "18px 20px 6px",
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.04)",
   },
+  listPanelMobile: {
+    padding: "14px 12px 4px",
+  },
   listHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -372,11 +390,18 @@ const localStyles: Record<string, CSSProperties> = {
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
     background: "transparent",
   },
+  orderCardMobile: {
+    padding: "12px 0",
+  },
   orderHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "start",
     gap: 14,
+  },
+  orderHeaderMobile: {
+    display: "grid",
+    gap: 8,
   },
   orderTitleBlock: {
     minWidth: 0,
@@ -412,16 +437,38 @@ const localStyles: Record<string, CSSProperties> = {
     fontSize: 13,
     fontWeight: 800,
   },
-  note: {
-    marginTop: 12,
-    color: "#625b53",
-    lineHeight: 1.45,
+  noteBox: {
+    marginTop: 8,
+    border: "1px solid rgba(159, 29, 47, 0.18)",
+    borderRadius: 8,
+    background: "#fff7f0",
+    color: "#514a43",
+    padding: "8px 10px",
+    display: "grid",
+    gap: 3,
+    fontSize: 13,
+    lineHeight: 1.35,
+  },
+  noteBoxEmpty: {
+    marginTop: 8,
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    background: "#f7f4ef",
+    color: "#766e64",
+    padding: "8px 10px",
+    display: "grid",
+    gap: 3,
+    fontSize: 13,
+    lineHeight: 1.35,
   },
   actionsBar: {
     display: "flex",
     flexWrap: "wrap",
     gap: 8,
     marginTop: 12,
+  },
+  actionsBarMobile: {
+    display: "grid",
   },
   actionButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
@@ -432,5 +479,9 @@ const localStyles: Record<string, CSSProperties> = {
     cursor: "pointer",
     fontSize: 13,
     fontWeight: 850,
+  },
+  actionButtonMobile: {
+    width: "100%",
+    padding: "11px 12px",
   },
 };

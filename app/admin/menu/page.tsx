@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { toast } from "react-hot-toast";
+import { Toaster, toast } from "react-hot-toast";
 import {
   defaultMenuCategories,
   getCategoryLabel,
@@ -86,6 +86,7 @@ export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>(defaultMenuCategories);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
   const isMobile = useMediaQuery("(max-width: 760px)");
@@ -312,6 +313,8 @@ export default function AdminMenuPage() {
     const name = newCategoryName.trim();
     const slug = normalizeCategorySlug(name);
 
+    if (creatingCategory) return;
+
     if (!name || !slug) {
       toast.error("Informe o nome da categoria.");
       return;
@@ -327,19 +330,26 @@ export default function AdminMenuPage() {
       sort_order: categories.length,
       active: true,
     };
-    const { data, error } = await supabase
-      .from("menu_categories")
-      .insert([payload])
-      .select();
+    setCreatingCategory(true);
+    try {
+      const { data, error } = await supabase
+        .from("menu_categories")
+        .upsert([payload], { onConflict: "slug" })
+        .select("id,slug,name,sort_order,active");
 
-    if (error) {
-      toast.error("Crie a tabela menu_categories no Supabase para salvar categorias.");
-      return;
+      if (error || !data?.length) {
+        toast.error(error?.message || "Não foi possível criar a categoria.");
+        return;
+      }
+
+      setCategories(sortCategories([...(categories || []), (data?.[0] || payload) as MenuCategory]));
+      setNewCategoryName("");
+      toast.success("Categoria criada.");
+    } catch {
+      toast.error("Não foi possível criar a categoria.");
+    } finally {
+      setCreatingCategory(false);
     }
-
-    setCategories(sortCategories([...(categories || []), (data?.[0] || payload) as MenuCategory]));
-    setNewCategoryName("");
-    toast.success("Categoria criada.");
   };
 
   const toggleItemActive = async (item: MenuItem) => {
@@ -376,6 +386,9 @@ export default function AdminMenuPage() {
   const toggleCategoryActive = async (category: MenuCategory) => {
     const nextActive = category.active === false;
     const previousCategories = categories;
+    const updateQuery = supabase
+      .from("menu_categories")
+      .update({ active: nextActive });
 
     setCategories((current) =>
       sortCategories(
@@ -387,15 +400,42 @@ export default function AdminMenuPage() {
       )
     );
 
-    const { error } = await supabase
-      .from("menu_categories")
-      .update({ active: nextActive })
-      .eq("slug", category.slug);
+    let updateResult = await (category.id
+      ? updateQuery.eq("id", category.id).select("id")
+      : updateQuery.eq("slug", category.slug).select("id"));
 
-    if (error) {
+    if (!updateResult.error && !updateResult.data?.length) {
+      updateResult = await supabase
+        .from("menu_categories")
+        .upsert(
+          {
+            slug: category.slug,
+            name: category.name,
+            sort_order: category.sort_order,
+            active: nextActive,
+          },
+          { onConflict: "slug" }
+        )
+        .select("id");
+    }
+
+    if (updateResult.error || !updateResult.data?.length) {
       setCategories(previousCategories);
       toast.error("Não foi possível alterar o status da categoria.");
       return;
+    }
+
+    const savedId = updateResult.data[0]?.id;
+    if (savedId) {
+      setCategories((current) =>
+        sortCategories(
+          current.map((currentCategory) =>
+            currentCategory.slug === category.slug
+              ? { ...currentCategory, id: savedId }
+              : currentCategory
+          )
+        )
+      );
     }
 
     if (editingCategory?.slug === category.slug) {
@@ -409,30 +449,28 @@ export default function AdminMenuPage() {
 
   return (
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
-      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}) }}>
-        <h2 style={styles.sidebarTitle}>Missô Admin</h2>
-        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}) }}>
-          <AdminLink href="/admin/menu" pathname={pathname}>
+      <Toaster position="top-right" />
+      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}), ...(isMobile ? styles.sidebarMobile : {}) }}>
+        <h2 style={{ ...styles.sidebarTitle, ...(isMobile ? styles.sidebarTitleMobile : {}) }}>Missô Admin</h2>
+        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobile : {}) }}>
+          <AdminLink href="/admin/menu" pathname={pathname} compact={isMobile}>
             Cardápio
           </AdminLink>
-          <AdminLink href="/admin/faturamento" pathname={pathname}>
+          <AdminLink href="/admin/faturamento" pathname={pathname} compact={isMobile}>
             Faturamento
           </AdminLink>
           {false && (
-          <AdminLink href="/admin" pathname={pathname}>
+          <AdminLink href="/admin" pathname={pathname} compact={isMobile}>
             Visão geral
           </AdminLink>
           )}
-          <AdminLink href="/admin/pedidos" pathname={pathname}>
+          <AdminLink href="/admin/pedidos" pathname={pathname} compact={isMobile}>
             Pedidos
           </AdminLink>
-          <AdminLink href="/admin/clientes" pathname={pathname}>
-            Clientes
-          </AdminLink>
-          <AdminLink href="/admin/promocoes" pathname={pathname}>
+          <AdminLink href="/admin/promocoes" pathname={pathname} compact={isMobile}>
             Promoções
           </AdminLink>
-          <AdminLink href="/admin/configuracoes" pathname={pathname}>
+          <AdminLink href="/admin/configuracoes" pathname={pathname} compact={isMobile}>
             Configurações
           </AdminLink>
         </nav>
@@ -442,12 +480,12 @@ export default function AdminMenuPage() {
         <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
           <div>
             <p style={styles.eyebrow}>Operação</p>
-            <h1 style={styles.title}>Cardápio</h1>
+            <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>Cardápio</h1>
           </div>
           <button
             type="button"
             onClick={handleAddItem}
-            style={styles.primaryButton}
+            style={{ ...styles.primaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
           >
             Adicionar item
           </button>
@@ -459,12 +497,12 @@ export default function AdminMenuPage() {
             placeholder="Buscar prato..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            style={styles.input}
+            style={{ ...styles.input, ...(isMobile ? styles.controlMobile : {}) }}
           />
           <select
             value={filterCategory}
             onChange={(event) => setFilterCategory(event.target.value)}
-            style={styles.select}
+            style={{ ...styles.select, ...(isMobile ? styles.controlMobile : {}) }}
           >
             <option value="">Todas as categorias</option>
             {categoryOptions.map((category) => (
@@ -475,17 +513,17 @@ export default function AdminMenuPage() {
           </select>
         </section>
 
-        <section style={styles.categoryManager}>
+        <section style={{ ...styles.categoryManager, ...(isMobile ? styles.categoryManagerMobile : {}) }}>
           <div style={{ ...styles.categoryManagerHeader, ...(isMobile ? styles.categoryManagerHeaderMobile : {}) }}>
             <div>
               <p style={styles.cardEyebrow}>Categorias</p>
-              <h2 style={styles.categoryManagerTitle}>Editar categorias</h2>
-              <p style={styles.categoryManagerText}>
+              <h2 style={{ ...styles.categoryManagerTitle, ...(isMobile ? styles.categoryManagerTitleMobile : {}) }}>Editar categorias</h2>
+              <p style={{ ...styles.categoryManagerText, ...(isMobile ? styles.categoryManagerTextMobile : {}) }}>
                 Altere nomes, crie novas categorias e oculte grupos do cardápio público.
               </p>
             </div>
             <div style={styles.categorySummarySide}>
-              <div style={styles.categoryStats}>
+              <div style={{ ...styles.categoryStats, ...(isMobile ? styles.categoryStatsMobile : {}) }}>
                 <div style={styles.categoryStat}>
                   <strong>{categoryOptions.length}</strong>
                   <span>Total</span>
@@ -521,12 +559,26 @@ export default function AdminMenuPage() {
                   <input
                     value={newCategoryName}
                     onChange={(event) => setNewCategoryName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void handleCreateCategory();
+                      }
+                    }}
                     placeholder="Ex: Promoções"
                     style={styles.input}
                   />
                 </label>
-                <button type="button" onClick={handleCreateCategory} style={styles.primaryButton}>
-                  Criar categoria
+                <button
+                  type="button"
+                  onClick={() => void handleCreateCategory()}
+                  disabled={creatingCategory || !newCategoryName.trim()}
+                  style={{
+                    ...styles.primaryButton,
+                    ...(creatingCategory || !newCategoryName.trim() ? styles.primaryButtonDisabled : {}),
+                  }}
+                >
+                  {creatingCategory ? "Criando..." : "Criar categoria"}
                 </button>
               </div>
 
@@ -573,7 +625,10 @@ export default function AdminMenuPage() {
                     <div style={{ ...styles.categoryToggleCell, ...(isMobile ? styles.fullWidthMobile : {}) }}>
                       <button
                         type="button"
-                        onClick={() => toggleCategoryActive(category)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void toggleCategoryActive(category);
+                        }}
                         style={{
                           ...styles.itemSwitch,
                           ...(category.active !== false ? styles.itemSwitchActive : styles.itemSwitchPaused),
@@ -617,7 +672,7 @@ export default function AdminMenuPage() {
         )}
         {savingOrder && <p style={styles.noticeStrong}>Ordem alterada. Salvando...</p>}
 
-        <section style={styles.categoryList}>
+        <section style={{ ...styles.categoryList, ...(isMobile ? styles.categoryListMobile : {}) }}>
           {orderedCategories.map((category) => {
             const itemsInCategory = sortItems(groupedItems[category] || []);
             const categoryActive =
@@ -725,22 +780,25 @@ export default function AdminMenuPage() {
                             alt={item.name}
                             width={92}
                             height={64}
-                            style={styles.itemImage}
+                            style={{ ...styles.itemImage, ...(isMobile ? styles.itemImageMobile : {}) }}
                           />
                         )}
                         <div>
-                          <h3 style={styles.itemName}>{item.name}</h3>
+                          <h3 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h3>
                           <p style={styles.itemPrice}>{money(Number(item.price))}</p>
                           {!itemActive && <p style={styles.itemPausedText}>Pausado</p>}
                           {item.description && (
-                            <p style={styles.itemDescription}>{item.description}</p>
+                            <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>{item.description}</p>
                           )}
                         </div>
                       </div>
                       <div style={{ ...styles.itemActions, ...(isMobile ? styles.itemActionsMobile : {}) }}>
                         <button
                           type="button"
-                          onClick={() => toggleItemActive(item)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void toggleItemActive(item);
+                          }}
                           aria-pressed={itemActive}
                           style={{
                             ...styles.itemSwitch,
@@ -761,7 +819,7 @@ export default function AdminMenuPage() {
                         <button
                           type="button"
                           onClick={() => setEditingItem(item)}
-                          style={styles.secondaryButton}
+                          style={{ ...styles.secondaryButton, ...(isMobile ? styles.secondaryButtonMobile : {}) }}
                         >
                           Editar
                         </button>
@@ -835,15 +893,17 @@ function AdminLink({
   href,
   pathname,
   children,
+  compact,
 }: {
   href: string;
   pathname: string;
   children: React.ReactNode;
+  compact?: boolean;
 }) {
   const active = pathname === href;
 
   return (
-    <Link href={href} style={{ ...styles.navLink, ...(active ? styles.navLinkActive : {}) }}>
+    <Link href={href} style={{ ...styles.navLink, ...(compact ? styles.navLinkMobile : {}), ...(active ? styles.navLinkActive : {}) }}>
       {children}
     </Link>
   );
@@ -1338,9 +1398,19 @@ const styles: Record<string, CSSProperties> = {
     borderRight: "none",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
   },
+  sidebarMobile: {
+    padding: "12px 12px 10px",
+    position: "sticky",
+    top: 0,
+    zIndex: 20,
+  },
   sidebarTitle: {
     fontSize: 20,
     marginBottom: 22,
+  },
+  sidebarTitleMobile: {
+    fontSize: 16,
+    marginBottom: 10,
   },
   nav: {
     display: "grid",
@@ -1350,12 +1420,24 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexWrap: "wrap",
   },
+  navMobile: {
+    flexWrap: "nowrap",
+    gap: 6,
+    overflowX: "auto",
+    paddingBottom: 2,
+  },
   navLink: {
     color: "#514a43",
     textDecoration: "none",
     borderRadius: 8,
     padding: "12px 14px",
     fontWeight: 850,
+  },
+  navLinkMobile: {
+    flex: "0 0 auto",
+    padding: "9px 11px",
+    fontSize: 13,
+    whiteSpace: "nowrap",
   },
   navLinkActive: {
     background: "#1c1a17",
@@ -1377,6 +1459,8 @@ const styles: Record<string, CSSProperties> = {
   headerMobile: {
     display: "grid",
     alignItems: "start",
+    gap: 12,
+    marginBottom: 12,
   },
   eyebrow: {
     color: "#9f1d2f",
@@ -1388,6 +1472,9 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 4,
     fontSize: "clamp(36px, 5vw, 58px)",
     lineHeight: 1,
+  },
+  titleMobile: {
+    fontSize: 32,
   },
   primaryButton: {
     border: "none",
@@ -1410,6 +1497,7 @@ const styles: Record<string, CSSProperties> = {
   },
   toolbarStack: {
     gridTemplateColumns: "1fr",
+    gap: 8,
   },
   input: {
     width: "100%",
@@ -1428,6 +1516,10 @@ const styles: Record<string, CSSProperties> = {
     background: "#fffdf8",
     color: "#1c1a17",
   },
+  controlMobile: {
+    padding: 11,
+    fontSize: 16,
+  },
   notice: {
     color: "#625b53",
     margin: "8px 0 14px",
@@ -1445,6 +1537,10 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 16,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.16)",
   },
+  categoryManagerMobile: {
+    padding: 14,
+    marginBottom: 12,
+  },
   categoryManagerHeader: {
     display: "grid",
     gridTemplateColumns: "minmax(220px, 1fr) minmax(260px, 420px)",
@@ -1460,6 +1556,9 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 24,
     color: "#fffdf8",
   },
+  categoryManagerTitleMobile: {
+    fontSize: 20,
+  },
   categoryManagerText: {
     marginTop: 6,
     color: "#d8d0c4",
@@ -1467,10 +1566,16 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.45,
     maxWidth: 520,
   },
+  categoryManagerTextMobile: {
+    display: "none",
+  },
   categoryStats: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: 10,
+  },
+  categoryStatsMobile: {
+    gap: 6,
   },
   categorySummarySide: {
     display: "grid",
@@ -1640,6 +1745,9 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gap: 16,
   },
+  categoryListMobile: {
+    gap: 10,
+  },
   categoryCard: {
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.08)",
@@ -1649,7 +1757,7 @@ const styles: Record<string, CSSProperties> = {
     transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border 140ms ease",
   },
   categoryCardMobile: {
-    padding: 14,
+    padding: 10,
   },
   categoryHeader: {
     display: "flex",
@@ -1660,6 +1768,8 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryHeaderMobile: {
     display: "grid",
+    gap: 8,
+    marginBottom: 10,
   },
   categoryTitleGroup: {
     display: "flex",
@@ -1730,6 +1840,8 @@ const styles: Record<string, CSSProperties> = {
   itemCardMobile: {
     display: "grid",
     alignItems: "start",
+    gap: 9,
+    padding: 9,
   },
   itemMain: {
     minWidth: 0,
@@ -1739,15 +1851,24 @@ const styles: Record<string, CSSProperties> = {
   },
   itemMainMobile: {
     alignItems: "flex-start",
+    gap: 8,
   },
   itemImage: {
     borderRadius: 8,
     objectFit: "cover",
     background: "#f0ebe2",
   },
+  itemImageMobile: {
+    width: 64,
+    height: 48,
+  },
   itemName: {
     fontSize: 17,
     lineHeight: 1.25,
+  },
+  itemNameMobile: {
+    fontSize: 14,
+    lineHeight: 1.18,
   },
   itemPrice: {
     color: "#625b53",
@@ -1766,6 +1887,14 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
     lineHeight: 1.35,
   },
+  itemDescriptionMobile: {
+    fontSize: 12,
+    lineHeight: 1.25,
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
+  },
   itemActions: {
     display: "flex",
     alignItems: "center",
@@ -1774,7 +1903,8 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: "wrap",
   },
   itemActionsMobile: {
-    justifyContent: "stretch",
+    justifyContent: "space-between",
+    gap: 6,
   },
   itemSwitch: {
     width: 40,
@@ -1822,6 +1952,10 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     fontWeight: 850,
     whiteSpace: "nowrap",
+  },
+  secondaryButtonMobile: {
+    padding: "9px 12px",
+    marginLeft: "auto",
   },
   inactiveButton: {
     background: "#f0ebe2",

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { printOrder } from "../../lib/printOrder";
 import { supabase } from "../../lib/supabase";
@@ -201,6 +202,12 @@ export default function AdminPanel() {
   const activeOrders = orders.filter(
     (order) => !["retirado"].includes(order.status)
   );
+  const readyOrders = activeOrders.filter(
+    (order) => normalizeKitchenStatus(order.status) === "pronto"
+  );
+  const delayedOrders = activeOrders.filter(
+    (order) => minutesSinceAt(order.created_at, now) > 35
+  );
 
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
@@ -209,9 +216,19 @@ export default function AdminPanel() {
           <p style={styles.eyebrow}>Painel em tempo real</p>
           <h1 style={styles.title}>Cozinha</h1>
         </div>
-        <div style={styles.headerStat}>
-          <span>Pedidos ativos</span>
-          <strong>{activeOrders.length}</strong>
+        <div style={{ ...styles.headerStats, ...(isMobile ? styles.headerStatsMobile : {}) }}>
+          <div style={styles.headerStat}>
+            <span>Ativos</span>
+            <strong>{activeOrders.length}</strong>
+          </div>
+          <div style={styles.headerStat}>
+            <span>Prontos</span>
+            <strong>{readyOrders.length}</strong>
+          </div>
+          <div style={{ ...styles.headerStat, ...(delayedOrders.length > 0 ? styles.headerStatAlert : {}) }}>
+            <span>Atrasados</span>
+            <strong>{delayedOrders.length}</strong>
+          </div>
         </div>
       </header>
 
@@ -225,40 +242,44 @@ export default function AdminPanel() {
           {sorted.map((order) => (
             (() => {
               const kitchenStatus = normalizeKitchenStatus(order.status);
+              const minutesInQueue = minutesSinceAt(order.created_at, now);
+              const delayed = minutesInQueue > 35 && !["retirado"].includes(order.status);
 
               return (
             <article
               key={order.id}
               style={{
                 ...styles.card,
-                ...(minutesSinceAt(order.created_at, now) > 35 &&
-                !["retirado"].includes(order.status)
-                  ? styles.cardDelayed
-                  : {}),
+                ...(delayed ? styles.cardDelayed : {}),
               }}
             >
-              <div style={styles.cardHeader}>
+              <div style={{ ...styles.cardHeader, ...(isMobile ? styles.cardHeaderMobile : {}) }}>
                 <div>
                   <p style={styles.orderId}>Pedido #{order.id}</p>
                   <p style={styles.time}>
                     {formatBrasiliaDateTime(order.created_at)}
                   </p>
-                  <p style={styles.time}>{minutesSinceAt(order.created_at, now)} min na fila</p>
+                  <p style={{ ...styles.queueTime, ...(delayed ? styles.queueTimeDelayed : {}) }}>
+                    {minutesInQueue} min na fila
+                  </p>
                 </div>
-                <span
-                  style={{
-                    ...styles.badge,
-                    ...(statusStyle[kitchenStatus] || {}),
-                  }}
-                >
-                  {statusLabels[kitchenStatus] || kitchenStatus}
-                </span>
+                <div style={styles.badgeStack}>
+                  <span
+                    style={{
+                      ...styles.badge,
+                      ...(statusStyle[kitchenStatus] || {}),
+                    }}
+                  >
+                    {statusLabels[kitchenStatus] || kitchenStatus}
+                  </span>
+                  <span style={styles.paymentBadge}>Pago</span>
+                </div>
               </div>
 
               <div style={styles.customerBox}>
                 <strong>{order.name || "Cliente"}</strong>
                 <span>{order.phone || "Telefone não informado"}</span>
-                <span>Retirada no balcão</span>
+                <span style={styles.fulfillmentBadge}>Retirada no balcão</span>
                 {order.note && <p>Obs: {order.note}</p>}
               </div>
 
@@ -284,6 +305,9 @@ export default function AdminPanel() {
               </div>
 
               <div style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
+                <Link href={`/pedido/${order.id}`} style={styles.actionDetails}>
+                  Ver detalhes
+                </Link>
                 <button
                   type="button"
                   style={styles.actionSecondary}
@@ -397,7 +421,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "28px 20px 56px",
   },
   pageMobile: {
-    padding: "22px 14px 42px",
+    padding: "18px 12px 42px",
   },
   header: {
     maxWidth: 1180,
@@ -410,6 +434,7 @@ const styles: Record<string, CSSProperties> = {
   headerMobile: {
     display: "grid",
     alignItems: "start",
+    gap: 12,
   },
   eyebrow: {
     color: "#9f1d2f",
@@ -422,20 +447,32 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "clamp(36px, 5vw, 58px)",
     lineHeight: 1,
   },
+  headerStats: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: 8,
+    minWidth: 360,
+  },
+  headerStatsMobile: {
+    width: "100%",
+    minWidth: 0,
+  },
   headerStat: {
     background: "#1c1a17",
     color: "#fffdf8",
     borderRadius: 8,
-    padding: "14px 18px",
+    padding: "12px 14px",
     display: "grid",
     gap: 4,
-    minWidth: 150,
+  },
+  headerStatAlert: {
+    background: "#991b1b",
   },
   grid: {
     maxWidth: 1180,
     margin: "0 auto",
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(310px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))",
     gap: 14,
   },
   gridMobile: {
@@ -447,7 +484,7 @@ const styles: Record<string, CSSProperties> = {
     borderStyle: "solid",
     borderColor: "rgba(28, 26, 23, 0.08)",
     borderRadius: 8,
-    padding: 18,
+    padding: 20,
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
   },
   cardDelayed: {
@@ -460,6 +497,10 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
     alignItems: "start",
   },
+  cardHeaderMobile: {
+    display: "grid",
+    gap: 10,
+  },
   orderId: {
     fontSize: 20,
     fontWeight: 850,
@@ -469,6 +510,21 @@ const styles: Record<string, CSSProperties> = {
     color: "#766e64",
     fontSize: 13,
   },
+  queueTime: {
+    marginTop: 7,
+    color: "#514a43",
+    fontSize: 14,
+    fontWeight: 850,
+  },
+  queueTimeDelayed: {
+    color: "#991b1b",
+  },
+  badgeStack: {
+    display: "flex",
+    gap: 6,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
   badge: {
     borderRadius: 999,
     padding: "7px 10px",
@@ -477,6 +533,15 @@ const styles: Record<string, CSSProperties> = {
     textTransform: "capitalize",
     whiteSpace: "nowrap",
   },
+  paymentBadge: {
+    borderRadius: 999,
+    padding: "7px 10px",
+    fontSize: 12,
+    fontWeight: 850,
+    whiteSpace: "nowrap",
+    background: "#ecfdf5",
+    color: "#0f7a4a",
+  },
   customerBox: {
     marginTop: 16,
     display: "grid",
@@ -484,6 +549,15 @@ const styles: Record<string, CSSProperties> = {
     color: "#514a43",
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
     paddingTop: 14,
+  },
+  fulfillmentBadge: {
+    width: "fit-content",
+    borderRadius: 999,
+    background: "#f0ebe2",
+    color: "#514a43",
+    padding: "5px 8px",
+    fontSize: 12,
+    fontWeight: 850,
   },
   itemsBox: {
     marginTop: 16,
@@ -510,13 +584,13 @@ const styles: Record<string, CSSProperties> = {
   actions: {
     marginTop: 16,
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: 8,
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
     paddingTop: 14,
   },
   actionsMobile: {
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "1fr",
   },
   actionSecondary: {
     border: "none",
@@ -526,8 +600,24 @@ const styles: Record<string, CSSProperties> = {
     padding: 12,
     cursor: "pointer",
     fontWeight: 850,
-    minHeight: 46,
+    minHeight: 52,
     whiteSpace: "nowrap",
+  },
+  actionDetails: {
+    border: "none",
+    borderRadius: 999,
+    background: "#fffdf8",
+    color: "#1c1a17",
+    padding: 12,
+    cursor: "pointer",
+    fontWeight: 850,
+    minHeight: 52,
+    whiteSpace: "nowrap",
+    textDecoration: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "inset 0 0 0 1px rgba(28, 26, 23, 0.12)",
   },
   actionPrimary: {
     border: "none",
@@ -537,7 +627,7 @@ const styles: Record<string, CSSProperties> = {
     padding: 12,
     cursor: "pointer",
     fontWeight: 850,
-    minHeight: 46,
+    minHeight: 52,
     whiteSpace: "nowrap",
   },
   actionReady: {

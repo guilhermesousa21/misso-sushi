@@ -328,33 +328,30 @@ export default function FaturamentoPage() {
 
   return (
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
-      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}) }}>
+      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}), ...(isMobile ? styles.sidebarMobile : {}) }}>
         <div>
           <h2 style={styles.sidebarTitle}>Missô Admin</h2>
           <p style={styles.sidebarMuted}>Gestão operacional</p>
         </div>
-        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}) }}>
-          <AdminLink href="/admin/menu" pathname={pathname}>
+        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobile : {}) }}>
+          <AdminLink href="/admin/menu" pathname={pathname} compact={isMobile}>
             Cardápio
           </AdminLink>
-          <AdminLink href="/admin/faturamento" pathname={pathname}>
+          <AdminLink href="/admin/faturamento" pathname={pathname} compact={isMobile}>
             Faturamento
           </AdminLink>
           {false && (
-          <AdminLink href="/admin" pathname={pathname}>
+          <AdminLink href="/admin" pathname={pathname} compact={isMobile}>
             Visão geral
           </AdminLink>
           )}
-          <AdminLink href="/admin/pedidos" pathname={pathname}>
+          <AdminLink href="/admin/pedidos" pathname={pathname} compact={isMobile}>
             Pedidos
           </AdminLink>
-          <AdminLink href="/admin/clientes" pathname={pathname}>
-            Clientes
-          </AdminLink>
-          <AdminLink href="/admin/promocoes" pathname={pathname}>
+          <AdminLink href="/admin/promocoes" pathname={pathname} compact={isMobile}>
             Promoções
           </AdminLink>
-          <AdminLink href="/admin/configuracoes" pathname={pathname}>
+          <AdminLink href="/admin/configuracoes" pathname={pathname} compact={isMobile}>
             Configurações
           </AdminLink>
         </nav>
@@ -364,7 +361,7 @@ export default function FaturamentoPage() {
         <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
           <div>
             <p style={styles.eyebrow}>Financeiro</p>
-            <h1 style={styles.title}>Faturamento</h1>
+            <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>Faturamento</h1>
           </div>
           <span style={styles.countPill}>
             {loading ? "Carregando" : `${number(filteredOrders.length)} pedidos`}
@@ -432,7 +429,7 @@ export default function FaturamentoPage() {
           </label>
         </section>
 
-        <section style={styles.metrics}>
+        <section style={{ ...styles.metrics, ...(isMobile ? styles.metricsMobile : {}) }}>
           <Metric
             label="Faturamento"
             value={money(analytics.totalRevenue)}
@@ -460,7 +457,7 @@ export default function FaturamentoPage() {
         </section>
 
         <section style={{ ...styles.dashboardGrid, ...(isTablet ? styles.dashboardGridStack : {}) }}>
-          <article style={styles.chartCard}>
+          <article style={{ ...styles.chartCard, ...(isMobile ? styles.chartCardMobile : {}) }}>
             <div style={styles.cardHeader}>
               <div>
                 <p style={styles.cardEyebrow}>Evolução</p>
@@ -468,7 +465,7 @@ export default function FaturamentoPage() {
               </div>
               <span style={styles.pill}>{dailyLabels.length} dia(s)</span>
             </div>
-            <div style={styles.chartBox}>
+            <div style={{ ...styles.chartBox, ...(isMobile ? styles.chartBoxMobile : {}) }}>
               {loading ? (
                 <p style={styles.muted}>Carregando dados...</p>
               ) : filteredOrders.length === 0 ? (
@@ -500,7 +497,7 @@ export default function FaturamentoPage() {
         </section>
 
         <section style={{ ...styles.bottomGrid, ...(isTablet ? styles.bottomGridStack : {}) }}>
-          <article style={styles.card}>
+          <article style={{ ...styles.card, ...(isMobile ? styles.cardMobile : {}) }}>
             <div style={styles.cardHeader}>
               <div>
                 <p style={styles.cardEyebrow}>Pedidos</p>
@@ -509,7 +506,7 @@ export default function FaturamentoPage() {
             </div>
             <div style={styles.table}>
               {filteredOrders.slice(0, 8).map((order) => (
-                <div key={order.id} style={styles.tableRow}>
+                <div key={order.id} style={{ ...styles.tableRow, ...(isMobile ? styles.tableRowMobile : {}) }}>
                   <div>
                     <strong>#{order.id}</strong>
                     <p style={styles.mutedSmall}>
@@ -521,14 +518,14 @@ export default function FaturamentoPage() {
                       </p>
                     )}
                   </div>
-                  <strong style={styles.alignRight}>{money(calcTotal(order))}</strong>
+                  <strong style={{ ...styles.alignRight, ...(isMobile ? styles.alignLeftMobile : {}) }}>{money(calcTotal(order))}</strong>
                 </div>
               ))}
               {!loading && filteredOrders.length === 0 && <EmptyState />}
             </div>
           </article>
 
-          <article style={styles.card}>
+          <article style={{ ...styles.card, ...(isMobile ? styles.cardMobile : {}) }}>
             <div style={styles.cardHeader}>
               <div>
                 <p style={styles.cardEyebrow}>Cardápio</p>
@@ -537,7 +534,7 @@ export default function FaturamentoPage() {
             </div>
             <div style={styles.itemRanking}>
               {analytics.topItems.map((item, index) => (
-                <div key={item.name} style={styles.rankRow}>
+                <div key={item.name} style={{ ...styles.rankRow, ...(isMobile ? styles.rankRowMobile : {}) }}>
                   <span style={styles.rankNumber}>{index + 1}</span>
                   <div style={styles.rankMain}>
                     <strong>{item.name}</strong>
@@ -559,15 +556,17 @@ function AdminLink({
   href,
   pathname,
   children,
+  compact,
 }: {
   href: string;
   pathname: string;
   children: React.ReactNode;
+  compact?: boolean;
 }) {
   const active = pathname === href;
 
   return (
-    <Link href={href} style={{ ...styles.navLink, ...(active ? styles.navLinkActive : {}) }}>
+    <Link href={href} style={{ ...styles.navLink, ...(compact ? styles.navLinkMobile : {}), ...(active ? styles.navLinkActive : {}) }}>
       {children}
     </Link>
   );
@@ -659,14 +658,27 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
     gap: 14,
   },
+  sidebarMobile: {
+    position: "sticky",
+    top: 0,
+    zIndex: 30,
+    padding: "12px 12px 10px",
+    gap: 10,
+  },
   sidebarTitle: {
     fontSize: 20,
     lineHeight: 1.1,
+  },
+  sidebarTitleMobile: {
+    fontSize: 16,
   },
   sidebarMuted: {
     marginTop: 5,
     color: "#766e64",
     fontSize: 13,
+  },
+  sidebarMutedMobile: {
+    display: "none",
   },
   nav: {
     display: "grid",
@@ -676,12 +688,24 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexWrap: "wrap",
   },
+  navMobile: {
+    flexWrap: "nowrap",
+    gap: 6,
+    overflowX: "auto",
+    paddingBottom: 2,
+  },
   navLink: {
     color: "#514a43",
     textDecoration: "none",
     borderRadius: 8,
     padding: "12px 14px",
     fontWeight: 850,
+  },
+  navLinkMobile: {
+    flex: "0 0 auto",
+    padding: "9px 11px",
+    fontSize: 13,
+    whiteSpace: "nowrap",
   },
   navLinkActive: {
     background: "#1c1a17",
@@ -692,7 +716,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
   },
   contentMobile: {
-    padding: "22px 14px 42px",
+    padding: "18px 12px 42px",
   },
   header: {
     display: "flex",
@@ -704,6 +728,7 @@ const styles: Record<string, CSSProperties> = {
   headerMobile: {
     display: "grid",
     alignItems: "start",
+    gap: 10,
   },
   eyebrow: {
     color: "#9f1d2f",
@@ -715,6 +740,9 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 4,
     fontSize: "clamp(36px, 5vw, 58px)",
     lineHeight: 1,
+  },
+  titleMobile: {
+    fontSize: 32,
   },
   countPill: {
     borderRadius: 999,
@@ -799,9 +827,13 @@ const styles: Record<string, CSSProperties> = {
   },
   metrics: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))",
     gap: 12,
     marginBottom: 16,
+  },
+  metricsMobile: {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 8,
   },
   metricCard: {
     background: "#fffdf8",
@@ -847,6 +879,9 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
     minWidth: 0,
   },
+  chartCardMobile: {
+    padding: 14,
+  },
   card: {
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.08)",
@@ -854,6 +889,9 @@ const styles: Record<string, CSSProperties> = {
     padding: 18,
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
     minWidth: 0,
+  },
+  cardMobile: {
+    padding: 14,
   },
   cardHeader: {
     display: "flex",
@@ -893,6 +931,10 @@ const styles: Record<string, CSSProperties> = {
   chartBox: {
     height: 360,
     minHeight: 360,
+  },
+  chartBoxMobile: {
+    height: 280,
+    minHeight: 280,
   },
   sideStack: {
     display: "grid",
@@ -945,8 +987,15 @@ const styles: Record<string, CSSProperties> = {
     padding: "12px 0",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
   },
+  tableRowMobile: {
+    gridTemplateColumns: "1fr",
+    gap: 6,
+  },
   alignRight: {
     textAlign: "right",
+  },
+  alignLeftMobile: {
+    textAlign: "left",
   },
   itemRanking: {
     display: "grid",
@@ -959,6 +1008,9 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
     padding: "11px 0",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
+  },
+  rankRowMobile: {
+    gridTemplateColumns: "28px minmax(0, 1fr)",
   },
   rankNumber: {
     width: 32,

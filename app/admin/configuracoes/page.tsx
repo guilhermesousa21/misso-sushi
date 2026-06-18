@@ -11,6 +11,7 @@ import {
   type BusinessHours,
   weeklyBusinessHours,
 } from "../../../lib/storeHours";
+import { useMediaQuery } from "../../../lib/useMediaQuery";
 import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
 
 type StoreSettings = {
@@ -32,6 +33,7 @@ export default function AdminSettingsPage() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
+  const isMobile = useMediaQuery("(max-width: 760px)");
 
   const withinBusinessHours = isWithinBusinessHours(now, settings.business_hours);
   const storeOpenNow = settings.is_open && withinBusinessHours;
@@ -130,8 +132,8 @@ export default function AdminSettingsPage() {
 
   return (
     <AdminShell eyebrow="Operação" title="Configurações">
-      <form onSubmit={handleSubmit} style={baseStyles.card}>
-        <div style={baseStyles.cardHeader}>
+      <form onSubmit={handleSubmit} style={{ ...baseStyles.card, ...(isMobile ? styles.cardMobile : {}) }}>
+        <div style={{ ...baseStyles.cardHeader, ...(isMobile ? styles.cardHeaderMobile : {}) }}>
           <div>
             <p style={baseStyles.cardEyebrow}>Loja</p>
             <h2 style={baseStyles.cardTitle}>Status e atendimento</h2>
@@ -142,6 +144,7 @@ export default function AdminSettingsPage() {
           style={{
             ...styles.statusPanel,
             ...(storeOpenNow ? styles.statusPanelOpen : styles.statusPanelClosed),
+            ...(isMobile ? styles.statusPanelMobile : {}),
           }}
         >
           <div style={styles.statusContent}>
@@ -177,7 +180,7 @@ export default function AdminSettingsPage() {
                 : `Fechada pelo horário cadastrado. ${getNextOpeningLabel(now, settings.business_hours)}.`}
             </p>
           </div>
-          <div style={styles.statusSwitch} role="group" aria-label="Status da loja">
+          <div style={{ ...styles.statusSwitch, ...(isMobile ? styles.statusSwitchMobile : {}) }} role="group" aria-label="Status da loja">
             <button
               type="button"
               onClick={() => updateStoreStatus(true)}
@@ -223,7 +226,7 @@ export default function AdminSettingsPage() {
               const hours = settings.business_hours[day];
 
               return (
-                <div key={day} style={styles.scheduleRow}>
+                <div key={day} style={{ ...styles.scheduleRow, ...(isMobile ? styles.scheduleRowMobile : {}) }}>
                   <strong style={styles.dayLabel}>{hours.label}</strong>
                   <input
                     type="time"
@@ -264,7 +267,7 @@ export default function AdminSettingsPage() {
 
         {message && <p style={styles.message}>{message}</p>}
 
-        <button type="submit" disabled={saving} style={baseStyles.primaryLink}>
+        <button type="submit" disabled={saving} style={{ ...baseStyles.primaryLink, ...(isMobile ? styles.fullWidthButton : {}) }}>
           {saving ? "Salvando..." : "Salvar configurações"}
         </button>
       </form>
@@ -273,6 +276,13 @@ export default function AdminSettingsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
+  cardMobile: {
+    padding: 14,
+  },
+  cardHeaderMobile: {
+    display: "grid",
+    gap: 8,
+  },
   formGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -294,6 +304,10 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     background: "#fffdf8",
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
+  },
+  statusPanelMobile: {
+    gridTemplateColumns: "1fr",
+    padding: 14,
   },
   statusPanelOpen: {
     borderColor: "rgba(15, 122, 74, 0.18)",
@@ -365,6 +379,10 @@ const styles: Record<string, CSSProperties> = {
     padding: 5,
     minWidth: 226,
   },
+  statusSwitchMobile: {
+    minWidth: 0,
+    width: "100%",
+  },
   statusOption: {
     border: "none",
     borderRadius: 999,
@@ -406,6 +424,9 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
     alignItems: "center",
   },
+  scheduleRowMobile: {
+    gridTemplateColumns: "1fr",
+  },
   dayLabel: {
     color: "#1c1a17",
     textTransform: "capitalize",
@@ -414,5 +435,8 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 8,
     color: "#625b53",
     lineHeight: 1.45,
+  },
+  fullWidthButton: {
+    width: "100%",
   },
 };

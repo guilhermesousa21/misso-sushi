@@ -9,7 +9,6 @@ const navItems = [
   { href: "/admin/menu", label: "Cardápio" },
   { href: "/admin/faturamento", label: "Faturamento" },
   { href: "/admin/pedidos", label: "Pedidos" },
-  { href: "/admin/clientes", label: "Clientes" },
   { href: "/admin/promocoes", label: "Promoções" },
   { href: "/admin/configuracoes", label: "Configurações" },
 ];
@@ -91,25 +90,26 @@ export function AdminShell({
 
   return (
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
-      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}) }}>
+      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}), ...(isMobile ? styles.sidebarMobile : {}) }}>
         <div>
-          <h2 style={styles.sidebarTitle}>Missô Admin</h2>
-          <p style={styles.sidebarMuted}>Gestão operacional</p>
+          <h2 style={{ ...styles.sidebarTitle, ...(isMobile ? styles.sidebarTitleMobile : {}) }}>Missô Admin</h2>
+          <p style={{ ...styles.sidebarMuted, ...(isMobile ? styles.sidebarMutedMobile : {}) }}>Gestão operacional</p>
         </div>
-        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}) }}>
+        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobile : {}) }}>
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               style={{
                 ...styles.navLink,
+                ...(isMobile ? styles.navLinkMobile : {}),
                 ...(pathname === item.href ? styles.navLinkActive : {}),
               }}
             >
               {item.label}
             </Link>
           ))}
-          <button type="button" onClick={handleLogout} style={styles.logoutButton}>
+          <button type="button" onClick={handleLogout} style={{ ...styles.logoutButton, ...(isMobile ? styles.logoutButtonMobile : {}) }}>
             Sair
           </button>
         </nav>
@@ -119,9 +119,9 @@ export function AdminShell({
         <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
           <div>
             <p style={styles.eyebrow}>{eyebrow}</p>
-            <h1 style={styles.title}>{title}</h1>
+            <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>{title}</h1>
           </div>
-          {action}
+          {action && <div style={{ ...(isMobile ? styles.headerActionMobile : {}) }}>{action}</div>}
         </header>
         {children}
       </section>
@@ -162,7 +162,7 @@ export const adminStyles: Record<string, CSSProperties> = {
   },
   metrics: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(190px, 100%), 1fr))",
     gap: 12,
     marginBottom: 16,
   },
@@ -305,14 +305,27 @@ function baseStyles(): Record<string, CSSProperties> {
       borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
       gap: 14,
     },
+    sidebarMobile: {
+      position: "sticky",
+      top: 0,
+      zIndex: 30,
+      padding: "12px 12px 10px",
+      gap: 10,
+    },
     sidebarTitle: {
       fontSize: 20,
       lineHeight: 1.1,
+    },
+    sidebarTitleMobile: {
+      fontSize: 16,
     },
     sidebarMuted: {
       marginTop: 5,
       color: "#766e64",
       fontSize: 13,
+    },
+    sidebarMutedMobile: {
+      display: "none",
     },
     nav: {
       display: "grid",
@@ -322,12 +335,24 @@ function baseStyles(): Record<string, CSSProperties> {
       display: "flex",
       flexWrap: "wrap",
     },
+    navMobile: {
+      flexWrap: "nowrap",
+      gap: 6,
+      overflowX: "auto",
+      paddingBottom: 2,
+    },
     navLink: {
       color: "#514a43",
       textDecoration: "none",
       borderRadius: 8,
       padding: "12px 14px",
       fontWeight: 850,
+    },
+    navLinkMobile: {
+      flex: "0 0 auto",
+      padding: "9px 11px",
+      fontSize: 13,
+      whiteSpace: "nowrap",
     },
     navLinkActive: {
       background: "#1c1a17",
@@ -343,12 +368,18 @@ function baseStyles(): Record<string, CSSProperties> {
       fontWeight: 850,
       textAlign: "left",
     },
+    logoutButtonMobile: {
+      flex: "0 0 auto",
+      padding: "9px 11px",
+      fontSize: 13,
+      whiteSpace: "nowrap",
+    },
     content: {
       padding: "28px 24px 56px",
       minWidth: 0,
     },
     contentMobile: {
-      padding: "22px 14px 42px",
+      padding: "18px 12px 42px",
     },
     header: {
       display: "flex",
@@ -360,6 +391,15 @@ function baseStyles(): Record<string, CSSProperties> {
     headerMobile: {
       display: "grid",
       alignItems: "start",
+      gap: 10,
+      marginBottom: 14,
+    },
+    headerActionMobile: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "flex-start",
+      overflowX: "auto",
     },
     eyebrow: {
       color: "#9f1d2f",
@@ -371,6 +411,9 @@ function baseStyles(): Record<string, CSSProperties> {
       marginTop: 4,
       fontSize: "clamp(36px, 5vw, 58px)",
       lineHeight: 1,
+    },
+    titleMobile: {
+      fontSize: 32,
     },
     muted: {
       color: "#625b53",
