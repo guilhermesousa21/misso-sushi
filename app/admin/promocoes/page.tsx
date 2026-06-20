@@ -42,6 +42,20 @@ const formatBrazilianDateInput = (value: string) => {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 };
 
+const formatBrazilianTimeInput = (value: string) => {
+  const digits = onlyDigits(value).slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+};
+
+const isValidBrazilianTime = (value: string) => {
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return false;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+};
+
 const getDateTimeParts = (value?: string | null) => {
   if (!value) return { date: "", time: "" };
 
@@ -77,7 +91,7 @@ const getDateTimeParts = (value?: string | null) => {
 
 const toDateTimeValue = (dateValue: string, timeValue: string) => {
   const digits = onlyDigits(dateValue);
-  if (digits.length !== 8 || !timeValue) return "";
+  if (digits.length !== 8 || !isValidBrazilianTime(timeValue)) return "";
 
   const day = digits.slice(0, 2);
   const month = digits.slice(2, 4);
@@ -533,13 +547,16 @@ function PromotionDateTimeField({
           style={styles.input}
         />
         <input
-          type="time"
+          type="text"
+          inputMode="numeric"
           value={timeValue}
           onChange={(event) => {
-            const nextTime = event.target.value;
+            const nextTime = formatBrazilianTimeInput(event.target.value);
             setTimeValue(nextTime);
             updateDateTime(dateValue, nextTime);
           }}
+          placeholder="00:00"
+          maxLength={5}
           aria-label={`${label} - hora`}
           style={styles.input}
         />
