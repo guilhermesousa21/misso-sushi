@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, PointerEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,7 +11,6 @@ import {
   defaultMenuCategories,
   getCategoryLabel,
   getCategoryOrder,
-  normalizeCategorySlug,
   sortCategories,
   type MenuCategory,
 } from "../../../lib/menuCategories";
@@ -86,10 +85,6 @@ const getOrderedCategorySlugs = (
 export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>(defaultMenuCategories);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [creatingCategory, setCreatingCategory] = useState(false);
-  const [highlightedCategorySlug, setHighlightedCategorySlug] = useState<string | null>(null);
-  const newCategoryInputRef = useRef<HTMLInputElement>(null);
   const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
   const isMobile = useMediaQuery("(max-width: 760px)");
   const isTablet = useMediaQuery("(max-width: 1040px)");
@@ -143,12 +138,6 @@ export default function AdminMenuPage() {
 
     fetchMenuData();
   }, []);
-
-  useEffect(() => {
-    if (!highlightedCategorySlug) return;
-    const timer = window.setTimeout(() => setHighlightedCategorySlug(null), 2200);
-    return () => window.clearTimeout(timer);
-  }, [highlightedCategorySlug]);
 
   const handleAddItem = (categorySlug?: string) => {
     const fallbackCategory =
@@ -351,59 +340,6 @@ export default function AdminMenuPage() {
   ).length;
   const pausedItemCount = items.length - activeItemCount;
 
-  const newCategorySlugPreview = normalizeCategorySlug(newCategoryName);
-  const categoryNameAlreadyExists = categories.some(
-    (category) => category.slug === newCategorySlugPreview
-  );
-  const canCreateCategory =
-    Boolean(newCategoryName.trim()) &&
-    Boolean(newCategorySlugPreview) &&
-    !categoryNameAlreadyExists;
-
-  const handleCreateCategory = async () => {
-    const name = newCategoryName.trim();
-    const slug = normalizeCategorySlug(name);
-
-    if (creatingCategory) return;
-
-    if (!name || !slug) {
-      toast.error("Informe um nome válido para a categoria.");
-      return;
-    }
-    if (categories.some((category) => category.slug === slug)) {
-      toast.error("Essa categoria já existe.");
-      return;
-    }
-
-    setCreatingCategory(true);
-    try {
-      const response = await fetch("/api/admin/menu-categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      const result = (await response.json()) as {
-        category?: MenuCategory;
-        error?: string;
-      };
-
-      if (!response.ok || !result.category) {
-        toast.error(result.error || "Não foi possível criar a categoria.");
-        return;
-      }
-
-      setCategories((current) => sortCategories([...current, result.category as MenuCategory]));
-      setNewCategoryName("");
-      setHighlightedCategorySlug(result.category.slug);
-      toast.success(`Categoria "${result.category.name}" criada.`);
-      newCategoryInputRef.current?.focus();
-    } catch {
-      toast.error("Não foi possível criar a categoria.");
-    } finally {
-      setCreatingCategory(false);
-    }
-  };
-
   const toggleItemActive = async (item: MenuItem) => {
     const nextActive = item.active === false || item.availability_status === "inativo";
     const payload = {
@@ -484,13 +420,6 @@ export default function AdminMenuPage() {
             >
               + Novo item
             </button>
-            <button
-              type="button"
-              onClick={() => newCategoryInputRef.current?.focus()}
-              style={{ ...styles.secondaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
-            >
-              Nova categoria
-            </button>
           </div>
         </header>
 
@@ -532,64 +461,6 @@ export default function AdminMenuPage() {
             </button>
           </div>
         )}
-
-        <form
-          style={{ ...styles.newCategoryBox, ...(isMobile ? styles.newCategoryBoxMobile : {}) }}
-          onSubmit={(event) => {
-            event.preventDefault();
-            void handleCreateCategory();
-          }}
-        >
-          <div style={styles.newCategoryHeader}>
-            <span style={styles.newCategoryBadge}>Nova categoria</span>
-            <strong style={styles.newCategoryTitle}>Criar categoria</strong>
-          </div>
-          <label style={styles.newCategoryField}>
-            <span style={styles.label}>Nome da categoria</span>
-            <div
-              style={{
-                ...styles.newCategoryControls,
-                ...(isMobile ? styles.newCategoryControlsMobile : {}),
-              }}
-            >
-              <input
-                ref={newCategoryInputRef}
-                value={newCategoryName}
-                onChange={(event) => setNewCategoryName(event.target.value)}
-                placeholder="Ex: Combos especiais"
-                style={{
-                  ...styles.input,
-                  ...styles.newCategoryInput,
-                  ...(newCategoryName.trim() && !canCreateCategory ? styles.inputError : {}),
-                }}
-                autoComplete="off"
-                maxLength={60}
-                aria-describedby="new-category-help"
-              />
-              <button
-                type="submit"
-                disabled={creatingCategory || !canCreateCategory}
-                style={{
-                  ...styles.primaryButton,
-                  ...styles.newCategoryButton,
-                  ...(isMobile ? styles.fullWidthMobile : {}),
-                  ...(creatingCategory || !canCreateCategory ? styles.primaryButtonDisabled : {}),
-                }}
-              >
-                {creatingCategory ? "Criando..." : "Criar"}
-              </button>
-            </div>
-            <span id="new-category-help" style={styles.newCategoryHelp}>
-              {newCategoryName.trim() && !newCategorySlugPreview
-                ? "Use pelo menos uma letra ou número."
-                : categoryNameAlreadyExists
-                ? "Já existe uma categoria com esse nome."
-                : newCategorySlugPreview
-                ? "Pressione Enter para criar rapidamente."
-                : ""}
-            </span>
-          </label>
-        </form>
 
         {!canReorder && (
           <p style={styles.notice}>Limpe a busca e o filtro para reorganizar categorias e itens.</p>
@@ -1704,74 +1575,6 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     fontWeight: 850,
     whiteSpace: "nowrap",
-  },
-  newCategoryBox: {
-    display: "grid",
-    gridTemplateColumns: "minmax(180px, 260px) minmax(0, 1fr)",
-    gap: 16,
-    alignItems: "center",
-    borderRadius: 14,
-    border: "1px solid rgba(159, 29, 47, 0.14)",
-    background: "linear-gradient(180deg, #fffdf8 0%, #f7f2ea 100%)",
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: "0 10px 24px rgba(28, 26, 23, 0.06)",
-  },
-  newCategoryBoxMobile: {
-    gridTemplateColumns: "1fr",
-    gap: 12,
-  },
-  newCategoryHeader: {
-    display: "grid",
-    gap: 8,
-    alignContent: "center",
-  },
-  newCategoryBadge: {
-    width: "fit-content",
-    borderRadius: 999,
-    background: "#f0ebe2",
-    color: "#9f1d2f",
-    padding: "5px 9px",
-    fontSize: 11,
-    fontWeight: 900,
-    textTransform: "uppercase",
-  },
-  newCategoryTitle: {
-    display: "block",
-    color: "#1c1a17",
-    fontSize: 18,
-    lineHeight: 1.15,
-  },
-  newCategoryField: {
-    display: "grid",
-    gap: 8,
-    minWidth: 0,
-  },
-  newCategoryControls: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    gap: 8,
-    alignItems: "stretch",
-  },
-  newCategoryControlsMobile: {
-    gridTemplateColumns: "1fr",
-  },
-  newCategoryInput: {
-    minHeight: 48,
-  },
-  newCategoryHelp: {
-    color: "#766e64",
-    fontSize: 12,
-    lineHeight: 1.45,
-    fontWeight: 650,
-  },
-  newCategoryButton: {
-    minWidth: 112,
-    whiteSpace: "nowrap",
-  },
-  inputError: {
-    borderColor: "#9f1d2f",
-    boxShadow: "0 0 0 3px rgba(159, 29, 47, 0.1)",
   },
   fullWidthMobile: {
     gridColumn: "1 / -1",
