@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { formatAddonSummary, getOrderPickupLabel } from "../../lib/orderFeatures";
+import { formatAddonSummary, getKitchenPickupBadge, getMinPickupMinutes, type OperationalSettings } from "../../lib/orderFeatures";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { printOrder } from "../../lib/printOrder";
 import { supabase } from "../../lib/supabase";
@@ -44,7 +44,6 @@ type Order = {
 };
 
 type ConfirmationState =
-  | { action: "print"; order: Order }
   | { action: "ready"; order: Order }
   | { action: "picked_up"; order: Order }
   | null;
@@ -84,14 +83,36 @@ const calcTotal = (items: OrderItem[]) =>
 const minutesSinceAt = (value: string, now: Date) =>
   Math.max(0, Math.floor((now.getTime() - parseSupabaseDate(value).getTime()) / 60000));
 
-const isKitchenOrderDelayed = (order: Order, now: Date) =>
-  normalizeKitchenStatus(order.status) === "recebido" &&
-  minutesSinceAt(order.created_at, now) > 35;
+const getQueueLabel = (order: Order, now: Date) => {
+  if (order.fulfillment_type === "scheduled" && order.scheduled_for) {
+    const pickupTime = parseSupabaseDate(order.scheduled_for);
+    const minutesUntil = Math.max(
+      0,
+      Math.floor((pickupTime.getTime() - now.getTime()) / 60000)
+    );
+
+    return minutesUntil > 0 ? `Retirada em ${minutesUntil} min` : "Horário de retirada";
+  }
+
+  return `${minutesSinceAt(order.created_at, now)} min na fila`;
+};
+
+const isKitchenOrderDelayed = (order: Order, now: Date, delayMinutes: number) => {
+  if (normalizeKitchenStatus(order.status) !== "recebido") return false;
+
+  if (order.fulfillment_type === "scheduled" && order.scheduled_for) {
+    return parseSupabaseDate(order.scheduled_for).getTime() < now.getTime();
+  }
+
+  return minutesSinceAt(order.created_at, now) > delayMinutes;
+};
 
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [operationalSettings, setOperationalSettings] = useState<OperationalSettings | null>(null);
   const isMobile = useMediaQuery("(max-width: 720px)");
   const [now, setNow] = useState(() => new Date());
+  const delayMinutes = getMinPickupMinutes(operationalSettings);
   const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
   const [confirming, setConfirming] = useState(false);
   const [filter, setFilter] = useState<KitchenFilter | null>(null);
@@ -134,6 +155,15 @@ export default function AdminPanel() {
 
     fetchOrders();
 
+    async function fetchSettings() {
+      const { data } = await supabase.from("store_settings").select("*").limit(1).maybeSingle();
+      if (mounted && data) {
+        setOperationalSettings(data as OperationalSettings);
+      }
+    }
+
+    void fetchSettings();
+
     const channel = supabase
       .channel("orders-channel")
       .on(
@@ -154,7 +184,7 @@ export default function AdminPanel() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNow(new Date());
-    }, 30000);
+    }, 60000);
 
     return () => window.clearInterval(timer);
   }, []);
@@ -203,9 +233,7 @@ export default function AdminPanel() {
 
     setConfirming(true);
     try {
-      if (confirmation.action === "print") {
-        printOrder(confirmation.order);
-      } else if (confirmation.action === "ready") {
+      if (confirmation.action === "ready") {
         await markOrderReady(confirmation.order);
       } else {
         await markOrderPickedUp(confirmation.order);
@@ -239,23 +267,25 @@ export default function AdminPanel() {
   const receivedOrders = queueOrders.filter(
     (order) =>
       normalizeKitchenStatus(order.status) === "recebido" &&
-      !isKitchenOrderDelayed(order, now)
+      !isKitchenOrderDelayed(order, now, delayMinutes)
   );
   const readyOrders = queueOrders.filter(
     (order) => normalizeKitchenStatus(order.status) === "pronto"
   );
-  const delayedOrders = queueOrders.filter((order) => isKitchenOrderDelayed(order, now));
+  const delayedOrders = queueOrders.filter((order) =>
+    isKitchenOrderDelayed(order, now, delayMinutes)
+  );
 
   const orderMatchesFilter = (order: Order, filterValue: KitchenFilter | null) => {
     if (!filterValue) return true;
 
     const kitchenStatus = normalizeKitchenStatus(order.status);
     if (filterValue === "recebidos") {
-      return kitchenStatus === "recebido" && !isKitchenOrderDelayed(order, now);
+      return kitchenStatus === "recebido" && !isKitchenOrderDelayed(order, now, delayMinutes);
     }
     if (filterValue === "prontos") return kitchenStatus === "pronto";
     if (filterValue === "retirados") return isOrderPickedUp(order);
-    return isKitchenOrderDelayed(order, now);
+    return isKitchenOrderDelayed(order, now, delayMinutes);
   };
 
   const filteredOrders =
@@ -351,8 +381,9 @@ export default function AdminPanel() {
           {filteredOrders.map((order) => (
             (() => {
               const kitchenStatus = normalizeKitchenStatus(order.status);
-              const minutesInQueue = minutesSinceAt(order.created_at, now);
-              const delayed = isKitchenOrderDelayed(order, now);
+              const pickupBadge = getKitchenPickupBadge(order);
+              const queueLabel = getQueueLabel(order, now);
+              const delayed = isKitchenOrderDelayed(order, now, delayMinutes);
 
               return (
             <article
@@ -363,13 +394,23 @@ export default function AdminPanel() {
               }}
             >
               <div style={{ ...styles.cardHeader, ...(isMobile ? styles.cardHeaderMobile : {}) }}>
-                <div>
+                <div style={styles.cardHeaderMain}>
                   <p style={styles.orderId}>Pedido #{order.id}</p>
                   <p style={styles.time}>
                     {formatBrasiliaDateTime(order.created_at)}
                   </p>
+                  <div
+                    style={{
+                      ...styles.pickupBadge,
+                      ...(pickupBadge.variant === "scheduled"
+                        ? styles.pickupBadgeScheduled
+                        : styles.pickupBadgeAsap),
+                    }}
+                  >
+                    {pickupBadge.label}
+                  </div>
                   <p style={{ ...styles.queueTime, ...(delayed ? styles.queueTimeDelayed : {}) }}>
-                    {minutesInQueue} min na fila
+                    {queueLabel}
                   </p>
                 </div>
                 <div style={styles.badgeStack}>
@@ -388,7 +429,6 @@ export default function AdminPanel() {
               <div style={styles.customerBox}>
                 <strong>{order.name || "Cliente"}</strong>
                 <span>{order.phone || "Telefone não informado"}</span>
-                <span style={styles.fulfillmentBadge}>{getOrderPickupLabel(order)}</span>
                 {formatAddonSummary(order.addons) && (
                   <p>Complementos: {formatAddonSummary(order.addons)}</p>
                 )}
@@ -400,8 +440,7 @@ export default function AdminPanel() {
                 {order.items.length > 0 ? (
                   order.items.map((item, index) => (
                     <div key={`${item.id}-${index}`} style={styles.itemRow}>
-                      <span>{formatOrderItemLabel(item)}</span>
-                      <strong>{money(item.price * (item.quantity ?? 1))}</strong>
+                      <span style={styles.itemName}>{formatOrderItemLabel(item)}</span>
                     </div>
                   ))
                 ) : (
@@ -421,7 +460,7 @@ export default function AdminPanel() {
                 <button
                   type="button"
                   style={styles.actionSecondary}
-                  onClick={() => setConfirmation({ action: "print", order })}
+                  onClick={() => printOrder(order)}
                 >
                   Imprimir
                 </button>
@@ -478,26 +517,16 @@ export default function AdminPanel() {
           >
             <div style={styles.confirmHeader}>
               <span style={styles.confirmIcon}>
-                {confirmation.action === "ready"
-                  ? "✓"
-                  : confirmation.action === "picked_up"
-                    ? "↗"
-                    : "•"}
+                {confirmation.action === "ready" ? "✓" : "↗"}
               </span>
               <div>
                 <p style={styles.confirmEyebrow}>
-                  {confirmation.action === "ready"
-                    ? "Aviso ao cliente"
-                    : confirmation.action === "picked_up"
-                      ? "Finalizar pedido"
-                      : "Impressão"}
+                  {confirmation.action === "ready" ? "Aviso ao cliente" : "Finalizar pedido"}
                 </p>
                 <h2 id="confirm-title" style={styles.confirmTitle}>
                   {confirmation.action === "ready"
                     ? `Marcar pedido #${confirmation.order.id} como pronto?`
-                    : confirmation.action === "picked_up"
-                      ? `Marcar pedido #${confirmation.order.id} como retirado?`
-                      : `Imprimir pedido #${confirmation.order.id}?`}
+                    : `Marcar pedido #${confirmation.order.id} como retirado?`}
                 </h2>
               </div>
             </div>
@@ -548,9 +577,7 @@ export default function AdminPanel() {
                   ? "Processando..."
                   : confirmation.action === "ready"
                     ? "Confirmar pronto"
-                    : confirmation.action === "picked_up"
-                      ? "Confirmar retirado"
-                      : "Confirmar impressão"}
+                    : "Confirmar retirado"}
               </button>
             </div>
           </section>
@@ -676,6 +703,11 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gap: 10,
   },
+  cardHeaderMain: {
+    minWidth: 0,
+    display: "grid",
+    gap: 2,
+  },
   orderId: {
     fontSize: 20,
     fontWeight: 850,
@@ -693,6 +725,23 @@ const styles: Record<string, CSSProperties> = {
   },
   queueTimeDelayed: {
     color: "#991b1b",
+  },
+  pickupBadge: {
+    marginTop: 10,
+    width: "fit-content",
+    borderRadius: 999,
+    padding: "8px 12px",
+    fontSize: 14,
+    fontWeight: 850,
+    lineHeight: 1.25,
+  },
+  pickupBadgeAsap: {
+    background: "#1c1a17",
+    color: "#fffdf8",
+  },
+  pickupBadgeScheduled: {
+    background: "#3730a3",
+    color: "#fffdf8",
   },
   badgeStack: {
     display: "flex",
@@ -725,27 +774,20 @@ const styles: Record<string, CSSProperties> = {
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
     paddingTop: 14,
   },
-  fulfillmentBadge: {
-    width: "fit-content",
-    borderRadius: 999,
-    background: "#f0ebe2",
-    color: "#514a43",
-    padding: "5px 8px",
-    fontSize: 12,
-    fontWeight: 850,
-  },
   itemsBox: {
     marginTop: 16,
     display: "grid",
-    gap: 8,
+    gap: 10,
   },
   itemRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 14,
-    padding: "7px 0",
+    padding: "4px 0",
     borderBottom: "1px dashed rgba(28, 26, 23, 0.16)",
-    fontSize: 14,
+  },
+  itemName: {
+    fontSize: 17,
+    fontWeight: 850,
+    lineHeight: 1.35,
+    color: "#1c1a17",
   },
   muted: {
     color: "#766e64",

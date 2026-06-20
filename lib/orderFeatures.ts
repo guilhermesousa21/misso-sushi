@@ -138,6 +138,23 @@ export const getOrderPickupLabel = (order: {
     ? `Agendada para ${formatPickupTime(order.scheduled_for)}`
     : "O quanto antes";
 
+export const getKitchenPickupBadge = (order: {
+  fulfillment_type?: string | null;
+  scheduled_for?: string | null;
+}) => {
+  if (order.fulfillment_type === "scheduled" && order.scheduled_for) {
+    return {
+      label: `Agendado · ${formatPickupTime(order.scheduled_for)}`,
+      variant: "scheduled" as const,
+    };
+  }
+
+  return {
+    label: "Retirada padrão",
+    variant: "asap" as const,
+  };
+};
+
 export const buildPickupSlots = (
   settings: OperationalSettings | null | undefined,
   now = new Date()
