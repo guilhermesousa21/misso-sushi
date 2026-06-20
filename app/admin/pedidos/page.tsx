@@ -66,6 +66,8 @@ const formatBrasiliaDateTime = (value: string) =>
     minute: "2-digit",
   });
 
+const isPaidOrder = (order: AdminOrder) => order.payment_status === "pago";
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,11 +89,13 @@ export default function AdminOrdersPage() {
       const { data } = await supabase
         .from("orders")
         .select("*")
+        .eq("payment_status", "pago")
         .order("created_at", { ascending: false });
 
       if (mounted) {
         setOrders(
           (data || [])
+            .filter((order) => isPaidOrder(order as AdminOrder))
             .map((order) => ({
               ...(order as AdminOrder),
               items: Array.isArray((order as AdminOrder).items)
@@ -114,14 +118,19 @@ export default function AdminOrdersPage() {
       .channel("admin-orders-page")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
         const order = normalizeOrder(payload.new as AdminOrder);
+        if (!isPaidOrder(order)) return;
         setOrders((prev) => [order, ...prev]);
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
         const order = normalizeOrder(payload.new as AdminOrder);
         setOrders((prev) => {
-          const exists = prev.some((o) => o.id === order.id);
+          if (!isPaidOrder(order)) {
+            return prev.filter((current) => current.id !== order.id);
+          }
+
+          const exists = prev.some((current) => current.id === order.id);
           return exists
-            ? prev.map((o) => (o.id === order.id ? order : o))
+            ? prev.map((current) => (current.id === order.id ? order : current))
             : [order, ...prev];
         });
       })
@@ -142,6 +151,8 @@ export default function AdminOrdersPage() {
     const rangeEnd = dateRange === "custom" ? dateTo : "";
 
     return orders.filter((order) => {
+      if (!isPaidOrder(order)) return false;
+
       const orderDate = toBrasiliaDateKey(order.created_at);
       const byDateStart = !rangeStart || orderDate >= rangeStart;
       const byDateEnd = !rangeEnd || orderDate <= rangeEnd;
