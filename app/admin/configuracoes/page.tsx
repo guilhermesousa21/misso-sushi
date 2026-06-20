@@ -11,6 +11,10 @@ import {
   weeklyBusinessHours,
 } from "../../../lib/storeHours";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
+import {
+  defaultCheckoutAddons,
+  type CheckoutAddonConfig,
+} from "../../../lib/orderFeatures";
 import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
 
 type StoreSettings = {
@@ -24,6 +28,7 @@ type StoreSettings = {
   max_advance_days: number;
   order_slot_limit: number;
   business_hours: BusinessHours;
+  checkout_addons: CheckoutAddonConfig[];
 };
 
 const defaultSettings: StoreSettings = {
@@ -36,6 +41,7 @@ const defaultSettings: StoreSettings = {
   max_advance_days: 1,
   order_slot_limit: 0,
   business_hours: weeklyBusinessHours,
+  checkout_addons: defaultCheckoutAddons,
 };
 
 const orderedWeekDays = [1, 2, 3, 4, 5, 6, 0];
@@ -102,6 +108,9 @@ export default function AdminSettingsPage() {
           ...defaultSettings,
           ...(data as StoreSettings),
           business_hours: getBusinessHours((data as StoreSettings).business_hours),
+          checkout_addons: (data as StoreSettings).checkout_addons?.length
+            ? (data as StoreSettings).checkout_addons
+            : defaultCheckoutAddons,
         });
       }
     }
@@ -143,6 +152,7 @@ export default function AdminSettingsPage() {
       max_advance_days: Number(settings.max_advance_days || 1),
       order_slot_limit: Number(settings.order_slot_limit || 0),
       business_hours: settings.business_hours,
+      checkout_addons: settings.checkout_addons,
     };
     const legacyPayload = {
       is_open: settings.is_open,
@@ -177,6 +187,9 @@ export default function AdminSettingsPage() {
         ...defaultSettings,
         ...(data[0] as StoreSettings),
         business_hours: getBusinessHours((data[0] as StoreSettings).business_hours),
+        checkout_addons: (data[0] as StoreSettings).checkout_addons?.length
+          ? (data[0] as StoreSettings).checkout_addons
+          : defaultCheckoutAddons,
       });
     }
     setMessage("Configurações salvas.");
@@ -496,6 +509,94 @@ export default function AdminSettingsPage() {
           </p>
         </section>
 
+        <section style={{ ...baseStyles.card, ...(isMobile ? styles.cardMobile : {}) }}>
+          <div style={{ ...baseStyles.cardHeader, ...(isMobile ? styles.cardHeaderMobile : {}) }}>
+            <div>
+              <p style={baseStyles.cardEyebrow}>Checkout</p>
+              <h2 style={baseStyles.cardTitle}>Complementos</h2>
+            </div>
+          </div>
+
+          <div style={styles.addonList}>
+            {settings.checkout_addons.map((addon, index) => (
+              <div key={addon.id || index} style={styles.addonRow}>
+                <label style={styles.field}>
+                  <span style={styles.timeLabel}>Nome</span>
+                  <input
+                    value={addon.name}
+                    onChange={(event) => {
+                      const next = [...settings.checkout_addons];
+                      next[index] = { ...addon, name: event.target.value };
+                      setSettings({ ...settings, checkout_addons: next });
+                    }}
+                    style={baseStyles.input}
+                  />
+                </label>
+                <label style={styles.field}>
+                  <span style={styles.timeLabel}>Preço</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={addon.unit_price}
+                    onChange={(event) => {
+                      const next = [...settings.checkout_addons];
+                      next[index] = { ...addon, unit_price: Number(event.target.value) };
+                      setSettings({ ...settings, checkout_addons: next });
+                    }}
+                    style={baseStyles.input}
+                  />
+                </label>
+                <label style={styles.addonActiveField}>
+                  <input
+                    type="checkbox"
+                    checked={addon.active !== false}
+                    onChange={(event) => {
+                      const next = [...settings.checkout_addons];
+                      next[index] = { ...addon, active: event.target.checked };
+                      setSettings({ ...settings, checkout_addons: next });
+                    }}
+                  />
+                  Ativo
+                </label>
+                <button
+                  type="button"
+                  style={baseStyles.secondaryButton}
+                  onClick={() => {
+                    setSettings({
+                      ...settings,
+                      checkout_addons: settings.checkout_addons.filter((_, itemIndex) => itemIndex !== index),
+                    });
+                  }}
+                >
+                  Remover
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            style={{ ...baseStyles.secondaryButton, marginTop: 12 }}
+            onClick={() =>
+              setSettings({
+                ...settings,
+                checkout_addons: [
+                  ...settings.checkout_addons,
+                  {
+                    id: `addon-${Date.now()}`,
+                    name: "Novo complemento",
+                    unit_price: 2.5,
+                    active: true,
+                  },
+                ],
+              })
+            }
+          >
+            + Adicionar complemento
+          </button>
+        </section>
+
         <div style={{ ...styles.saveBar, ...(isMobile ? styles.saveBarMobile : {}) }}>
           {message ? (
             <p style={styles.message}>{message}</p>
@@ -759,6 +860,26 @@ const styles: Record<string, CSSProperties> = {
   },
   fullWidthButton: {
     width: "100%",
+  },
+  addonList: {
+    display: "grid",
+    gap: 12,
+  },
+  addonRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1.4fr) minmax(120px, 0.7fr) auto auto",
+    gap: 10,
+    alignItems: "end",
+  },
+  addonActiveField: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    color: "#514a43",
+    fontSize: 13,
+    fontWeight: 850,
+    paddingBottom: 12,
+    whiteSpace: "nowrap",
   },
 };
 

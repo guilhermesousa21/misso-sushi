@@ -14,6 +14,8 @@ const navItems = [
   { href: "/admin/configuracoes", label: "Configurações" },
 ];
 
+const extraNavItems = [{ href: "/cozinha", label: "Cozinha" }];
+
 export const money = (value: number) =>
   value.toLocaleString("pt-BR", {
     style: "currency",
@@ -103,6 +105,20 @@ export function AdminShell({
         </div>
         <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobileHidden : {}) }}>
           {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                ...styles.navLink,
+                ...(isMobile ? styles.navLinkMobile : {}),
+                ...(pathname === item.href ? styles.navLinkActive : {}),
+              }}
+            >
+              {item.label}
+            </Link>
+          ))}
+          <div style={styles.navDivider} />
+          {extraNavItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -390,6 +406,11 @@ function baseStyles(): Record<string, CSSProperties> {
     navLinkActive: {
       background: "#1c1a17",
       color: "#fffdf8",
+    },
+    navDivider: {
+      height: 1,
+      background: "rgba(28, 26, 23, 0.08)",
+      margin: "4px 0",
     },
     logoutButton: {
       border: "1px solid rgba(28, 26, 23, 0.12)",

@@ -9,6 +9,13 @@ export type OrderAddon = {
 
 export type OrderFulfillmentType = "asap" | "scheduled";
 
+export type CheckoutAddonConfig = {
+  id: string;
+  name: string;
+  unit_price: number;
+  active?: boolean;
+};
+
 export type OperationalSettings = {
   business_hours?: unknown;
   average_time?: string | null;
@@ -18,6 +25,7 @@ export type OperationalSettings = {
   min_pickup_minutes?: number | null;
   max_advance_days?: number | null;
   order_slot_limit?: number | null;
+  checkout_addons?: CheckoutAddonConfig[] | null;
 };
 
 export const defaultServiceFeeLabel = "Taxa de embalagem";
@@ -26,11 +34,21 @@ export const defaultMinPickupMinutes = 35;
 export const defaultMaxAdvanceDays = 1;
 export const addonUnitPrice = 2.5;
 
-export const checkoutAddons: OrderAddon[] = [
-  { id: "hashi", name: "Hashi", quantity: 1, unit_price: addonUnitPrice },
-  { id: "shoyu-extra", name: "Shoyu extra", quantity: 1, unit_price: addonUnitPrice },
-  { id: "gengibre", name: "Gengibre", quantity: 1, unit_price: addonUnitPrice },
+export const defaultCheckoutAddons: CheckoutAddonConfig[] = [
+  { id: "hashi", name: "Hashi", unit_price: addonUnitPrice, active: true },
+  { id: "shoyu-extra", name: "Shoyu extra", unit_price: addonUnitPrice, active: true },
+  { id: "gengibre", name: "Gengibre", unit_price: addonUnitPrice, active: true },
 ];
+
+export const getCheckoutAddons = (settings?: OperationalSettings | null): OrderAddon[] =>
+  (settings?.checkout_addons?.length ? settings.checkout_addons : defaultCheckoutAddons)
+    .filter((addon) => addon.active !== false && addon.name.trim())
+    .map((addon) => ({
+      id: addon.id,
+      name: addon.name.trim(),
+      quantity: 1,
+      unit_price: Number(addon.unit_price) > 0 ? Number(addon.unit_price) : addonUnitPrice,
+    }));
 
 export const money = (value: number) =>
   value.toLocaleString("pt-BR", {

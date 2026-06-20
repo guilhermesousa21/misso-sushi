@@ -87,6 +87,12 @@ export const getTodayBusinessHoursLabel = (
   return `${today.label}: ${today.open}-${today.close}`;
 };
 
+export const isStoreAcceptingOrders = (
+  manuallyOpen: boolean,
+  date = new Date(),
+  businessHours: BusinessHours = weeklyBusinessHours
+) => manuallyOpen && isWithinBusinessHours(date, businessHours);
+
 export const getNextOpeningLabel = (
   date = new Date(),
   businessHours: BusinessHours = weeklyBusinessHours

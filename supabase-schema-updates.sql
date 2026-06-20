@@ -11,6 +11,11 @@ create table if not exists public.store_settings (
   min_pickup_minutes integer not null default 35,
   max_advance_days integer not null default 1,
   order_slot_limit integer not null default 0,
+  checkout_addons jsonb not null default '[
+    { "id": "hashi", "name": "Hashi", "unit_price": 2.5, "active": true },
+    { "id": "shoyu-extra", "name": "Shoyu extra", "unit_price": 2.5, "active": true },
+    { "id": "gengibre", "name": "Gengibre", "unit_price": 2.5, "active": true }
+  ]'::jsonb,
   business_hours jsonb not null default '{
     "0": { "label": "domingo", "open": "12:00", "close": "23:00" },
     "1": { "label": "segunda-feira", "open": "12:00", "close": "23:00" },
@@ -126,7 +131,12 @@ alter table if exists public.store_settings
   add column if not exists pickup_slot_minutes integer not null default 30,
   add column if not exists min_pickup_minutes integer not null default 35,
   add column if not exists max_advance_days integer not null default 1,
-  add column if not exists order_slot_limit integer not null default 0;
+  add column if not exists order_slot_limit integer not null default 0,
+  add column if not exists checkout_addons jsonb not null default '[
+    { "id": "hashi", "name": "Hashi", "unit_price": 2.5, "active": true },
+    { "id": "shoyu-extra", "name": "Shoyu extra", "unit_price": 2.5, "active": true },
+    { "id": "gengibre", "name": "Gengibre", "unit_price": 2.5, "active": true }
+  ]'::jsonb;
 
 alter table if exists public.promotions
   add column if not exists min_order_value numeric not null default 0,

@@ -4,8 +4,6 @@ import type { CSSProperties, PointerEvent } from "react";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import Image from "next/image";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Toaster, toast } from "react-hot-toast";
 import {
   defaultMenuCategories,
@@ -18,6 +16,7 @@ import {
 import { supabase } from "../../../lib/supabase";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
 import { MenuItem } from "../../../types";
+import { AdminShell } from "../AdminShell";
 
 type EditableMenuItem = MenuItem & { isNew?: boolean };
 type DeletedMenuItem = MenuItem & { deleted: true };
@@ -97,7 +96,6 @@ export default function AdminMenuPage() {
   const [dropTarget, setDropTarget] = useState<DragState | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const pathname = usePathname();
   const canReorder = !search.trim() && !filterCategory;
   const forceExpandedCategories = Boolean(search.trim() || filterCategory);
   const clearDragState = () => {
@@ -421,61 +419,74 @@ export default function AdminMenuPage() {
     toast.success(nextActive ? "Item ativado." : "Item pausado.");
   };
 
-  return (
-    <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
-      <Toaster position="top-right" />
-      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}), ...(isMobile ? styles.sidebarMobile : {}) }}>
-        <h2 style={{ ...styles.sidebarTitle, ...(isMobile ? styles.sidebarTitleMobile : {}) }}>Missô Admin</h2>
-        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobile : {}) }}>
-          <AdminLink href="/admin/menu" pathname={pathname} compact={isMobile}>
-            Cardápio
-          </AdminLink>
-          <AdminLink href="/admin/faturamento" pathname={pathname} compact={isMobile}>
-            Faturamento
-          </AdminLink>
-          {false && (
-          <AdminLink href="/admin" pathname={pathname} compact={isMobile}>
-            Visão geral
-          </AdminLink>
-          )}
-          <AdminLink href="/admin/pedidos" pathname={pathname} compact={isMobile}>
-            Pedidos
-          </AdminLink>
-          <AdminLink href="/admin/clientes" pathname={pathname} compact={isMobile}>
-            Clientes
-          </AdminLink>
-          <AdminLink href="/admin/promocoes" pathname={pathname} compact={isMobile}>
-            Promoções
-          </AdminLink>
-          <AdminLink href="/admin/configuracoes" pathname={pathname} compact={isMobile}>
-            Configurações
-          </AdminLink>
-        </nav>
-      </aside>
+  const updateItemFields = async (
+    item: MenuItem,
+    patch: Partial<MenuItem>,
+    successMessage: string
+  ) => {
+    setItems((current) =>
+      current.map((currentItem) =>
+        currentItem.id === item.id ? { ...currentItem, ...patch } : currentItem
+      )
+    );
 
-      <section style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
-        <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
-          <div>
-            <p style={styles.eyebrow}>Operação</p>
-            <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>Cardápio</h1>
-          </div>
-          <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
-            <button
-              type="button"
-              onClick={() => handleAddItem()}
-              style={{ ...styles.primaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
-            >
-              + Novo item
-            </button>
-            <button
-              type="button"
-              onClick={() => setCreatingCategoryModalOpen(true)}
-              style={{ ...styles.headerSecondaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
-            >
-              + Nova categoria
-            </button>
-          </div>
-        </header>
+    const { error } = await supabase.from("menu").update(patch).eq("id", Number(item.id));
+
+    if (error) {
+      setItems((current) =>
+        current.map((currentItem) => (currentItem.id === item.id ? item : currentItem))
+      );
+      toast.error("Não foi possível atualizar o item.");
+      return;
+    }
+
+    toast.success(successMessage);
+  };
+
+  const toggleItemSoldOut = async (item: MenuItem) => {
+    const isSoldOut = item.availability_status === "esgotado";
+    await updateItemFields(
+      item,
+      {
+        availability_status: isSoldOut ? "ativo" : "esgotado",
+        active: true,
+      },
+      isSoldOut ? "Item disponível novamente." : "Item marcado como esgotado."
+    );
+  };
+
+  const toggleItemFeatured = async (item: MenuItem) => {
+    const featured = !item.featured;
+    await updateItemFields(
+      item,
+      { featured },
+      featured ? "Item marcado como destaque." : "Destaque removido."
+    );
+  };
+
+  const headerActions = (
+    <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
+      <button
+        type="button"
+        onClick={() => handleAddItem()}
+        style={{ ...styles.primaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
+      >
+        + Novo item
+      </button>
+      <button
+        type="button"
+        onClick={() => setCreatingCategoryModalOpen(true)}
+        style={{ ...styles.headerSecondaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
+      >
+        + Nova categoria
+      </button>
+    </div>
+  );
+
+  return (
+    <>
+      <Toaster position="top-right" />
+      <AdminShell eyebrow="Operação" title="Cardápio" action={headerActions}>
 
         <section style={{ ...styles.toolbar, ...(isMobile ? styles.toolbarStack : {}) }}>
           <input
@@ -671,6 +682,7 @@ export default function AdminMenuPage() {
                     (() => {
                       const itemActive =
                         item.active !== false && item.availability_status !== "inativo";
+                      const itemSoldOut = item.availability_status === "esgotado";
 
                       return (
                     <div
@@ -712,6 +724,7 @@ export default function AdminMenuPage() {
                         ...styles.itemCard,
                         ...(isMobile ? styles.itemCardMobile : {}),
                         ...(!itemActive ? styles.itemCardPaused : {}),
+                        ...(itemSoldOut ? styles.itemCardSoldOut : {}),
                         ...(dropTarget?.type === "item" &&
                         dropTarget.itemId === item.id &&
                         dragged?.type === "item" &&
@@ -747,7 +760,11 @@ export default function AdminMenuPage() {
                         <div>
                           <h3 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h3>
                           <p style={styles.itemPrice}>{money(Number(item.price))}</p>
-                          {!itemActive && <p style={styles.itemPausedText}>Pausado</p>}
+                          <div style={styles.itemStatusLine}>
+                            {!itemActive && <span style={styles.itemStatusBadgePaused}>Pausado</span>}
+                            {itemSoldOut && <span style={styles.itemStatusBadgeSoldOut}>Esgotado</span>}
+                            {item.featured && <span style={styles.itemStatusBadgeFeatured}>Destaque</span>}
+                          </div>
                           {item.description && (
                             <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>{item.description}</p>
                           )}
@@ -779,6 +796,26 @@ export default function AdminMenuPage() {
                         </span>
                         <button
                           type="button"
+                          onClick={() => void toggleItemSoldOut(item)}
+                          style={{
+                            ...styles.tagButton,
+                            ...(itemSoldOut ? styles.tagButtonActiveSoldOut : {}),
+                          }}
+                        >
+                          {itemSoldOut ? "Esgotado" : "Marcar esgotado"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void toggleItemFeatured(item)}
+                          style={{
+                            ...styles.tagButton,
+                            ...(item.featured ? styles.tagButtonActiveFeatured : {}),
+                          }}
+                        >
+                          {item.featured ? "Destaque" : "Destacar"}
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setEditingItem(item)}
                           style={{ ...styles.secondaryButton, ...(isMobile ? styles.secondaryButtonMobile : {}) }}
                         >
@@ -795,7 +832,7 @@ export default function AdminMenuPage() {
             );
           })}
         </section>
-      </section>
+      </AdminShell>
 
       {editingCategory && (
         <CategoryEditModal
@@ -860,27 +897,7 @@ export default function AdminMenuPage() {
           }}
         />
       )}
-    </main>
-  );
-}
-
-function AdminLink({
-  href,
-  pathname,
-  children,
-  compact,
-}: {
-  href: string;
-  pathname: string;
-  children: React.ReactNode;
-  compact?: boolean;
-}) {
-  const active = pathname === href;
-
-  return (
-    <Link href={href} style={{ ...styles.navLink, ...(compact ? styles.navLinkMobile : {}), ...(active ? styles.navLinkActive : {}) }}>
-      {children}
-    </Link>
+    </>
   );
 }
 
@@ -1224,6 +1241,7 @@ function EditModal({
         image: form.image || null,
         active: form.active !== false && form.availability_status !== "inativo",
         availability_status: form.availability_status || "ativo",
+        featured: Boolean(form.featured),
       };
 
       const { data, error } = isNewItem
@@ -1359,6 +1377,36 @@ function EditModal({
                 style={styles.textarea}
               />
             </label>
+
+            <div style={{ ...styles.formGrid, ...(compact ? styles.formGridCompact : {}) }}>
+              <label style={styles.field}>
+                <span style={styles.label}>Disponibilidade</span>
+                <select
+                  value={form.availability_status || "ativo"}
+                  onChange={(event) => {
+                    setConfirmDelete(false);
+                    setForm({ ...form, availability_status: event.target.value });
+                  }}
+                  style={styles.select}
+                >
+                  <option value="ativo">Ativo</option>
+                  <option value="esgotado">Esgotado</option>
+                  <option value="inativo">Pausado</option>
+                </select>
+              </label>
+
+              <label style={styles.featuredField}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.featured)}
+                  onChange={(event) => {
+                    setConfirmDelete(false);
+                    setForm({ ...form, featured: event.target.checked });
+                  }}
+                />
+                Exibir nos destaques do cardápio
+              </label>
+            </div>
 
             <div style={styles.pricePreview}>
               <span>Prévia do preço</span>
@@ -1838,6 +1886,69 @@ const styles: Record<string, CSSProperties> = {
   itemCardPaused: {
     background: "#f7f4ef",
     opacity: 0.76,
+  },
+  itemCardSoldOut: {
+    borderColor: "rgba(153, 27, 27, 0.18)",
+  },
+  itemStatusLine: {
+    marginTop: 6,
+    display: "flex",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  itemStatusBadgePaused: {
+    borderRadius: 999,
+    background: "#f0ebe2",
+    color: "#625b53",
+    padding: "4px 8px",
+    fontSize: 11,
+    fontWeight: 850,
+  },
+  itemStatusBadgeSoldOut: {
+    borderRadius: 999,
+    background: "#fee2e2",
+    color: "#991b1b",
+    padding: "4px 8px",
+    fontSize: 11,
+    fontWeight: 850,
+  },
+  itemStatusBadgeFeatured: {
+    borderRadius: 999,
+    background: "#fff1f2",
+    color: "#9f1d2f",
+    padding: "4px 8px",
+    fontSize: 11,
+    fontWeight: 850,
+  },
+  tagButton: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    background: "#fffdf8",
+    color: "#514a43",
+    padding: "8px 10px",
+    cursor: "pointer",
+    fontWeight: 850,
+    fontSize: 12,
+    whiteSpace: "nowrap",
+  },
+  tagButtonActiveSoldOut: {
+    background: "#fee2e2",
+    color: "#991b1b",
+    borderColor: "transparent",
+  },
+  tagButtonActiveFeatured: {
+    background: "#fff1f2",
+    color: "#9f1d2f",
+    borderColor: "transparent",
+  },
+  featuredField: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    color: "#514a43",
+    fontSize: 13,
+    fontWeight: 850,
+    paddingTop: 28,
   },
   itemCardMobile: {
     display: "grid",

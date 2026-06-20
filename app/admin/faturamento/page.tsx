@@ -2,8 +2,6 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Bar } from "react-chartjs-2";
 import {
   BarElement,
@@ -19,6 +17,7 @@ import {
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { supabase } from "../../../lib/supabase";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
+import { AdminShell } from "../AdminShell";
 
 ChartJS.register(
   Title,
@@ -147,7 +146,6 @@ export default function FaturamentoPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
-  const pathname = usePathname();
 
   useEffect(() => {
     let mounted = true;
@@ -327,46 +325,15 @@ export default function FaturamentoPage() {
   };
 
   return (
-    <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
-      <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}), ...(isMobile ? styles.sidebarMobile : {}) }}>
-        <div>
-          <h2 style={styles.sidebarTitle}>Missô Admin</h2>
-          <p style={styles.sidebarMuted}>Gestão operacional</p>
-        </div>
-        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobile : {}) }}>
-          <AdminLink href="/admin/menu" pathname={pathname} compact={isMobile}>
-            Cardápio
-          </AdminLink>
-          <AdminLink href="/admin/faturamento" pathname={pathname} compact={isMobile}>
-            Faturamento
-          </AdminLink>
-          {false && (
-          <AdminLink href="/admin" pathname={pathname} compact={isMobile}>
-            Visão geral
-          </AdminLink>
-          )}
-          <AdminLink href="/admin/pedidos" pathname={pathname} compact={isMobile}>
-            Pedidos
-          </AdminLink>
-          <AdminLink href="/admin/promocoes" pathname={pathname} compact={isMobile}>
-            Promoções
-          </AdminLink>
-          <AdminLink href="/admin/configuracoes" pathname={pathname} compact={isMobile}>
-            Configurações
-          </AdminLink>
-        </nav>
-      </aside>
-
-      <section style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
-        <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
-          <div>
-            <p style={styles.eyebrow}>Financeiro</p>
-            <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>Faturamento</h1>
-          </div>
-          <span style={styles.countPill}>
-            {loading ? "Carregando" : `${number(filteredOrders.length)} pedidos`}
-          </span>
-        </header>
+    <AdminShell
+      eyebrow="Financeiro"
+      title="Faturamento"
+      action={
+        <span style={styles.countPill}>
+          {loading ? "Carregando" : `${number(filteredOrders.length)} pedidos`}
+        </span>
+      }
+    >
 
         <section
           style={{
@@ -547,28 +514,7 @@ export default function FaturamentoPage() {
             </div>
           </article>
         </section>
-      </section>
-    </main>
-  );
-}
-
-function AdminLink({
-  href,
-  pathname,
-  children,
-  compact,
-}: {
-  href: string;
-  pathname: string;
-  children: React.ReactNode;
-  compact?: boolean;
-}) {
-  const active = pathname === href;
-
-  return (
-    <Link href={href} style={{ ...styles.navLink, ...(compact ? styles.navLinkMobile : {}), ...(active ? styles.navLinkActive : {}) }}>
-      {children}
-    </Link>
+    </AdminShell>
   );
 }
 

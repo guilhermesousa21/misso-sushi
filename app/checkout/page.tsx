@@ -9,13 +9,14 @@ import { supabase } from "../../lib/supabase";
 import {
   getBusinessHours,
   getNextOpeningLabel,
+  isStoreAcceptingOrders,
   isWithinBusinessHours,
   weeklyBusinessHours,
   type BusinessHours,
 } from "../../lib/storeHours";
 import {
   buildPickupSlots,
-  checkoutAddons,
+  getCheckoutAddons,
   formatPickupTime,
   getOrderSlotLimit,
   getPickupSlotMinutes,
@@ -139,6 +140,7 @@ export default function CheckoutPage() {
   const [averageTime, setAverageTime] = useState("35 a 50 min");
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
   const [operationalSettings, setOperationalSettings] = useState<OperationalSettings | null>(null);
+  const [availableAddons, setAvailableAddons] = useState(getCheckoutAddons(null));
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [cartNotice, setCartNotice] = useState("");
   const [scheduledOrderCounts, setScheduledOrderCounts] = useState<Record<string, number>>({});
@@ -147,7 +149,7 @@ export default function CheckoutPage() {
   const serviceFeeLabel = getServiceFeeLabel(operationalSettings);
   const pickupSlots = buildPickupSlots(operationalSettings);
   const slotLimit = getOrderSlotLimit(operationalSettings);
-  const selectedAddonList = checkoutAddons
+  const selectedAddonList = availableAddons
     .map((addon) => ({ ...addon, quantity: selectedAddons[addon.id] || 0 }))
     .filter((addon) => addon.quantity > 0);
   const addonTotal = selectedAddonList.reduce(
@@ -167,11 +169,17 @@ export default function CheckoutPage() {
         .maybeSingle();
       const savedBusinessHours = getBusinessHours(data?.business_hours);
       const manuallyOpen = data?.is_open !== false;
-      setOperationalSettings(data as OperationalSettings | null);
+      const settings = data as OperationalSettings | null;
+      setOperationalSettings(settings);
+      setAvailableAddons(getCheckoutAddons(settings));
       setBusinessHours(savedBusinessHours);
       setManualOpen(manuallyOpen);
       setAverageTime(data?.average_time || "35 a 50 min");
-      setStoreOpen(data ? manuallyOpen : isWithinBusinessHours(new Date(), savedBusinessHours));
+      setStoreOpen(
+        data
+          ? isStoreAcceptingOrders(manuallyOpen, new Date(), savedBusinessHours)
+          : isWithinBusinessHours(new Date(), savedBusinessHours)
+      );
       const [firstSlot] = buildPickupSlots(data as OperationalSettings | null);
       if (firstSlot) {
         setScheduledFor((current) => current || toLocalInputValue(firstSlot));
@@ -179,6 +187,13 @@ export default function CheckoutPage() {
     }
     fetchStoreStatus();
   }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setStoreOpen(isStoreAcceptingOrders(manualOpen, new Date(), businessHours));
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [manualOpen, businessHours]);
 
   useEffect(() => {
     async function fetchScheduledCounts() {
@@ -291,8 +306,13 @@ export default function CheckoutPage() {
     [10, 11].includes(onlyDigits(phone).length) &&
     storeOpen &&
     selectedSlotIsAvailable;
+  const withinBusinessHours = isWithinBusinessHours(new Date(), businessHours);
   const formHelp = !storeOpen
-    ? "Os pedidos estão bloqueados até a loja reabrir."
+    ? !manualOpen
+      ? "A loja está fechada manualmente."
+      : !withinBusinessHours
+        ? `Fora do horário de funcionamento. ${getNextOpeningLabel(new Date(), businessHours)}.`
+        : "Os pedidos estão bloqueados até a loja reabrir."
     : !hasFirstAndLastName(name)
       ? "Informe nome e sobrenome para continuar."
       : ![10, 11].includes(onlyDigits(phone).length)
@@ -378,17 +398,31 @@ export default function CheckoutPage() {
     }
     setCheckoutState("generating");
     try {
-      const savedOrder = await insertOrder({ status: "preparando", payment_method: "card", payment_status: "pago" });
-      await fetch("/api/orders/paid-side-effects", {
+      const savedOrder = await insertOrder({
+        status: "aguardando_pagamento",
+        payment_method: "card",
+        payment_status: "pendente",
+      });
+      const preferenceRes = await fetch("/api/checkout/preference", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: savedOrder.id }),
-      }).catch(() => null);
-      fetch("/api/whatsapp/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(savedOrder) }).catch(() => {});
-      clear();
-      router.push(`/pedido/${savedOrder.id}`);
+        body: JSON.stringify({
+          orderId: savedOrder.id,
+          amount: finalTotal,
+          title: `Missô Sushi #${savedOrder.id}`,
+          payer: { name: normalizeName(name), email: "cliente@email.com" },
+        }),
+      });
+      const preferenceData = await preferenceRes.json();
+      if (!preferenceRes.ok || !preferenceData.init_point) {
+        throw new Error(preferenceData.error || preferenceData.detail || "Não foi possível iniciar o pagamento.");
+      }
+      const redirectUrl = String(preferenceData.init_point);
+      window.setTimeout(() => {
+        window.location.assign(redirectUrl);
+      }, 0);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível enviar o pedido.");
+      setError(e instanceof Error ? e.message : "Não foi possível iniciar o pagamento com cartão.");
       setCheckoutState("form");
     }
   };
@@ -658,7 +692,7 @@ export default function CheckoutPage() {
               Complementos <span>R$ 2,50 cada</span>
             </summary>
             <div style={styles.addonGrid}>
-              {checkoutAddons.map((addon) => {
+              {availableAddons.map((addon) => {
                 const quantity = selectedAddons[addon.id] || 0;
                 return (
                   <div key={addon.id} style={styles.addonRow}>
@@ -768,7 +802,7 @@ export default function CheckoutPage() {
             )}
             {method === "card" && (
               <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
-                Clique em Cartão para enviar o pedido.
+                Você será redirecionado ao Mercado Pago para pagar com cartão com segurança.
               </p>
             )}
           </div>

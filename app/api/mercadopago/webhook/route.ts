@@ -44,14 +44,25 @@ export async function POST(request: Request) {
     .eq("mercado_pago_payment_id", String(paymentId))
     .maybeSingle();
 
-  const { data: orders } = await supabase
-    .from("orders")
-    .update(update)
-    .eq("mercado_pago_payment_id", String(paymentId))
-    .select();
+  let targetOrder = existingOrder;
+
+  if (!targetOrder && result.external_reference) {
+    const { data: referencedOrder } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", result.external_reference)
+      .maybeSingle();
+    targetOrder = referencedOrder;
+  }
+
+  const updateQuery = targetOrder?.id
+    ? supabase.from("orders").update({ ...update, mercado_pago_payment_id: String(paymentId) }).eq("id", targetOrder.id)
+    : supabase.from("orders").update(update).eq("mercado_pago_payment_id", String(paymentId));
+
+  const { data: orders } = await updateQuery.select();
 
   if (payment_status === "pago" && orders?.[0]) {
-    if (existingOrder?.payment_status !== "pago") {
+    if (targetOrder?.payment_status !== "pago") {
       await applyPaidOrderSideEffects(orders[0]);
     }
 

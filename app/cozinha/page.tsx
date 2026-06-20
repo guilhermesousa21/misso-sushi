@@ -39,6 +39,7 @@ type Order = {
 type ConfirmationState =
   | { action: "print"; order: Order }
   | { action: "ready"; order: Order }
+  | { action: "picked_up"; order: Order }
   | null;
 
 type KitchenFilter = "recebidos" | "prontos" | "atrasados";
@@ -203,6 +204,20 @@ export default function AdminPanel() {
     }
   }
 
+  async function markOrderPickedUp(order: Order) {
+    if (order.status === "retirado") return;
+
+    const { error } = await supabase.from("orders").update({ status: "retirado" }).eq("id", order.id);
+    if (error) {
+      window.alert("Não foi possível marcar o pedido como retirado.");
+      return;
+    }
+
+    setOrders((prev) =>
+      prev.map((current) => (current.id === order.id ? { ...current, status: "retirado" } : current))
+    );
+  }
+
   async function handleConfirmAction() {
     if (!confirmation) return;
 
@@ -210,8 +225,10 @@ export default function AdminPanel() {
     try {
       if (confirmation.action === "print") {
         printOrder(confirmation.order);
-      } else {
+      } else if (confirmation.action === "ready") {
         await markOrderReady(confirmation.order);
+      } else {
+        await markOrderPickedUp(confirmation.order);
       }
       setConfirmation(null);
     } finally {
@@ -221,7 +238,10 @@ export default function AdminPanel() {
 
   const todayKey = toBrasiliaDateKey(now);
   const visibleOrders = orders.filter(
-    (order) => toBrasiliaDateKey(order.created_at) === todayKey
+    (order) =>
+      toBrasiliaDateKey(order.created_at) === todayKey &&
+      normalizeKitchenStatus(order.status) !== "retirado" &&
+      order.status !== "retirado"
   );
 
   const sorted = [...visibleOrders].sort((a, b) => {
@@ -414,10 +434,14 @@ export default function AdminPanel() {
                     ...styles.actionPrimary,
                     ...(kitchenStatus === "pronto" ? styles.actionReady : {}),
                   }}
-                  onClick={() => setConfirmation({ action: "ready", order })}
-                  disabled={kitchenStatus === "pronto"}
+                  onClick={() =>
+                    setConfirmation({
+                      action: kitchenStatus === "pronto" ? "picked_up" : "ready",
+                      order,
+                    })
+                  }
                 >
-                  {kitchenStatus === "pronto" ? "Pedido pronto" : "Pedido pronto"}
+                  {kitchenStatus === "pronto" ? "Marcar retirado" : "Pedido pronto"}
                 </button>
               </div>
             </article>
@@ -442,16 +466,26 @@ export default function AdminPanel() {
           >
             <div style={styles.confirmHeader}>
               <span style={styles.confirmIcon}>
-                {confirmation.action === "ready" ? "✓" : "•"}
+                {confirmation.action === "ready"
+                  ? "✓"
+                  : confirmation.action === "picked_up"
+                    ? "↗"
+                    : "•"}
               </span>
               <div>
                 <p style={styles.confirmEyebrow}>
-                  {confirmation.action === "ready" ? "Aviso ao cliente" : "Impressão"}
+                  {confirmation.action === "ready"
+                    ? "Aviso ao cliente"
+                    : confirmation.action === "picked_up"
+                      ? "Finalizar pedido"
+                      : "Impressão"}
                 </p>
                 <h2 id="confirm-title" style={styles.confirmTitle}>
                   {confirmation.action === "ready"
                     ? `Marcar pedido #${confirmation.order.id} como pronto?`
-                    : `Imprimir pedido #${confirmation.order.id}?`}
+                    : confirmation.action === "picked_up"
+                      ? `Marcar pedido #${confirmation.order.id} como retirado?`
+                      : `Imprimir pedido #${confirmation.order.id}?`}
                 </h2>
               </div>
             </div>
@@ -477,6 +511,12 @@ export default function AdminPanel() {
               </p>
             )}
 
+            {confirmation.action === "picked_up" && (
+              <p style={styles.confirmNote}>
+                O pedido sairá da fila da cozinha e ficará registrado como retirado pelo cliente.
+              </p>
+            )}
+
             <div style={styles.confirmActions}>
               <button
                 type="button"
@@ -496,7 +536,9 @@ export default function AdminPanel() {
                   ? "Processando..."
                   : confirmation.action === "ready"
                     ? "Confirmar pronto"
-                    : "Confirmar impressão"}
+                    : confirmation.action === "picked_up"
+                      ? "Confirmar retirado"
+                      : "Confirmar impressão"}
               </button>
             </div>
           </section>
