@@ -1703,10 +1703,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
   },
   headerSecondaryButton: {
-    border: "1px solid rgba(28, 26, 23, 0.14)",
+    border: "none",
     borderRadius: 999,
-    background: "#fffdf8",
-    color: "#1c1a17",
+    background: "#1c1a17",
+    color: "#fffdf8",
     padding: "12px 16px",
     cursor: "pointer",
     fontWeight: 850,
