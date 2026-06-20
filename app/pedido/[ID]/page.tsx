@@ -162,6 +162,17 @@ export default function PedidoPage({
           </strong>
         </div>
 
+        {(order.items || []).length > 0 && (
+          <div style={styles.itemsBox}>
+            <strong style={styles.itemsTitle}>Itens do pedido</strong>
+            {(order.items || []).map((item, index) => (
+              <p key={`${item.id}-${index}`} style={styles.itemLine}>
+                {formatOrderItemLabel(item)}
+              </p>
+            ))}
+          </div>
+        )}
+
         <div style={styles.infoGrid}>
           <div style={styles.infoBox}>
             <span>Retirada</span>
@@ -189,16 +200,6 @@ export default function PedidoPage({
             );
           })}
         </div>
-        {(order.items || []).length > 0 && (
-          <div style={styles.itemsBox}>
-            <strong style={styles.itemsTitle}>Itens do pedido</strong>
-            {(order.items || []).map((item, index) => (
-              <p key={`${item.id}-${index}`} style={styles.itemLine}>
-                {formatOrderItemLabel(item)}
-              </p>
-            ))}
-          </div>
-        )}
         {(order.items || []).length > 0 && (
           <button type="button" onClick={handleRepeatOrder} style={styles.repeatButton}>
             Repetir este pedido
@@ -402,7 +403,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
   },
   itemsBox: {
-    marginTop: 18,
+    marginTop: 12,
     borderRadius: 8,
     border: "1px solid rgba(28, 26, 23, 0.08)",
     background: "#fffaf2",
