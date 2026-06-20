@@ -27,4 +27,5 @@ export type OrderAddon = {
   id: string;
   name: string;
   quantity: number;
+  unit_price?: number;
 };

@@ -61,7 +61,7 @@ export type AdminOrder = {
   fulfillment?: string | null;
   fulfillment_type?: string | null;
   scheduled_for?: string | null;
-  addons?: { id: string; name: string; quantity: number }[] | null;
+  addons?: { id: string; name: string; quantity: number; unit_price?: number | null }[] | null;
   service_fee?: number | null;
   service_fee_label?: string | null;
 };

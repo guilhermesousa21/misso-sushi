@@ -31,7 +31,7 @@ type Order = {
   payment_status?: string;
   fulfillment_type?: string;
   scheduled_for?: string;
-  addons?: { id: string; name: string; quantity: number }[];
+  addons?: { id: string; name: string; quantity: number; unit_price?: number | null }[];
   service_fee?: number;
   service_fee_label?: string;
 };

@@ -150,8 +150,12 @@ export default function CheckoutPage() {
   const selectedAddonList = checkoutAddons
     .map((addon) => ({ ...addon, quantity: selectedAddons[addon.id] || 0 }))
     .filter((addon) => addon.quantity > 0);
+  const addonTotal = selectedAddonList.reduce(
+    (sum, addon) => sum + Number(addon.unit_price || 0) * addon.quantity,
+    0
+  );
   const discountAmount = calculateDiscount(appliedCoupon, total);
-  const finalTotal = Math.max(0, total + serviceFee - discountAmount);
+  const finalTotal = Math.max(0, total + addonTotal + serviceFee - discountAmount);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
@@ -685,7 +689,10 @@ export default function CheckoutPage() {
                 const quantity = selectedAddons[addon.id] || 0;
                 return (
                   <div key={addon.id} style={styles.addonRow}>
-                    <span>{addon.name}</span>
+                    <span>
+                      {addon.name}
+                      <small style={styles.addonPrice}> {money(Number(addon.unit_price || 0))} cada</small>
+                    </span>
                     <div style={styles.qtyControl}>
                       <button
                         type="button"
@@ -827,10 +834,16 @@ export default function CheckoutPage() {
               ))}
             </div>
             <div style={styles.summaryTotalBox}>
-              {(discountAmount > 0 || serviceFee > 0) && (
+              {(discountAmount > 0 || serviceFee > 0 || addonTotal > 0) && (
                 <div style={styles.summaryTotalLine}>
                   <span>Subtotal</span>
                   <strong>{money(total)}</strong>
+                </div>
+              )}
+              {addonTotal > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>Complementos</span>
+                  <strong>{money(addonTotal)}</strong>
                 </div>
               )}
               {serviceFee > 0 && (
@@ -906,6 +919,7 @@ const styles: Record<string, CSSProperties> = {
   textarea: { width: "100%", minHeight: 96, resize: "vertical", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
   addonGrid: { display: "grid", gap: 10 },
   addonRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 8, padding: "12px 14px", background: "#fff" },
+  addonPrice: { display: "block", marginTop: 3, color: "#766e64", fontSize: 12, fontWeight: 750 },
   qtyControl: { display: "inline-flex", alignItems: "center", gap: 10 },
   qtyButton: { width: 30, height: 30, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", cursor: "pointer", fontWeight: 850 },
   methods: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 },

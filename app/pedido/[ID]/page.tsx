@@ -15,7 +15,7 @@ type Order = {
   payment_status?: string | null;
   fulfillment_type?: string | null;
   scheduled_for?: string | null;
-  addons?: { id: string; name: string; quantity: number }[] | null;
+  addons?: { id: string; name: string; quantity: number; unit_price?: number | null }[] | null;
   items?: {
     id: number;
     name: string;

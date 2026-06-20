@@ -9,6 +9,7 @@ type PrintableAddon = {
   id?: string;
   name: string;
   quantity?: number;
+  unit_price?: number | null;
 };
 
 export type PrintableOrder = {
@@ -84,6 +85,10 @@ export function printOrder(order: PrintableOrder) {
   const subtotal = getSubtotal(order);
   const discount = Number(order.discount_amount || 0);
   const serviceFee = Number(order.service_fee || 0);
+  const addonTotal = (order.addons || []).reduce(
+    (sum, addon) => sum + Number(addon.unit_price || 0) * (addon.quantity ?? 1),
+    0
+  );
   const total = getTotal(order);
   const paymentStatus = order.payment_status || "pendente";
   const paymentLabel = order.payment_method
@@ -111,7 +116,11 @@ export function printOrder(order: PrintableOrder) {
       : `<tr><td colspan="2">Nenhum item salvo neste pedido.</td></tr>`;
   const addonText = (order.addons || [])
     .filter((addon) => Number(addon.quantity || 0) > 0)
-    .map((addon) => `${addon.quantity ?? 1}x ${addon.name}`)
+    .map((addon) => {
+      const quantity = addon.quantity ?? 1;
+      const lineTotal = Number(addon.unit_price || 0) * quantity;
+      return `${quantity}x ${addon.name}${lineTotal > 0 ? ` - ${money(lineTotal)}` : ""}`;
+    })
     .join(", ");
 
   printWindow.document.write(`
@@ -238,6 +247,11 @@ export function printOrder(order: PrintableOrder) {
           <section class="section">
             <div class="line"><span>Pagamento</span><strong>${escapeHtml(paymentLabel)}</strong></div>
             <div class="line"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
+            ${
+              addonTotal > 0
+                ? `<div class="line"><span>Complementos</span><strong>${money(addonTotal)}</strong></div>`
+                : ""
+            }
             ${
               serviceFee > 0
                 ? `<div class="line"><span>${escapeHtml(order.service_fee_label || "Taxa de embalagem")}</span><strong>${money(serviceFee)}</strong></div>`

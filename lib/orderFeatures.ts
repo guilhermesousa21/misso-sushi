@@ -4,6 +4,7 @@ export type OrderAddon = {
   id: string;
   name: string;
   quantity: number;
+  unit_price?: number;
 };
 
 export type OrderFulfillmentType = "asap" | "scheduled";
@@ -23,12 +24,19 @@ export const defaultServiceFeeLabel = "Taxa de embalagem";
 export const defaultPickupSlotMinutes = 30;
 export const defaultMinPickupMinutes = 35;
 export const defaultMaxAdvanceDays = 1;
+export const addonUnitPrice = 2.5;
 
 export const checkoutAddons: OrderAddon[] = [
-  { id: "hashi", name: "Hashi", quantity: 1 },
-  { id: "shoyu-extra", name: "Shoyu extra", quantity: 1 },
-  { id: "gengibre", name: "Gengibre", quantity: 1 },
+  { id: "hashi", name: "Hashi", quantity: 1, unit_price: addonUnitPrice },
+  { id: "shoyu-extra", name: "Shoyu extra", quantity: 1, unit_price: addonUnitPrice },
+  { id: "gengibre", name: "Gengibre", quantity: 1, unit_price: addonUnitPrice },
 ];
+
+export const money = (value: number) =>
+  value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 
 export const clampPositiveInteger = (value: unknown, fallback: number) => {
   const numberValue = Number(value);
@@ -91,11 +99,21 @@ export const formatPickupTime = (value?: string | null) => {
 };
 
 export const formatAddonSummary = (
-  addons?: { id?: string; name: string; quantity?: number | null }[] | null
+  addons?: {
+    id?: string;
+    name: string;
+    quantity?: number | null;
+    unit_price?: number | null;
+  }[] | null
 ) =>
   (addons || [])
     .filter((addon) => Number(addon.quantity || 0) > 0)
-    .map((addon) => `${addon.quantity}x ${addon.name}`)
+    .map((addon) => {
+      const quantity = Number(addon.quantity || 0);
+      const unitPrice = Number(addon.unit_price || 0);
+      const total = unitPrice * quantity;
+      return `${quantity}x ${addon.name}${unitPrice > 0 ? ` (${money(total)})` : ""}`;
+    })
     .join(", ");
 
 export const getOrderPickupLabel = (order: {
