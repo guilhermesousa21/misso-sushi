@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import {
   getBusinessHours,
-  getNextOpeningLabel,
   getTodayBusinessHoursLabel,
   isStoreAcceptingOrders,
   isWithinBusinessHours,
@@ -26,6 +25,10 @@ import {
 import { MenuItem } from "../types";
 import { useCart, type CartItem } from "./context/CartContext";
 import { money, isItemOrderable } from "../lib/orderUtils";
+import {
+  StoreStatusBanner,
+  storeStatusBannerHeight,
+} from "./components/StoreStatusBanner";
 
 type CartLine = CartItem;
 
@@ -266,26 +269,25 @@ export default function Page() {
   };
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
+    <main style={{ ...styles.page, paddingTop: storeStatusBannerHeight }}>
+      <StoreStatusBanner
+        storeOpen={storeOpen}
+        manualOpen={manualOpen}
+        businessHours={businessHours}
+        averageTime={averageTime}
+      />
+      <header style={{ ...styles.header, top: storeStatusBannerHeight }}>
         <div style={{ ...styles.headerInner, ...(isMobile ? styles.headerInnerMobile : {}) }}>
           <div>
             <h1 style={styles.brand}>Missô Sushi</h1>
             <p style={styles.headerStatus}>
               {storeOpen
-                ? `Aberto - tempo médio de preparo ${averageTime}`
-                : "Loja fechada no momento"}
+                ? `Tempo médio de preparo: ${averageTime}`
+                : "Pedidos pausados no momento"}
             </p>
             <p style={styles.headerHours}>
               {getTodayBusinessHoursLabel(new Date(), businessHours)}
             </p>
-            {!storeOpen && (
-              <p style={styles.closedBanner}>
-                {!manualOpen
-                  ? "Fechado no momento"
-                  : `Fora do horário · ${getNextOpeningLabel(new Date(), businessHours)}`}
-              </p>
-            )}
           </div>
           <div style={styles.headerActions}>
             <Link href="/meus-pedidos" style={styles.headerLink}>
@@ -754,16 +756,6 @@ const styles: Record<string, CSSProperties> = {
     color: "#766e64",
     fontSize: 12,
     fontWeight: 650,
-  },
-  closedBanner: {
-    marginTop: 7,
-    display: "inline-flex",
-    borderRadius: 999,
-    background: "#fee2e2",
-    color: "#991b1b",
-    padding: "6px 10px",
-    fontSize: 12,
-    fontWeight: 850,
   },
   headerCartButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",

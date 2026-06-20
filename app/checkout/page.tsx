@@ -34,6 +34,14 @@ import { useMediaQuery } from "../../lib/useMediaQuery";
 import type { MenuItem } from "../../types";
 import { useCart } from "../context/CartContext";
 import { money, isItemOrderable } from "../../lib/orderUtils";
+import {
+  CheckoutStepper,
+  type CheckoutStep,
+} from "../components/CheckoutStepper";
+import {
+  StoreStatusBanner,
+  storeStatusBannerHeight,
+} from "../components/StoreStatusBanner";
 
 type PaymentMethod = "pix" | "card";
 
@@ -152,6 +160,7 @@ export default function CheckoutPage() {
 
   const [loyaltyStatus, setLoyaltyStatus] = useState<LoyaltyStatus | null>(null);
   const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(1);
 
   const serviceFee = getServiceFee(operationalSettings);
   const serviceFeeLabel = getServiceFeeLabel(operationalSettings);
@@ -342,26 +351,50 @@ export default function CheckoutPage() {
     (Boolean(scheduledFor) &&
       pickupSlots.some((slot) => toLocalInputValue(slot) === scheduledFor) &&
       (slotLimit <= 0 || (scheduledOrderCounts[scheduledFor] || 0) < slotLimit));
+  const isStep1Valid =
+    hasFirstAndLastName(name) && [10, 11].includes(onlyDigits(phone).length);
+  const isStep2Valid = selectedSlotIsAvailable;
   const isFormValid =
-    cart.length > 0 &&
-    hasFirstAndLastName(name) &&
-    [10, 11].includes(onlyDigits(phone).length) &&
-    storeOpen &&
-    selectedSlotIsAvailable;
+    cart.length > 0 && isStep1Valid && storeOpen && isStep2Valid;
+  const maxReachableStep: CheckoutStep = isStep1Valid
+    ? isStep2Valid
+      ? 3
+      : 2
+    : 1;
   const withinBusinessHours = isWithinBusinessHours(new Date(), businessHours);
-  const formHelp = !storeOpen
-    ? !manualOpen
-      ? "A loja está fechada manualmente."
-      : !withinBusinessHours
-        ? `Fora do horário de funcionamento. ${getNextOpeningLabel(new Date(), businessHours)}.`
-        : "Os pedidos estão bloqueados até a loja reabrir."
-    : !hasFirstAndLastName(name)
-      ? "Informe nome e sobrenome para continuar."
-      : ![10, 11].includes(onlyDigits(phone).length)
-        ? "Informe um telefone com DDD."
-        : !selectedSlotIsAvailable
+  const stepHelp =
+    checkoutStep === 1
+      ? !hasFirstAndLastName(name)
+        ? "Informe nome e sobrenome para continuar."
+        : ![10, 11].includes(onlyDigits(phone).length)
+          ? "Informe um telefone com DDD."
+          : "Dados prontos. Avance para retirada."
+      : checkoutStep === 2
+        ? !selectedSlotIsAvailable
           ? "Escolha um horário de retirada disponível."
-          : "Tudo certo para enviar o pedido.";
+          : "Retirada configurada. Avance para pagamento."
+        : !storeOpen
+          ? !manualOpen
+            ? "A loja está fechada manualmente."
+            : !withinBusinessHours
+              ? `Fora do horário de funcionamento. ${getNextOpeningLabel(new Date(), businessHours)}.`
+              : "Os pedidos estão bloqueados até a loja reabrir."
+          : "Escolha a forma de pagamento para finalizar.";
+
+  const handleContinueStep = () => {
+    if (checkoutStep === 1 && isStep1Valid) {
+      setCheckoutStep(2);
+      return;
+    }
+    if (checkoutStep === 2 && isStep2Valid) {
+      setCheckoutStep(3);
+    }
+  };
+
+  const handleBackStep = () => {
+    if (checkoutStep === 2) setCheckoutStep(1);
+    if (checkoutStep === 3) setCheckoutStep(2);
+  };
 
   const insertOrder = async (extra: Record<string, unknown>) => {
     const base: Record<string, unknown> = {
@@ -633,8 +666,29 @@ export default function CheckoutPage() {
   }
 
   // ── Formulário ───────────────────────────────────────────────────────────────
+  const canContinueStep =
+    checkoutStep === 1 ? isStep1Valid : checkoutStep === 2 ? isStep2Valid : false;
+  const stepHelpOk =
+    checkoutStep === 1
+      ? isStep1Valid
+      : checkoutStep === 2
+        ? isStep2Valid
+        : isFormValid;
+
   return (
-    <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
+    <main
+      style={{
+        ...styles.page,
+        ...(isMobile ? styles.pageMobile : {}),
+        paddingTop: storeStatusBannerHeight + (isMobile ? 18 : 20),
+      }}
+    >
+      <StoreStatusBanner
+        storeOpen={storeOpen}
+        manualOpen={manualOpen}
+        businessHours={businessHours}
+        averageTime={averageTime}
+      />
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <Link href="/" style={styles.backLink}>Voltar ao cardápio</Link>
         <div style={styles.headerTitle}>
@@ -645,259 +699,315 @@ export default function CheckoutPage() {
 
       <div style={{ ...styles.shell, ...(isMobile ? styles.shellMobile : {}) }}>
         <section style={styles.mainColumn}>
-          {/* Dados do cliente */}
-          <div style={styles.card}>
-            <h2 style={styles.sectionTitle}>Dados para contato</h2>
-            <div style={{ ...styles.formGrid, ...(isMobile ? styles.formGridMobile : {}) }}>
-              <label style={styles.field}>
-                <span style={styles.label}>Nome e sobrenome</span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(sanitizeName(e.target.value))}
-                  onBlur={() => setName(normalizeName(name))}
-                  autoComplete="name"
-                  maxLength={30}
-                  placeholder="NOME SOBRENOME"
-                  style={styles.input}
-                />
-              </label>
-              <label style={styles.field}>
-                <span style={styles.label}>Telefone</span>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(formatPhone(e.target.value))}
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="(00) 00000-0000"
-                  maxLength={15}
-                  style={styles.input}
-                />
-              </label>
-            </div>
-            <p style={{ ...styles.formHelp, ...(isFormValid ? styles.formHelpOk : {}) }}>{formHelp}</p>
-          </div>
+          <CheckoutStepper
+            currentStep={checkoutStep}
+            maxReachableStep={maxReachableStep}
+            onStepChange={setCheckoutStep}
+            isMobile={isMobile}
+          />
 
-          {/* Retirada */}
-          <div style={styles.card}>
-            <div style={styles.inlineHeader}>
-              <h2 style={styles.sectionTitle}>Retirada</h2>
-              <span style={styles.inlineMeta}>Tempo médio: {averageTime}</span>
-            </div>
-            <p style={styles.mutedSmall}>
-              Seu pedido entra na fila de preparo imediatamente após o pagamento.
-            </p>
-            <button
-              type="button"
-              onClick={() => setWantsScheduledPickup((current) => !current)}
-              style={{
-                ...styles.scheduleToggle,
-                ...(wantsScheduledPickup ? styles.scheduleToggleActive : {}),
-              }}
-            >
-              {wantsScheduledPickup ? "Retirada imediata" : "Agendar retirada"}
-            </button>
-            {wantsScheduledPickup && (
-              <label style={{ ...styles.field, marginTop: 14 }}>
-                <span style={styles.label}>Horário de retirada</span>
-                <select
-                  value={scheduledFor}
-                  onChange={(event) => setScheduledFor(event.target.value)}
-                  style={styles.select}
+          {checkoutStep === 1 && (
+            <>
+              <div style={styles.card}>
+                <h2 style={styles.sectionTitle}>Dados para contato</h2>
+                <div style={{ ...styles.formGrid, ...(isMobile ? styles.formGridMobile : {}) }}>
+                  <label style={styles.field}>
+                    <span style={styles.label}>Nome e sobrenome</span>
+                    <input
+                      value={name}
+                      onChange={(e) => setName(sanitizeName(e.target.value))}
+                      onBlur={() => setName(normalizeName(name))}
+                      autoComplete="name"
+                      maxLength={30}
+                      placeholder="NOME SOBRENOME"
+                      style={styles.input}
+                    />
+                  </label>
+                  <label style={styles.field}>
+                    <span style={styles.label}>Telefone</span>
+                    <input
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhone(e.target.value))}
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="(00) 00000-0000"
+                      maxLength={15}
+                      style={styles.input}
+                    />
+                  </label>
+                </div>
+                <p style={{ ...styles.formHelp, ...(stepHelpOk ? styles.formHelpOk : {}) }}>
+                  {stepHelp}
+                </p>
+              </div>
+
+              {[10, 11].includes(onlyDigits(phone).length) && (
+                <div style={styles.card}>
+                  <div style={styles.inlineHeader}>
+                    <h2 style={styles.sectionTitle}>Fidelidade</h2>
+                    {loyaltyStatus?.eligibleNow && (
+                      <span style={styles.inlineMeta}>-{money(LOYALTY_DISCOUNT_VALUE)}</span>
+                    )}
+                  </div>
+                  {loyaltyLoading ? (
+                    <p style={styles.mutedSmall}>Consultando seu histórico...</p>
+                  ) : loyaltyStatus ? (
+                    <>
+                      <p style={styles.mutedSmall}>
+                        A cada {LOYALTY_ORDER_INTERVAL} pedidos, você ganha R${" "}
+                        {LOYALTY_DISCOUNT_VALUE.toFixed(0)} off.
+                      </p>
+                      <div style={styles.loyaltyProgressTrack}>
+                        <span
+                          style={{
+                            ...styles.loyaltyProgressFill,
+                            width: `${
+                              loyaltyStatus.eligibleNow
+                                ? 100
+                                : (loyaltyStatus.progressInCycle / LOYALTY_ORDER_INTERVAL) * 100
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <p style={styles.loyaltyText}>
+                        {loyaltyStatus.eligibleNow
+                          ? `Parabéns! Este é seu ${loyaltyStatus.nextOrderNumber}º pedido — desconto de fidelidade aplicado.`
+                          : `Você já fez ${loyaltyStatus.paidOrderCount} pedidos. Faltam ${loyaltyStatus.ordersUntilReward} para o próximo desconto.`}
+                      </p>
+                    </>
+                  ) : (
+                    <p style={styles.mutedSmall}>Não foi possível carregar o programa de fidelidade.</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {checkoutStep === 2 && (
+            <>
+              <div style={styles.card}>
+                <div style={styles.inlineHeader}>
+                  <h2 style={styles.sectionTitle}>Retirada</h2>
+                  <span style={styles.inlineMeta}>Tempo médio: {averageTime}</span>
+                </div>
+                <p style={styles.mutedSmall}>
+                  Seu pedido entra na fila de preparo imediatamente após o pagamento.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setWantsScheduledPickup((current) => !current)}
+                  style={{
+                    ...styles.scheduleToggle,
+                    ...(wantsScheduledPickup ? styles.scheduleToggleActive : {}),
+                  }}
                 >
-                  {pickupSlots.map((slot) => {
-                    const value = toLocalInputValue(slot);
-                    const count = scheduledOrderCounts[value] || 0;
-                    const full = slotLimit > 0 && count >= slotLimit;
+                  {wantsScheduledPickup ? "Retirada imediata" : "Agendar retirada"}
+                </button>
+                {wantsScheduledPickup && (
+                  <label style={{ ...styles.field, marginTop: 14 }}>
+                    <span style={styles.label}>Horário de retirada</span>
+                    <select
+                      value={scheduledFor}
+                      onChange={(event) => setScheduledFor(event.target.value)}
+                      style={styles.select}
+                    >
+                      {pickupSlots.map((slot) => {
+                        const value = toLocalInputValue(slot);
+                        const count = scheduledOrderCounts[value] || 0;
+                        const full = slotLimit > 0 && count >= slotLimit;
+                        return (
+                          <option key={value} value={value} disabled={full}>
+                            {formatPickupTime(slot.toISOString())}
+                            {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
+                            {full ? " - lotado" : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p style={styles.mutedSmall}>
+                      Grade de {getPickupSlotMinutes(operationalSettings)} em{" "}
+                      {getPickupSlotMinutes(operationalSettings)} minutos.
+                    </p>
+                  </label>
+                )}
+                <p style={{ ...styles.formHelp, ...(stepHelpOk ? styles.formHelpOk : {}) }}>
+                  {stepHelp}
+                </p>
+              </div>
+
+              <details open style={styles.compactDetails}>
+                <summary style={styles.detailsSummary}>
+                  Complementos <span>R$ 2,50 cada</span>
+                </summary>
+                <div style={styles.addonGrid}>
+                  {availableAddons.map((addon) => {
+                    const quantity = selectedAddons[addon.id] || 0;
                     return (
-                      <option key={value} value={value} disabled={full}>
-                        {formatPickupTime(slot.toISOString())}
-                        {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
-                        {full ? " - lotado" : ""}
-                      </option>
+                      <div key={addon.id} style={styles.addonRow}>
+                        <span>
+                          {addon.name}
+                          <small style={styles.addonPrice}> {money(Number(addon.unit_price || 0))} cada</small>
+                        </span>
+                        <div style={styles.qtyControl}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedAddons((current) => ({
+                                ...current,
+                                [addon.id]: Math.max(0, (current[addon.id] || 0) - 1),
+                              }))
+                            }
+                            style={styles.qtyButton}
+                          >
+                            -
+                          </button>
+                          <strong>{quantity}</strong>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedAddons((current) => ({
+                                ...current,
+                                [addon.id]: Math.min(9, (current[addon.id] || 0) + 1),
+                              }))
+                            }
+                            style={styles.qtyButton}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
-                </select>
-                <p style={styles.mutedSmall}>
-                  Grade de {getPickupSlotMinutes(operationalSettings)} em{" "}
-                  {getPickupSlotMinutes(operationalSettings)} minutos.
-                </p>
-              </label>
-            )}
-            {!storeOpen && (
-              <p style={styles.error}>
-                {manualOpen
-                  ? `A loja está fechada no momento e ${getNextOpeningLabel(new Date(), businessHours)}.`
-                  : `A loja está fechada manualmente e ${getNextOpeningLabel(new Date(), businessHours)}.`}
-              </p>
-            )}
-          </div>
+                </div>
+              </details>
 
-          {/* Complementos */}
-          <details open style={styles.compactDetails}>
-            <summary style={styles.detailsSummary}>
-              Complementos <span>R$ 2,50 cada</span>
-            </summary>
-            <div style={styles.addonGrid}>
-              {availableAddons.map((addon) => {
-                const quantity = selectedAddons[addon.id] || 0;
-                return (
-                  <div key={addon.id} style={styles.addonRow}>
-                    <span>
-                      {addon.name}
-                      <small style={styles.addonPrice}> {money(Number(addon.unit_price || 0))} cada</small>
-                    </span>
-                    <div style={styles.qtyControl}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedAddons((current) => ({
-                            ...current,
-                            [addon.id]: Math.max(0, (current[addon.id] || 0) - 1),
-                          }))
-                        }
-                        style={styles.qtyButton}
-                      >
-                        -
-                      </button>
-                      <strong>{quantity}</strong>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedAddons((current) => ({
-                            ...current,
-                            [addon.id]: Math.min(9, (current[addon.id] || 0) + 1),
-                          }))
-                        }
-                        style={styles.qtyButton}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </details>
+              <details open style={styles.compactDetails}>
+                <summary style={styles.detailsSummary}>Observação do pedido</summary>
+                <textarea
+                  id="note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Ex: sem cebolinha, enviar shoyu extra..."
+                  style={{ ...styles.textarea, ...styles.detailsContent }}
+                />
+              </details>
+            </>
+          )}
 
-          {/* Fidelidade */}
-          {[10, 11].includes(onlyDigits(phone).length) && (
-            <div style={styles.card}>
-              <div style={styles.inlineHeader}>
-                <h2 style={styles.sectionTitle}>Fidelidade</h2>
-                {loyaltyStatus?.eligibleNow && (
-                  <span style={styles.inlineMeta}>-{money(LOYALTY_DISCOUNT_VALUE)}</span>
+          {checkoutStep === 3 && (
+            <>
+              <div style={styles.card}>
+                <div style={styles.inlineHeader}>
+                  <h2 style={styles.sectionTitle}>Cupom</h2>
+                  {appliedCoupon && <span style={styles.inlineMeta}>-{money(discountAmount)}</span>}
+                </div>
+                <div style={{ ...styles.couponRow, ...(isMobile ? styles.couponRowMobile : {}) }}>
+                  <input
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(sanitizeCoupon(e.target.value));
+                      setCouponMessage("");
+                      if (appliedCoupon) setAppliedCoupon(null);
+                    }}
+                    placeholder="CÓDIGO"
+                    disabled={couponLoading}
+                    style={styles.input}
+                  />
+                  {appliedCoupon ? (
+                    <button type="button" onClick={handleRemoveCoupon} style={styles.secondaryButton}>
+                      Remover
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading}
+                      style={styles.secondaryButton}
+                    >
+                      {couponLoading ? "Aplicando..." : "Aplicar"}
+                    </button>
+                  )}
+                </div>
+                {couponMessage && (
+                  <p style={appliedCoupon ? styles.successText : styles.mutedSmall}>{couponMessage}</p>
                 )}
               </div>
-              {loyaltyLoading ? (
-                <p style={styles.mutedSmall}>Consultando seu histórico...</p>
-              ) : loyaltyStatus ? (
-                <>
-                  <p style={styles.mutedSmall}>
-                    A cada {LOYALTY_ORDER_INTERVAL} pedidos, você ganha R${" "}
-                    {LOYALTY_DISCOUNT_VALUE.toFixed(0)} off.
-                  </p>
-                  <div style={styles.loyaltyProgressTrack}>
-                    <span
-                      style={{
-                        ...styles.loyaltyProgressFill,
-                        width: `${
-                          loyaltyStatus.eligibleNow
-                            ? 100
-                            : (loyaltyStatus.progressInCycle / LOYALTY_ORDER_INTERVAL) * 100
-                        }%`,
+
+              <div style={styles.card}>
+                <h2 style={styles.sectionTitle}>Pagamento</h2>
+                <div style={styles.methods}>
+                  {(["pix", "card"] as PaymentMethod[]).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setMethod(option);
+                        if (option === "pix") {
+                          void handlePixPayment();
+                        } else {
+                          void handleCardOrder();
+                        }
                       }}
-                    />
-                  </div>
-                  <p style={styles.loyaltyText}>
-                    {loyaltyStatus.eligibleNow
-                      ? `Parabéns! Este é seu ${loyaltyStatus.nextOrderNumber}º pedido — desconto de fidelidade aplicado.`
-                      : `Você já fez ${loyaltyStatus.paidOrderCount} pedidos. Faltam ${loyaltyStatus.ordersUntilReward} para o próximo desconto.`}
+                      disabled={!isFormValid}
+                      style={{
+                        ...styles.methodButton,
+                        ...(method === option ? styles.methodButtonActive : {}),
+                        ...(!isFormValid ? styles.methodButtonDisabled : {}),
+                      }}
+                    >
+                      <span style={styles.methodIcon}>{option === "pix" ? "◆" : "▣"}</span>
+                      <span>{option === "pix" ? "PIX" : "Cartão"}</span>
+                    </button>
+                  ))}
+                </div>
+                {!isFormValid && <p style={styles.paymentWarning}>{stepHelp}</p>}
+                {method === "pix" && (
+                  <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
+                    Clique em PIX para gerar o QR Code.
                   </p>
-                </>
+                )}
+                {method === "card" && (
+                  <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
+                    Você será redirecionado ao Mercado Pago para pagar com cartão com segurança.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
+          {checkoutStep < 3 && (
+            <div style={{ ...styles.stepNav, ...(isMobile ? styles.stepNavMobile : {}) }}>
+              {checkoutStep > 1 ? (
+                <button type="button" onClick={handleBackStep} style={styles.backStepButton}>
+                  Voltar
+                </button>
               ) : (
-                <p style={styles.mutedSmall}>Não foi possível carregar o programa de fidelidade.</p>
+                <span />
               )}
+              <button
+                type="button"
+                onClick={handleContinueStep}
+                disabled={!canContinueStep}
+                style={{
+                  ...styles.continueButton,
+                  ...(!canContinueStep ? styles.continueButtonDisabled : {}),
+                }}
+              >
+                Continuar
+              </button>
             </div>
           )}
 
-          {/* Cupom */}
-          <div style={styles.card}>
-            <div style={styles.inlineHeader}>
-              <h2 style={styles.sectionTitle}>Cupom</h2>
-              {appliedCoupon && <span style={styles.inlineMeta}>-{money(discountAmount)}</span>}
-            </div>
-            <div style={{ ...styles.couponRow, ...(isMobile ? styles.couponRowMobile : {}) }}>
-              <input
-                value={couponCode}
-                onChange={(e) => { setCouponCode(sanitizeCoupon(e.target.value)); setCouponMessage(""); if (appliedCoupon) setAppliedCoupon(null); }}
-                placeholder="CÓDIGO"
-                disabled={couponLoading}
-                style={styles.input}
-              />
-              {appliedCoupon ? (
-                <button type="button" onClick={handleRemoveCoupon} style={styles.secondaryButton}>Remover</button>
-              ) : (
-                <button type="button" onClick={handleApplyCoupon} disabled={couponLoading} style={styles.secondaryButton}>
-                  {couponLoading ? "Aplicando..." : "Aplicar"}
-                </button>
-              )}
-            </div>
-            {couponMessage && (
-              <p style={appliedCoupon ? styles.successText : styles.mutedSmall}>{couponMessage}</p>
-            )}
-          </div>
-
-          {/* Observação */}
-          <details open style={styles.compactDetails}>
-            <summary style={styles.detailsSummary}>Observação do pedido</summary>
-            <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex: sem cebolinha, enviar shoyu extra..." style={{ ...styles.textarea, ...styles.detailsContent }} />
-          </details>
-
-          {/* Pagamento */}
-          <div style={styles.card}>
-            <h2 style={styles.sectionTitle}>Pagamento</h2>
-            <div style={styles.methods}>
-              {(["pix", "card"] as PaymentMethod[]).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => {
-                    setMethod(option);
-                    if (option === "pix") {
-                      void handlePixPayment();
-                    } else {
-                      void handleCardOrder();
-                    }
-                  }}
-                  disabled={!isFormValid}
-                  style={{
-                    ...styles.methodButton,
-                    ...(method === option ? styles.methodButtonActive : {}),
-                    ...(!isFormValid ? styles.methodButtonDisabled : {}),
-                  }}
-                >
-                  <span style={styles.methodIcon}>{option === "pix" ? "◆" : "▣"}</span>
-                  <span>{option === "pix" ? "PIX" : "Cartão"}</span>
-                </button>
-              ))}
-            </div>
-            {!isFormValid && <p style={styles.paymentWarning}>{formHelp}</p>}
-            {method === "pix" && (
-              <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
-                Clique em PIX para gerar o QR Code.
-              </p>
-            )}
-            {method === "card" && (
-              <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
-                Você será redirecionado ao Mercado Pago para pagar com cartão com segurança.
-              </p>
-            )}
-          </div>
+          {checkoutStep === 3 && (
+            <button type="button" onClick={handleBackStep} style={styles.backStepButtonStandalone}>
+              Voltar para retirada
+            </button>
+          )}
 
           {error && <p style={styles.error}>{error}</p>}
         </section>
 
-        <aside style={styles.summaryColumn}>
+        <aside style={{ ...styles.summaryColumn, top: storeStatusBannerHeight + 20 }}>
           <div style={styles.summaryCard}>
             <div style={styles.cardHeader}>
               <div>
@@ -1100,4 +1210,49 @@ const styles: Record<string, CSSProperties> = {
   orderLink: { marginTop: 14, color: "#625b53", fontWeight: 800, textDecoration: "none", textAlign: "center" },
   newOrderLink: { marginTop: 10, display: "inline-flex", justifyContent: "center", color: "#fffdf8", background: "#1c1a17", borderRadius: 999, padding: "12px 16px", fontWeight: 850, textDecoration: "none" },
   primaryLink: { marginTop: 22, display: "inline-flex", background: "#1c1a17", color: "#fffdf8", textDecoration: "none", borderRadius: 999, padding: "13px 18px", fontWeight: 850 },
+  stepNav: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr",
+    gap: 10,
+    alignItems: "center",
+  },
+  stepNavMobile: {
+    gridTemplateColumns: "1fr",
+  },
+  backStepButton: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    background: "#fffdf8",
+    color: "#1c1a17",
+    padding: "13px 18px",
+    cursor: "pointer",
+    fontWeight: 850,
+    justifySelf: "start",
+  },
+  backStepButtonStandalone: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    background: "#fffdf8",
+    color: "#1c1a17",
+    padding: "13px 18px",
+    cursor: "pointer",
+    fontWeight: 850,
+    width: "fit-content",
+  },
+  continueButton: {
+    border: "none",
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "13px 18px",
+    cursor: "pointer",
+    fontWeight: 850,
+    justifySelf: "end",
+    boxShadow: "0 12px 26px rgba(28, 26, 23, 0.14)",
+  },
+  continueButtonDisabled: {
+    opacity: 0.45,
+    cursor: "not-allowed",
+    boxShadow: "none",
+  },
 };
