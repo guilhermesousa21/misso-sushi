@@ -40,6 +40,22 @@ const defaultSettings: StoreSettings = {
 
 const orderedWeekDays = [1, 2, 3, 4, 5, 6, 0];
 
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
+const formatTime24Input = (value: string) => {
+  const digits = onlyDigits(value).slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+};
+
+const isValidTime24 = (value: string) => {
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return false;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+};
+
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<StoreSettings>(defaultSettings);
   const [saving, setSaving] = useState(false);
@@ -100,6 +116,17 @@ export default function AdminSettingsPage() {
     event.preventDefault();
     setSaving(true);
     setMessage("");
+
+    const invalidDay = orderedWeekDays.find((day) => {
+      const hours = settings.business_hours[day];
+      return !isValidTime24(hours.open) || !isValidTime24(hours.close);
+    });
+
+    if (invalidDay !== undefined) {
+      setSaving(false);
+      setMessage("Revise os horários. Use o formato 00:00 até 23:59.");
+      return;
+    }
 
     const payload = {
       is_open: settings.is_open,
@@ -384,34 +411,40 @@ export default function AdminSettingsPage() {
                   <label style={styles.timeField}>
                     <span style={styles.timeLabel}>Abre</span>
                     <input
-                      type="time"
+                      type="text"
+                      inputMode="numeric"
                       value={hours.open}
                       onChange={(event) =>
                         setSettings({
                           ...settings,
                           business_hours: {
                             ...settings.business_hours,
-                            [day]: { ...hours, open: event.target.value },
+                            [day]: { ...hours, open: formatTime24Input(event.target.value) },
                           },
                         })
                       }
+                      maxLength={5}
+                      placeholder="00:00"
                       style={{ ...baseStyles.input, ...styles.timeInput }}
                     />
                   </label>
                   <label style={styles.timeField}>
                     <span style={styles.timeLabel}>Fecha</span>
                     <input
-                      type="time"
+                      type="text"
+                      inputMode="numeric"
                       value={hours.close}
                       onChange={(event) =>
                         setSettings({
                           ...settings,
                           business_hours: {
                             ...settings.business_hours,
-                            [day]: { ...hours, close: event.target.value },
+                            [day]: { ...hours, close: formatTime24Input(event.target.value) },
                           },
                         })
                       }
+                      maxLength={5}
+                      placeholder="23:59"
                       style={{ ...baseStyles.input, ...styles.timeInput }}
                     />
                   </label>
