@@ -699,8 +699,12 @@ export default function CheckoutPage() {
               <span>Complementos</span>
               <strong>{money(addonTotal)}</strong>
             </div>
-            <div style={styles.addonSummary}>
-              {selectedAddonList.map((addon) => `${addon.quantity}x ${addon.name}`).join(", ")}
+            <div style={styles.addonSummaryList}>
+              {selectedAddonList.map((addon) => (
+                <div key={addon.id} style={styles.addonSummary}>
+                  {addon.quantity}x {addon.name}
+                </div>
+              ))}
             </div>
           </>
         )}
