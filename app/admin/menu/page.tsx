@@ -95,17 +95,12 @@ export default function AdminMenuPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [dragged, setDragged] = useState<DragState | null>(null);
   const [dropTarget, setDropTarget] = useState<DragState | null>(null);
-  const [dragIntent, setDragIntent] = useState<DragState | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const pathname = usePathname();
   const canReorder = !search.trim() && !filterCategory;
   const forceExpandedCategories = Boolean(search.trim() || filterCategory);
-  const prepareDrag = (nextDragIntent: DragState) => {
-    flushSync(() => setDragIntent(nextDragIntent));
-  };
   const clearDragState = () => {
-    setDragIntent(null);
     setDragged(null);
     setDropTarget(null);
   };
@@ -268,20 +263,11 @@ export default function AdminMenuPage() {
     await persistCategoryOrder(nextCategories);
   };
 
-  const handleItemDrop = async (targetItem: MenuItem, targetCategory: string) => {
-    if (!canReorder || dragged?.type !== "item" || dragged.itemId === targetItem.id) {
-      setDragged(null);
-      setDropTarget(null);
-      return;
-    }
-
-    const draggedItem = items.find((item) => item.id === dragged.itemId);
-    if (!draggedItem) {
-      setDragged(null);
-      setDropTarget(null);
-      return;
-    }
-
+  const getItemsAfterItemDrop = (
+    draggedItem: MenuItem,
+    targetCategory: string,
+    targetItemId?: number
+  ) => {
     const orderedCategorySlugs = getOrderedCategorySlugs(items, categories);
     const categoryOrderMap = new Map(orderedCategorySlugs.map((category, index) => [category, index]));
     const grouped = items.reduce((acc, item) => {
@@ -297,7 +283,10 @@ export default function AdminMenuPage() {
     });
 
     const targetItems = grouped[targetCategory] || [];
-    const targetIndex = targetItems.findIndex((item) => item.id === targetItem.id);
+    const targetIndex =
+      typeof targetItemId === "number"
+        ? targetItems.findIndex((item) => item.id === targetItemId)
+        : -1;
     targetItems.splice(
       targetIndex === -1 ? targetItems.length : targetIndex,
       0,
@@ -310,7 +299,7 @@ export default function AdminMenuPage() {
     );
     grouped[targetCategory] = targetItems;
 
-    const nextItems = Object.entries(grouped).flatMap(([category, categoryItems]) =>
+    return Object.entries(grouped).flatMap(([category, categoryItems]) =>
       categoryItems.map((item, index) => ({
         ...item,
         category,
@@ -318,11 +307,46 @@ export default function AdminMenuPage() {
         sort_order: index,
       }))
     );
+  };
 
+  const persistDroppedItems = async (nextItems: MenuItem[]) => {
     setItems(nextItems);
-    setDragged(null);
-    setDropTarget(null);
+    clearDragState();
     await persistItemOrder(nextItems);
+  };
+
+  const handleItemDrop = async (targetItem: MenuItem, targetCategory: string) => {
+    if (!canReorder || dragged?.type !== "item" || dragged.itemId === targetItem.id) {
+      setDragged(null);
+      setDropTarget(null);
+      return;
+    }
+
+    const draggedItem = items.find((item) => item.id === dragged.itemId);
+    if (!draggedItem) {
+      setDragged(null);
+      setDropTarget(null);
+      return;
+    }
+
+    await persistDroppedItems(getItemsAfterItemDrop(draggedItem, targetCategory, targetItem.id));
+  };
+
+  const handleItemDropToCategory = async (targetCategory: string) => {
+    if (!canReorder || dragged?.type !== "item") {
+      setDragged(null);
+      setDropTarget(null);
+      return;
+    }
+
+    const draggedItem = items.find((item) => item.id === dragged.itemId);
+    if (!draggedItem) {
+      setDragged(null);
+      setDropTarget(null);
+      return;
+    }
+
+    await persistDroppedItems(getItemsAfterItemDrop(draggedItem, targetCategory));
   };
 
   const filteredItems = items.filter(
@@ -504,7 +528,13 @@ export default function AdminMenuPage() {
                   canReorder && setDropTarget({ type: "category", category })
                 }
                 onDragOver={(event) => canReorder && event.preventDefault()}
-                onDrop={() => handleCategoryDrop(category)}
+                onDrop={() => {
+                  if (dragged?.type === "item") {
+                    void handleItemDropToCategory(category);
+                    return;
+                  }
+                  void handleCategoryDrop(category);
+                }}
                   style={{
                     ...styles.categoryCard,
                     ...(isMobile ? styles.categoryCardMobile : {}),
@@ -627,17 +657,13 @@ export default function AdminMenuPage() {
                       key={item.id}
                       draggable={canReorder}
                       onDragStart={(event) => {
-                        if (
-                          !canReorder ||
-                          dragIntent?.type !== "item" ||
-                          dragIntent.itemId !== item.id
-                        ) {
+                        if (!canReorder) {
                           event.preventDefault();
                           return;
                         }
                         event.dataTransfer.effectAllowed = "move";
                         event.stopPropagation();
-                        setDragged(dragIntent);
+                        setDragged({ type: "item", itemId: item.id });
                       }}
                       onDragEnd={clearDragState}
                       onDragEnter={(event) => {
@@ -680,13 +706,6 @@ export default function AdminMenuPage() {
                     >
                       <div style={{ ...styles.itemMain, ...(isMobile ? styles.itemMainMobile : {}) }}>
                         <span
-                          onPointerDown={() => {
-                            if (!canReorder) return;
-                            prepareDrag({ type: "item", itemId: item.id });
-                          }}
-                          onPointerUp={() => {
-                            if (!dragged) setDragIntent(null);
-                          }}
                           style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}
                         >
                           ::
