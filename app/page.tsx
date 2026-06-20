@@ -676,12 +676,8 @@ export default function Page() {
             </div>
 
             <div style={styles.cartFooter}>
-              <div style={styles.cartSubtotalRow}>
-                <span>Subtotal</span>
-                <strong>{money(total)}</strong>
-              </div>
-              <div style={styles.totalRow}>
-                <span>Total</span>
+              <div style={styles.cartFooterTotal}>
+                <span>Total do pedido</span>
                 <strong>{money(total)}</strong>
               </div>
               <button
@@ -693,8 +689,11 @@ export default function Page() {
                   ...(cart.length === 0 || !storeOpen ? styles.checkoutButtonDisabled : {}),
                 }}
               >
-                Finalizar pedido
+                Ir para pagamento · {money(total)}
               </button>
+              {!storeOpen && cart.length > 0 && (
+                <p style={styles.cartClosedNote}>Pedidos pausados no momento. Veja o horário no topo da página.</p>
+              )}
             </div>
           </aside>
         </div>
@@ -1278,24 +1277,20 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
   },
   cartFooter: {
-    padding: 20,
+    position: "sticky",
+    bottom: 0,
+    padding: "16px 20px calc(16px + env(safe-area-inset-bottom, 0px))",
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
     background: "#fffdf8",
+    boxShadow: "0 -12px 28px rgba(28, 26, 23, 0.08)",
   },
-  cartSubtotalRow: {
+  cartFooterTotal: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 12,
+    fontSize: 15,
     color: "#625b53",
-    fontSize: 14,
-  },
-  totalRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-    fontSize: 18,
   },
   checkoutButton: {
     width: "100%",
@@ -1303,14 +1298,24 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 999,
     background: "#9f1d2f",
     color: "#fff",
-    padding: 15,
+    padding: "16px 18px",
     cursor: "pointer",
     fontWeight: 850,
     fontSize: 16,
+    boxShadow: "0 14px 28px rgba(159, 29, 47, 0.22)",
   },
   checkoutButtonDisabled: {
     opacity: 0.45,
     cursor: "not-allowed",
+    boxShadow: "none",
+  },
+  cartClosedNote: {
+    marginTop: 10,
+    color: "#991b1b",
+    fontSize: 12,
+    fontWeight: 800,
+    lineHeight: 1.4,
+    textAlign: "center",
   },
   emptySearch: {
     borderRadius: 8,

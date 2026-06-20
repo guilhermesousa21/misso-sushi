@@ -784,18 +784,21 @@ export default function CheckoutPage() {
                   <span style={styles.inlineMeta}>Tempo médio: {averageTime}</span>
                 </div>
                 <p style={styles.mutedSmall}>
-                  Seu pedido entra na fila de preparo imediatamente após o pagamento.
+                  Por padrão, seu pedido entra na fila de preparo assim que o pagamento for confirmado.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setWantsScheduledPickup((current) => !current)}
-                  style={{
-                    ...styles.scheduleToggle,
-                    ...(wantsScheduledPickup ? styles.scheduleToggleActive : {}),
-                  }}
-                >
-                  {wantsScheduledPickup ? "Retirada imediata" : "Agendar retirada"}
-                </button>
+                <div style={styles.defaultPickupBox}>
+                  <strong>Retirada o quanto antes</strong>
+                  <span>Previsão: {averageTime} após confirmação do pagamento</span>
+                </div>
+                <label style={styles.scheduleCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={wantsScheduledPickup}
+                    onChange={(event) => setWantsScheduledPickup(event.target.checked)}
+                    style={styles.checkboxInput}
+                  />
+                  <span>Quero agendar horário</span>
+                </label>
                 {wantsScheduledPickup && (
                   <label style={{ ...styles.field, marginTop: 14 }}>
                     <span style={styles.label}>Horário de retirada</span>
@@ -1110,22 +1113,31 @@ const styles: Record<string, CSSProperties> = {
   formHelpOk: { color: "#0f7a4a" },
   operationalInfoGrid: { marginTop: 12, display: "flex", justifyContent: "space-between", gap: 12, borderRadius: 8, background: "#f0ebe2", color: "#514a43", padding: "12px 14px", fontWeight: 850 },
   scheduleChoice: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 },
-  scheduleToggle: {
-    marginTop: 12,
-    width: "100%",
-    border: "1px solid rgba(28, 26, 23, 0.12)",
+  defaultPickupBox: {
+    marginTop: 14,
+    display: "grid",
+    gap: 4,
     borderRadius: 8,
-    background: "#fff",
+    background: "#f0ebe2",
     color: "#1c1a17",
     padding: "12px 14px",
+    fontSize: 14,
+    lineHeight: 1.4,
+  },
+  scheduleCheckbox: {
+    marginTop: 14,
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
     cursor: "pointer",
     fontWeight: 850,
-    textAlign: "left",
+    color: "#1c1a17",
   },
-  scheduleToggleActive: {
-    background: "#1c1a17",
-    borderColor: "#1c1a17",
-    color: "#fffdf8",
+  checkboxInput: {
+    width: 18,
+    height: 18,
+    accentColor: "#9f1d2f",
+    cursor: "pointer",
   },
   fulfillmentButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 12, color: "#1c1a17", cursor: "pointer", fontWeight: 850 },
   fulfillmentButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },

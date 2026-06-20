@@ -29,8 +29,9 @@ export function StoreStatusBanner({
   }
 
   const nextOpening = getNextOpeningLabel(new Date(), businessHours);
+  const nextOpeningLabel = nextOpening.charAt(0).toUpperCase() + nextOpening.slice(1);
   const reason = !manualOpen
-    ? "A loja pausou os pedidos online no momento."
+    ? "Pedidos online pausados no momento."
     : "Estamos fora do horário de funcionamento.";
 
   return (
@@ -40,9 +41,8 @@ export function StoreStatusBanner({
       </span>
       <div style={styles.bannerText}>
         <strong>Pedidos indisponíveis agora</strong>
-        <span>
-          {reason} {nextOpening.charAt(0).toUpperCase() + nextOpening.slice(1)}.
-        </span>
+        <span style={styles.nextOpening}>{nextOpeningLabel}</span>
+        <span style={styles.closedReason}>{reason}</span>
       </div>
     </div>
   );
@@ -106,5 +106,14 @@ const styles: Record<string, CSSProperties> = {
     gap: 2,
     fontSize: 13,
     lineHeight: 1.35,
+  },
+  nextOpening: {
+    fontSize: 15,
+    fontWeight: 900,
+    lineHeight: 1.25,
+  },
+  closedReason: {
+    opacity: 0.88,
+    fontSize: 12,
   },
 };
