@@ -90,7 +90,9 @@ export const formatPickupTime = (value?: string | null) => {
   });
 };
 
-export const formatAddonSummary = (addons?: OrderAddon[] | null) =>
+export const formatAddonSummary = (
+  addons?: { id?: string; name: string; quantity?: number | null }[] | null
+) =>
   (addons || [])
     .filter((addon) => Number(addon.quantity || 0) > 0)
     .map((addon) => `${addon.quantity}x ${addon.name}`)

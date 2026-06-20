@@ -169,14 +169,13 @@ export default function CheckoutPage() {
       setManualOpen(manuallyOpen);
       setAverageTime(data?.average_time || "35 a 50 min");
       setStoreOpen(data ? manuallyOpen : isWithinBusinessHours(new Date(), savedBusinessHours));
+      const [firstSlot] = buildPickupSlots(data as OperationalSettings | null);
+      if (firstSlot) {
+        setScheduledFor((current) => current || toLocalInputValue(firstSlot));
+      }
     }
     fetchStoreStatus();
   }, []);
-
-  useEffect(() => {
-    if (scheduledFor || pickupSlots.length === 0) return;
-    setScheduledFor(toLocalInputValue(pickupSlots[0]));
-  }, [pickupSlots, scheduledFor]);
 
   useEffect(() => {
     async function fetchScheduledCounts() {

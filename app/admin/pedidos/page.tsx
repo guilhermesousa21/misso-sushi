@@ -69,7 +69,11 @@ const formatBrasiliaDateTime = (value: string) =>
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : new URLSearchParams(window.location.search).get("cliente") || ""
+  );
   const [dateRange, setDateRange] = useState<DateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -78,8 +82,6 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     let mounted = true;
-    const customerFromQuery = new URLSearchParams(window.location.search).get("cliente");
-    if (customerFromQuery) setSearch(customerFromQuery);
 
     async function fetchOrders() {
       const { data } = await supabase

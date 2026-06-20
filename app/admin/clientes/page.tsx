@@ -16,15 +16,6 @@ import {
   type AdminOrder,
 } from "../AdminShell";
 
-type Customer = {
-  phone: string;
-  name: string;
-  orders: AdminOrder[];
-  total: number;
-  favoriteItem: string;
-  lastOrder: AdminOrder;
-};
-
 export default function AdminCustomersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);

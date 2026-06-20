@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "../../../../lib/supabase";
+import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin";
 
 type Promotion = {
   id: number;
@@ -25,6 +25,7 @@ const calculateDiscount = (promotion: Promotion, subtotal: number) => {
 export async function POST(request: Request) {
   const { code, subtotal } = await request.json();
   const orderSubtotal = Number(subtotal) || 0;
+  const supabase = getSupabaseAdmin();
 
   if (!code || typeof code !== "string") {
     return NextResponse.json({ error: "Código inválido." }, { status: 400 });
