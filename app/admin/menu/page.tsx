@@ -823,7 +823,7 @@ export default function AdminMenuPage() {
           })}
         </section>
 
-        <section style={{ ...baseStyles.card, ...(isMobile ? styles.addonsCardMobile : {}) }}>
+        <section style={{ ...baseStyles.card, ...styles.addonsCard, ...(isMobile ? styles.addonsCardMobile : {}) }}>
           <div style={styles.addonsHeader}>
             <div>
               <p style={baseStyles.cardEyebrow}>Checkout</p>
