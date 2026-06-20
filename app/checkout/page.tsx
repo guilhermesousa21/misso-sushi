@@ -42,6 +42,7 @@ import {
   StoreStatusBanner,
   storeStatusBannerHeight,
 } from "../components/StoreStatusBanner";
+import { CheckoutFormSkeleton } from "../components/CheckoutFormSkeleton";
 
 type PaymentMethod = "pix" | "card";
 
@@ -641,15 +642,7 @@ export default function CheckoutPage() {
 
   // ── Carregando / vazio ───────────────────────────────────────────────────────
   if (!cartLoaded) {
-    return (
-      <main style={styles.page}>
-        <section style={styles.emptyState}>
-          <p style={styles.eyebrow}>Checkout</p>
-          <h1 style={styles.title}>Carregando pedido</h1>
-          <p style={styles.muted}>Estamos recuperando os itens do seu carrinho.</p>
-        </section>
-      </main>
-    );
+    return <CheckoutFormSkeleton isMobile={isMobile} />;
   }
 
   if (cart.length === 0) {
@@ -940,14 +933,7 @@ export default function CheckoutPage() {
                     <button
                       key={option}
                       type="button"
-                      onClick={() => {
-                        setMethod(option);
-                        if (option === "pix") {
-                          void handlePixPayment();
-                        } else {
-                          void handleCardOrder();
-                        }
-                      }}
+                      onClick={() => setMethod(option)}
                       disabled={!isFormValid}
                       style={{
                         ...styles.methodButton,
@@ -961,15 +947,27 @@ export default function CheckoutPage() {
                   ))}
                 </div>
                 {!isFormValid && <p style={styles.paymentWarning}>{stepHelp}</p>}
-                {method === "pix" && (
-                  <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
-                    Clique em PIX para gerar o QR Code.
-                  </p>
-                )}
-                {method === "card" && (
-                  <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
-                    Você será redirecionado ao Mercado Pago para pagar com cartão com segurança.
-                  </p>
+                {isFormValid && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (method === "pix") {
+                          void handlePixPayment();
+                        } else {
+                          void handleCardOrder();
+                        }
+                      }}
+                      style={styles.payButton}
+                    >
+                      Pagar {money(finalTotal)}
+                    </button>
+                    <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
+                      {method === "pix"
+                        ? "Confirme o pagamento para gerar o QR Code PIX."
+                        : "Confirme para ir ao Mercado Pago e pagar com cartão."}
+                    </p>
+                  </>
                 )}
               </div>
             </>
@@ -1151,6 +1149,19 @@ const styles: Record<string, CSSProperties> = {
   methodButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
   methodButtonDisabled: { opacity: 0.45, cursor: "not-allowed" },
   methodIcon: { fontSize: 15, lineHeight: 1 },
+  payButton: {
+    width: "100%",
+    marginTop: 16,
+    border: "none",
+    borderRadius: 999,
+    background: "#9f1d2f",
+    color: "#fffdf8",
+    padding: "15px 18px",
+    cursor: "pointer",
+    fontWeight: 850,
+    fontSize: 16,
+    boxShadow: "0 14px 28px rgba(159, 29, 47, 0.22)",
+  },
   paymentWarning: { marginTop: 12, borderRadius: 8, background: "#fff1f1", color: "#991b1b", padding: 12, fontSize: 13, fontWeight: 850, lineHeight: 1.4 },
   orderList: { display: "grid", gap: 13 },
   orderRow: { display: "flex", justifyContent: "space-between", gap: 18, paddingBottom: 13, borderBottom: "1px solid rgba(28, 26, 23, 0.08)" },

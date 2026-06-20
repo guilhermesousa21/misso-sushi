@@ -29,6 +29,7 @@ import {
   StoreStatusBanner,
   storeStatusBannerHeight,
 } from "./components/StoreStatusBanner";
+import { MenuPageSkeleton } from "./components/MenuPageSkeleton";
 
 type CartLine = CartItem;
 
@@ -60,6 +61,7 @@ export default function Page() {
   const [averageTime, setAverageTime] = useState("35 a 50 min");
   const [topItems, setTopItems] = useState<Record<number, number>>({});
   const [menuError, setMenuError] = useState("");
+  const [menuLoading, setMenuLoading] = useState(true);
 
   useEffect(() => {
     async function fetchMenuData() {
@@ -67,33 +69,38 @@ export default function Page() {
         setMenuError(
           "Supabase não configurado neste ambiente. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY para carregar o cardápio."
         );
+        setMenuLoading(false);
         return;
       }
 
-      const [{ data: menuData, error: menuError }, { data: categoryData }] =
-        await Promise.all([
-          supabase
-            .from("menu")
-            .select("*")
-            .order("category", { ascending: true })
-            .order("name", { ascending: true }),
-          supabase
-            .from("menu_categories")
-            .select("*")
-            .order("sort_order", { ascending: true }),
-        ]);
+      try {
+        const [{ data: menuData, error: menuError }, { data: categoryData }] =
+          await Promise.all([
+            supabase
+              .from("menu")
+              .select("*")
+              .order("category", { ascending: true })
+              .order("name", { ascending: true }),
+            supabase
+              .from("menu_categories")
+              .select("*")
+              .order("sort_order", { ascending: true }),
+          ]);
 
-      if (categoryData?.length) {
-        setCategories(sortCategories(categoryData as MenuCategory[]));
+        if (categoryData?.length) {
+          setCategories(sortCategories(categoryData as MenuCategory[]));
+        }
+
+        if (menuError) {
+          setMenuError(`Não foi possível carregar o cardápio: ${menuError.message}`);
+          return;
+        }
+
+        setMenuError("");
+        if (menuData) setItems(menuData as MenuItem[]);
+      } finally {
+        setMenuLoading(false);
       }
-
-      if (menuError) {
-        setMenuError(`Não foi possível carregar o cardápio: ${menuError.message}`);
-        return;
-      }
-
-      setMenuError("");
-      if (menuData) setItems(menuData as MenuItem[]);
     }
 
     fetchMenuData();
@@ -322,6 +329,12 @@ export default function Page() {
         </div>
       </section>
 
+      {menuLoading && !menuError ? (
+        <div style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
+          <MenuPageSkeleton isMobile={isMobile} />
+        </div>
+      ) : (
+        <>
       <nav style={styles.categoryNav} aria-label="Categorias do cardápio">
         <div style={styles.searchRow}>
           <label style={styles.searchBox}>
@@ -580,6 +593,8 @@ export default function Page() {
           );
         })}
       </div>
+        </>
+      )}
 
       {itemCount > 0 && (
         <button
