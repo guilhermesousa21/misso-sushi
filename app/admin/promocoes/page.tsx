@@ -33,6 +33,58 @@ const emptyPromotion: Promotion = {
   active: true,
 };
 
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
+const formatBrazilianDateInput = (value: string) => {
+  const digits = onlyDigits(value).slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+const getDateTimeParts = (value?: string | null) => {
+  if (!value) return { date: "", time: "" };
+
+  const localMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/);
+  if (localMatch) {
+    return {
+      date: `${localMatch[3]}/${localMatch[2]}/${localMatch[1]}`,
+      time: localMatch[4],
+    };
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { date: "", time: "" };
+
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(date);
+
+  return {
+    date: `${parts.find((part) => part.type === "day")?.value || ""}/${
+      parts.find((part) => part.type === "month")?.value || ""
+    }/${parts.find((part) => part.type === "year")?.value || ""}`,
+    time: `${parts.find((part) => part.type === "hour")?.value || "00"}:${
+      parts.find((part) => part.type === "minute")?.value || "00"
+    }`,
+  };
+};
+
+const toDateTimeValue = (dateValue: string, timeValue: string) => {
+  const digits = onlyDigits(dateValue);
+  if (digits.length !== 8 || !timeValue) return "";
+
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+  return `${year}-${month}-${day}T${timeValue}`;
+};
+
 export default function AdminPromotionsPage() {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [form, setForm] = useState<Promotion>(emptyPromotion);
@@ -291,24 +343,18 @@ export default function AdminPromotionsPage() {
             </div>
 
             <div style={localStyles.dateGrid}>
-              <label style={localStyles.field}>
-                <span style={localStyles.label}>Início</span>
-                <input
-                  type="datetime-local"
-                  value={form.starts_at || ""}
-                  onChange={(event) => setForm({ ...form, starts_at: event.target.value })}
-                  style={styles.input}
-                />
-              </label>
-              <label style={localStyles.field}>
-                <span style={localStyles.label}>Expira em</span>
-                <input
-                  type="datetime-local"
-                  value={form.expires_at || ""}
-                  onChange={(event) => setForm({ ...form, expires_at: event.target.value })}
-                  style={styles.input}
-                />
-              </label>
+              <PromotionDateTimeField
+                label="Início"
+                value={form.starts_at}
+                labelStyle={localStyles.label}
+                onChange={(value) => setForm({ ...form, starts_at: value })}
+              />
+              <PromotionDateTimeField
+                label="Expira em"
+                value={form.expires_at}
+                labelStyle={localStyles.label}
+                onChange={(value) => setForm({ ...form, expires_at: value })}
+              />
             </div>
 
           </div>
@@ -433,6 +479,72 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
+  );
+}
+
+function PromotionDateTimeField({
+  label,
+  value,
+  labelStyle,
+  onChange,
+}: {
+  label: string;
+  value?: string | null;
+  labelStyle: CSSProperties;
+  onChange: (value: string) => void;
+}) {
+  const parts = getDateTimeParts(value);
+  const [dateValue, setDateValue] = useState(parts.date);
+  const [timeValue, setTimeValue] = useState(parts.time);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const nextParts = getDateTimeParts(value);
+      setDateValue(nextParts.date);
+      setTimeValue(nextParts.time);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [value]);
+
+  const updateDateTime = (nextDate: string, nextTime: string) => {
+    if (!nextDate && !nextTime) {
+      onChange("");
+      return;
+    }
+
+    const nextValue = toDateTimeValue(nextDate, nextTime);
+    if (nextValue) onChange(nextValue);
+  };
+
+  return (
+    <label style={localStyles.field}>
+      <span style={labelStyle}>{label}</span>
+      <div style={localStyles.brazilianDateGrid}>
+        <input
+          inputMode="numeric"
+          value={dateValue}
+          onChange={(event) => {
+            const nextDate = formatBrazilianDateInput(event.target.value);
+            setDateValue(nextDate);
+            updateDateTime(nextDate, timeValue);
+          }}
+          placeholder="dd/mm/aaaa"
+          maxLength={10}
+          style={styles.input}
+        />
+        <input
+          type="time"
+          value={timeValue}
+          onChange={(event) => {
+            const nextTime = event.target.value;
+            setTimeValue(nextTime);
+            updateDateTime(dateValue, nextTime);
+          }}
+          aria-label={`${label} - hora`}
+          style={styles.input}
+        />
+      </div>
+    </label>
   );
 }
 
@@ -561,31 +673,25 @@ function PromotionEditModal({
             </label>
           </div>
           <div style={localStyles.dateGrid}>
-            <label style={localStyles.field}>
-              <span style={localStyles.modalLabel}>Início</span>
-              <input
-                type="datetime-local"
-                value={form.starts_at || ""}
-                onChange={(event) => {
-                  setConfirmDelete(false);
-                  setForm({ ...form, starts_at: event.target.value });
-                }}
-                style={styles.input}
-              />
-            </label>
+            <PromotionDateTimeField
+              label="Início"
+              value={form.starts_at}
+              labelStyle={localStyles.modalLabel}
+              onChange={(value) => {
+                setConfirmDelete(false);
+                setForm({ ...form, starts_at: value });
+              }}
+            />
 
-            <label style={localStyles.field}>
-              <span style={localStyles.modalLabel}>Expira em</span>
-              <input
-                type="datetime-local"
-                value={form.expires_at || ""}
-                onChange={(event) => {
-                  setConfirmDelete(false);
-                  setForm({ ...form, expires_at: event.target.value });
-                }}
-                style={styles.input}
-              />
-            </label>
+            <PromotionDateTimeField
+              label="Expira em"
+              value={form.expires_at}
+              labelStyle={localStyles.modalLabel}
+              onChange={(value) => {
+                setConfirmDelete(false);
+                setForm({ ...form, expires_at: value });
+              }}
+            />
           </div>
         </div>
 
@@ -714,6 +820,12 @@ const localStyles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "1fr",
     gap: 10,
+    minWidth: 0,
+  },
+  brazilianDateGrid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) 112px",
+    gap: 8,
     minWidth: 0,
   },
   preview: {
