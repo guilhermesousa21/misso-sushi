@@ -337,11 +337,6 @@ export default function AdminMenuPage() {
     acc[item.category] = (acc[item.category] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-  const activeItemCount = items.filter(
-    (item) => item.active !== false && item.availability_status !== "inativo"
-  ).length;
-  const pausedItemCount = items.length - activeItemCount;
-
   const toggleItemActive = async (item: MenuItem) => {
     const nextActive = item.active === false || item.availability_status === "inativo";
     const payload = {
@@ -478,25 +473,6 @@ export default function AdminMenuPage() {
           <p style={styles.noticeStrong}>Solte no novo lugar para salvar a ordem.</p>
         )}
         {savingOrder && <p style={styles.noticeStrong}>Ordem alterada. Salvando...</p>}
-
-        <section style={{ ...styles.menuOverview, ...(isMobile ? styles.menuOverviewMobile : {}) }}>
-          <div style={styles.menuMetric}>
-            <span>Total de itens</span>
-            <strong>{items.length}</strong>
-          </div>
-          <div style={styles.menuMetric}>
-            <span>Ativos</span>
-            <strong>{activeItemCount}</strong>
-          </div>
-          <div style={styles.menuMetric}>
-            <span>Pausados</span>
-            <strong>{pausedItemCount}</strong>
-          </div>
-          <div style={styles.menuMetric}>
-            <span>Categorias</span>
-            <strong>{categoryOptions.length}</strong>
-          </div>
-        </section>
 
         <section style={{ ...styles.categoryList, ...(isMobile ? styles.categoryListMobile : {}) }}>
           {orderedCategories.map((category) => {
@@ -1689,26 +1665,6 @@ const styles: Record<string, CSSProperties> = {
   fullWidthMobile: {
     gridColumn: "1 / -1",
     width: "100%",
-  },
-  menuOverview: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: 10,
-    marginBottom: 12,
-  },
-  menuOverviewMobile: {
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 8,
-  },
-  menuMetric: {
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
-    background: "#fffdf8",
-    padding: 12,
-    display: "grid",
-    gap: 5,
-    boxShadow: "0 10px 24px rgba(28, 26, 23, 0.04)",
-    minHeight: 78,
   },
   categoryList: {
     display: "grid",
