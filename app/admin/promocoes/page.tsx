@@ -290,7 +290,7 @@ export default function AdminPromotionsPage() {
               </label>
             </div>
 
-            <div style={{ ...localStyles.discountGrid, ...(isMobile ? localStyles.discountGridStack : {}) }}>
+            <div style={localStyles.dateGrid}>
               <label style={localStyles.field}>
                 <span style={localStyles.label}>Início</span>
                 <input
@@ -560,7 +560,7 @@ function PromotionEditModal({
               />
             </label>
           </div>
-          <div style={localStyles.discountGrid}>
+          <div style={localStyles.dateGrid}>
             <label style={localStyles.field}>
               <span style={localStyles.modalLabel}>Início</span>
               <input
@@ -709,6 +709,12 @@ const localStyles: Record<string, CSSProperties> = {
   },
   discountGridStack: {
     gridTemplateColumns: "1fr",
+  },
+  dateGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 10,
+    minWidth: 0,
   },
   preview: {
     borderRadius: 8,

@@ -173,6 +173,7 @@ export const adminStyles: Record<string, CSSProperties> = {
   input: {
     boxSizing: "border-box",
     width: "100%",
+    minWidth: 0,
     border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 8,
     padding: 12,
@@ -183,6 +184,7 @@ export const adminStyles: Record<string, CSSProperties> = {
   select: {
     boxSizing: "border-box",
     width: "100%",
+    minWidth: 0,
     border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 8,
     padding: 12,
