@@ -12,6 +12,11 @@ type Promotion = {
   description: string;
   discount_type: "percent" | "fixed";
   discount_value: number;
+  min_order_value?: number | null;
+  usage_limit?: number | null;
+  used_count?: number | null;
+  starts_at?: string | null;
+  expires_at?: string | null;
   active: boolean;
 };
 
@@ -20,6 +25,11 @@ const emptyPromotion: Promotion = {
   description: "",
   discount_type: "percent",
   discount_value: 10,
+  min_order_value: 0,
+  usage_limit: null,
+  used_count: 0,
+  starts_at: "",
+  expires_at: "",
   active: true,
 };
 
@@ -78,6 +88,10 @@ export default function AdminPromotionsPage() {
       description: form.description.trim(),
       discount_type: form.discount_type,
       discount_value: Number(form.discount_value || 0),
+      min_order_value: Number(form.min_order_value || 0),
+      usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
+      starts_at: form.starts_at || null,
+      expires_at: form.expires_at || null,
       active: form.active,
     };
 
@@ -111,6 +125,10 @@ export default function AdminPromotionsPage() {
       description: updatedPromotion.description.trim(),
       discount_type: updatedPromotion.discount_type,
       discount_value: Number(updatedPromotion.discount_value || 0),
+      min_order_value: Number(updatedPromotion.min_order_value || 0),
+      usage_limit: updatedPromotion.usage_limit ? Number(updatedPromotion.usage_limit) : null,
+      starts_at: updatedPromotion.starts_at || null,
+      expires_at: updatedPromotion.expires_at || null,
       active: updatedPromotion.active,
     };
 
@@ -240,6 +258,59 @@ export default function AdminPromotionsPage() {
               </label>
             </div>
 
+            <div style={{ ...localStyles.discountGrid, ...(isMobile ? localStyles.discountGridStack : {}) }}>
+              <label style={localStyles.field}>
+                <span style={localStyles.label}>Pedido mínimo</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.min_order_value || 0}
+                  onChange={(event) =>
+                    setForm({ ...form, min_order_value: Number(event.target.value) })
+                  }
+                  style={styles.input}
+                />
+              </label>
+              <label style={localStyles.field}>
+                <span style={localStyles.label}>Limite de usos</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.usage_limit ?? ""}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      usage_limit: event.target.value ? Number(event.target.value) : null,
+                    })
+                  }
+                  placeholder="Ilimitado"
+                  style={styles.input}
+                />
+              </label>
+            </div>
+
+            <div style={{ ...localStyles.discountGrid, ...(isMobile ? localStyles.discountGridStack : {}) }}>
+              <label style={localStyles.field}>
+                <span style={localStyles.label}>Início</span>
+                <input
+                  type="datetime-local"
+                  value={form.starts_at || ""}
+                  onChange={(event) => setForm({ ...form, starts_at: event.target.value })}
+                  style={styles.input}
+                />
+              </label>
+              <label style={localStyles.field}>
+                <span style={localStyles.label}>Expira em</span>
+                <input
+                  type="datetime-local"
+                  value={form.expires_at || ""}
+                  onChange={(event) => setForm({ ...form, expires_at: event.target.value })}
+                  style={styles.input}
+                />
+              </label>
+            </div>
+
           </div>
 
           <div style={localStyles.preview}>
@@ -302,6 +373,12 @@ export default function AdminPromotionsPage() {
                       {promotion.description || "Sem descrição"}
                     </p>
                     <strong style={localStyles.discountValue}>{discount} de desconto</strong>
+                    <p style={localStyles.couponDescription}>
+                      Mínimo: {Number(promotion.min_order_value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      {" | "}
+                      Usos: {Number(promotion.used_count || 0)}
+                      {promotion.usage_limit ? `/${promotion.usage_limit}` : " / ilimitado"}
+                    </p>
                   </div>
                   <div style={{ ...localStyles.couponActions, ...(isMobile ? localStyles.couponActionsMobile : {}) }}>
                     <button
@@ -444,6 +521,67 @@ function PromotionEditModal({
                 onChange={(event) => {
                   setConfirmDelete(false);
                   setForm({ ...form, discount_value: Number(event.target.value) });
+                }}
+                style={styles.input}
+              />
+            </label>
+          </div>
+          <div style={localStyles.discountGrid}>
+            <label style={localStyles.field}>
+              <span style={localStyles.modalLabel}>Pedido mínimo</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.min_order_value || 0}
+                onChange={(event) => {
+                  setConfirmDelete(false);
+                  setForm({ ...form, min_order_value: Number(event.target.value) });
+                }}
+                style={styles.input}
+              />
+            </label>
+
+            <label style={localStyles.field}>
+              <span style={localStyles.modalLabel}>Limite de usos</span>
+              <input
+                type="number"
+                min="0"
+                value={form.usage_limit ?? ""}
+                onChange={(event) => {
+                  setConfirmDelete(false);
+                  setForm({
+                    ...form,
+                    usage_limit: event.target.value ? Number(event.target.value) : null,
+                  });
+                }}
+                placeholder="Ilimitado"
+                style={styles.input}
+              />
+            </label>
+          </div>
+          <div style={localStyles.discountGrid}>
+            <label style={localStyles.field}>
+              <span style={localStyles.modalLabel}>Início</span>
+              <input
+                type="datetime-local"
+                value={form.starts_at || ""}
+                onChange={(event) => {
+                  setConfirmDelete(false);
+                  setForm({ ...form, starts_at: event.target.value });
+                }}
+                style={styles.input}
+              />
+            </label>
+
+            <label style={localStyles.field}>
+              <span style={localStyles.modalLabel}>Expira em</span>
+              <input
+                type="datetime-local"
+                value={form.expires_at || ""}
+                onChange={(event) => {
+                  setConfirmDelete(false);
+                  setForm({ ...form, expires_at: event.target.value });
                 }}
                 style={styles.input}
               />

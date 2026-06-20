@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { PrintableOrder } from "../../../../lib/printOrder";
+import { formatAddonSummary, getOrderPickupLabel } from "../../../../lib/orderFeatures";
 
 const money = (value: number) =>
   value.toLocaleString("pt-BR", {
@@ -28,10 +29,11 @@ const buildOrderMessage = (order: PrintableOrder) => {
     "",
     `Cliente: ${order.name || "Cliente"}`,
     `Telefone: ${order.phone || "Não informado"}`,
-    "Retirada: Balcão",
+    `Retirada: ${getOrderPickupLabel(order)}`,
     "",
     "Itens:",
     items || "Nenhum item salvo.",
+    order.addons?.length ? `\nComplementos: ${formatAddonSummary(order.addons)}` : "",
     order.note ? `\nObs: ${order.note}` : "",
     "",
     `Pagamento: ${
@@ -41,6 +43,9 @@ const buildOrderMessage = (order: PrintableOrder) => {
     }`,
     order.coupon_code
       ? `Cupom: ${order.coupon_code} (-${money(Number(order.discount_amount || 0))})`
+      : "",
+    Number(order.service_fee || 0) > 0
+      ? `${order.service_fee_label || "Taxa de embalagem"}: ${money(Number(order.service_fee || 0))}`
       : "",
     `Total: ${money(getTotal(order))}`,
   ]

@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { printOrder } from "../../../lib/printOrder";
+import { formatAddonSummary, getOrderPickupLabel } from "../../../lib/orderFeatures";
 import { supabase } from "../../../lib/supabase";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
 import {
@@ -77,6 +78,8 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     let mounted = true;
+    const customerFromQuery = new URLSearchParams(window.location.search).get("cliente");
+    if (customerFromQuery) setSearch(customerFromQuery);
 
     async function fetchOrders() {
       const { data } = await supabase
@@ -253,6 +256,7 @@ export default function AdminOrdersPage() {
                   {order.name || "Cliente"} - {order.phone || "Sem telefone"}
                 </p>
                 <p style={styles.mutedSmall}>{formatBrasiliaDateTime(order.created_at)}</p>
+                <p style={styles.mutedSmall}>Retirada: {getOrderPickupLabel(order)}</p>
               </div>
               <strong style={localStyles.orderTotal}>{money(calcTotal(order))}</strong>
             </div>
@@ -271,6 +275,16 @@ export default function AdminOrdersPage() {
             <div style={order.note?.trim() ? localStyles.noteBox : localStyles.noteBoxEmpty}>
               <strong>Observação do cliente</strong>
               <p>{order.note?.trim() || "Sem observação."}</p>
+            </div>
+
+            <div style={localStyles.noteBox}>
+              <strong>Operação</strong>
+              <p>
+                Complementos: {formatAddonSummary(order.addons) || "Nenhum"}
+                {Number(order.service_fee || 0) > 0
+                  ? ` | ${order.service_fee_label || "Taxa"}: ${money(Number(order.service_fee || 0))}`
+                  : ""}
+              </p>
             </div>
 
             <div style={{ ...localStyles.actionsBar, ...(isMobile ? localStyles.actionsBarMobile : {}) }}>

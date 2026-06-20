@@ -264,8 +264,8 @@ export default function FaturamentoPage() {
       totalDiscount,
       topItems: Array.from(topItems.entries())
         .map(([name, value]) => ({ name, ...value }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5),
+        .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+        .slice(0, 10),
       totalRevenue,
     };
   }, [filteredOrders]);

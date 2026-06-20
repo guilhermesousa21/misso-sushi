@@ -5,6 +5,12 @@ type PrintableItem = {
   quantity?: number;
 };
 
+type PrintableAddon = {
+  id?: string;
+  name: string;
+  quantity?: number;
+};
+
 export type PrintableOrder = {
   id: number | string;
   name?: string | null;
@@ -15,6 +21,11 @@ export type PrintableOrder = {
   subtotal?: number | null;
   discount_amount?: number | null;
   coupon_code?: string | null;
+  service_fee?: number | null;
+  service_fee_label?: string | null;
+  fulfillment_type?: string | null;
+  scheduled_for?: string | null;
+  addons?: PrintableAddon[] | null;
   status?: string | null;
   created_at?: string | null;
   payment_method?: string | null;
@@ -57,6 +68,11 @@ const formatDateTime = (value?: string | null) =>
       })
     : new Date().toLocaleString("pt-BR");
 
+const formatPickup = (order: PrintableOrder) =>
+  order.fulfillment_type === "scheduled" && order.scheduled_for
+    ? `Agendada para ${formatDateTime(order.scheduled_for)}`
+    : "O quanto antes";
+
 export function printOrder(order: PrintableOrder) {
   const printWindow = window.open("", "_blank", "width=420,height=720");
   if (!printWindow) {
@@ -67,6 +83,7 @@ export function printOrder(order: PrintableOrder) {
   const items = order.items || [];
   const subtotal = getSubtotal(order);
   const discount = Number(order.discount_amount || 0);
+  const serviceFee = Number(order.service_fee || 0);
   const total = getTotal(order);
   const paymentStatus = order.payment_status || "pendente";
   const paymentLabel = order.payment_method
@@ -92,6 +109,10 @@ export function printOrder(order: PrintableOrder) {
           })
           .join("")
       : `<tr><td colspan="2">Nenhum item salvo neste pedido.</td></tr>`;
+  const addonText = (order.addons || [])
+    .filter((addon) => Number(addon.quantity || 0) > 0)
+    .map((addon) => `${addon.quantity ?? 1}x ${addon.name}`)
+    .join(", ");
 
   printWindow.document.write(`
     <!doctype html>
@@ -194,7 +215,7 @@ export function printOrder(order: PrintableOrder) {
           <section class="section">
             <div class="line"><strong>Cliente</strong><span>${escapeHtml(order.name || "Cliente")}</span></div>
             <div class="line"><strong>Telefone</strong><span>${escapeHtml(order.phone || "Não informado")}</span></div>
-            <div class="line"><strong>Retirada</strong><span>Balcão</span></div>
+            <div class="line"><strong>Retirada</strong><span>${escapeHtml(formatPickup(order))}</span></div>
             <div class="line"><strong>Status</strong><span>${escapeHtml(order.status || "recebido")}</span></div>
           </section>
 
@@ -208,10 +229,20 @@ export function printOrder(order: PrintableOrder) {
               ? `<section class="section"><strong>Observações</strong><p class="note">${escapeHtml(order.note)}</p></section>`
               : ""
           }
+          ${
+            addonText
+              ? `<section class="section"><strong>Complementos</strong><p class="note">${escapeHtml(addonText)}</p></section>`
+              : ""
+          }
 
           <section class="section">
             <div class="line"><span>Pagamento</span><strong>${escapeHtml(paymentLabel)}</strong></div>
             <div class="line"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
+            ${
+              serviceFee > 0
+                ? `<div class="line"><span>${escapeHtml(order.service_fee_label || "Taxa de embalagem")}</span><strong>${money(serviceFee)}</strong></div>`
+                : ""
+            }
             ${
               discount > 0
                 ? `<div class="line"><span>Desconto${order.coupon_code ? ` (${escapeHtml(order.coupon_code)})` : ""}</span><strong>-${money(discount)}</strong></div>`

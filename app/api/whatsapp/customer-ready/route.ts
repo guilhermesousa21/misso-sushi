@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { PrintableOrder } from "../../../../lib/printOrder";
+import { getOrderPickupLabel } from "../../../../lib/orderFeatures";
 
 const normalizeWhatsAppPhone = (value?: string | null) => {
   const digits = (value || "").replace(/\D/g, "");
@@ -14,6 +15,7 @@ const buildReadyMessage = (order: PrintableOrder) =>
     `Olá, ${order.name || "cliente"}!`,
     "",
     `Seu pedido #${order.id} está pronto para retirada no balcão.`,
+    `Retirada: ${getOrderPickupLabel(order)}`,
     "Pode passar no Missô Sushi para retirar.",
     "",
     "Obrigado pelo pedido.",

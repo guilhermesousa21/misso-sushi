@@ -12,6 +12,7 @@ export type MenuItem = {
   available?: boolean | null;
   unavailable?: boolean | null;
   availability_status?: string | null;
+  stock_quantity?: number | null;
   featured?: boolean | null;
   created_at?: string;
 };
@@ -21,4 +22,10 @@ export type OrderDiscount = {
   discount_amount?: number | null;
   coupon_code?: string | null;
   promotion_id?: number | null;
+};
+
+export type OrderAddon = {
+  id: string;
+  name: string;
+  quantity: number;
 };

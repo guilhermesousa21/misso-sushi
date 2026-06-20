@@ -9,6 +9,7 @@ const navItems = [
   { href: "/admin/menu", label: "Cardápio" },
   { href: "/admin/faturamento", label: "Faturamento" },
   { href: "/admin/pedidos", label: "Pedidos" },
+  { href: "/admin/clientes", label: "Clientes" },
   { href: "/admin/promocoes", label: "Promoções" },
   { href: "/admin/configuracoes", label: "Configurações" },
 ];
@@ -58,6 +59,11 @@ export type AdminOrder = {
   payment_method?: string | null;
   payment_status?: string | null;
   fulfillment?: string | null;
+  fulfillment_type?: string | null;
+  scheduled_for?: string | null;
+  addons?: { id: string; name: string; quantity: number }[] | null;
+  service_fee?: number | null;
+  service_fee_label?: string | null;
 };
 
 export const calcTotal = (order: AdminOrder) =>

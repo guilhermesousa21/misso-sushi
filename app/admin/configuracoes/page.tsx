@@ -17,12 +17,24 @@ type StoreSettings = {
   id?: number;
   is_open: boolean;
   average_time: string;
+  service_fee: number;
+  service_fee_label: string;
+  pickup_slot_minutes: number;
+  min_pickup_minutes: number;
+  max_advance_days: number;
+  order_slot_limit: number;
   business_hours: BusinessHours;
 };
 
 const defaultSettings: StoreSettings = {
   is_open: true,
   average_time: "35 a 50 min",
+  service_fee: 0,
+  service_fee_label: "Taxa de embalagem",
+  pickup_slot_minutes: 30,
+  min_pickup_minutes: 35,
+  max_advance_days: 1,
+  order_slot_limit: 0,
   business_hours: weeklyBusinessHours,
 };
 
@@ -92,6 +104,12 @@ export default function AdminSettingsPage() {
     const payload = {
       is_open: settings.is_open,
       average_time: settings.average_time,
+      service_fee: Number(settings.service_fee || 0),
+      service_fee_label: settings.service_fee_label || "Taxa de embalagem",
+      pickup_slot_minutes: Number(settings.pickup_slot_minutes || 30),
+      min_pickup_minutes: Number(settings.min_pickup_minutes || 35),
+      max_advance_days: Number(settings.max_advance_days || 1),
+      order_slot_limit: Number(settings.order_slot_limit || 0),
       business_hours: settings.business_hours,
     };
 
@@ -128,6 +146,12 @@ export default function AdminSettingsPage() {
     const payload = {
       is_open: isOpen,
       average_time: settings.average_time,
+      service_fee: Number(settings.service_fee || 0),
+      service_fee_label: settings.service_fee_label || "Taxa de embalagem",
+      pickup_slot_minutes: Number(settings.pickup_slot_minutes || 30),
+      min_pickup_minutes: Number(settings.min_pickup_minutes || 35),
+      max_advance_days: Number(settings.max_advance_days || 1),
+      order_slot_limit: Number(settings.order_slot_limit || 0),
       business_hours: settings.business_hours,
     };
 
@@ -248,6 +272,87 @@ export default function AdminSettingsPage() {
                 }
                 style={baseStyles.input}
                 placeholder="Ex: 35 a 50 min"
+              />
+            </label>
+          </div>
+
+          <div style={{ ...styles.formGrid, ...(isMobile ? styles.formGridMobile : {}) }}>
+            <label style={styles.field}>
+              <span style={styles.label}>Nome da taxa</span>
+              <input
+                value={settings.service_fee_label}
+                onChange={(event) =>
+                  setSettings({ ...settings, service_fee_label: event.target.value })
+                }
+                style={baseStyles.input}
+                placeholder="Taxa de embalagem"
+              />
+            </label>
+            <label style={styles.field}>
+              <span style={styles.label}>Valor da taxa</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={settings.service_fee}
+                onChange={(event) =>
+                  setSettings({ ...settings, service_fee: Number(event.target.value) })
+                }
+                style={baseStyles.input}
+              />
+            </label>
+          </div>
+
+          <div style={{ ...styles.formGrid, ...(isMobile ? styles.formGridMobile : {}) }}>
+            <label style={styles.field}>
+              <span style={styles.label}>Intervalo da agenda (min)</span>
+              <input
+                type="number"
+                min="10"
+                step="5"
+                value={settings.pickup_slot_minutes}
+                onChange={(event) =>
+                  setSettings({ ...settings, pickup_slot_minutes: Number(event.target.value) })
+                }
+                style={baseStyles.input}
+              />
+            </label>
+            <label style={styles.field}>
+              <span style={styles.label}>Antecedência mínima (min)</span>
+              <input
+                type="number"
+                min="0"
+                step="5"
+                value={settings.min_pickup_minutes}
+                onChange={(event) =>
+                  setSettings({ ...settings, min_pickup_minutes: Number(event.target.value) })
+                }
+                style={baseStyles.input}
+              />
+            </label>
+            <label style={styles.field}>
+              <span style={styles.label}>Dias para agendar</span>
+              <input
+                type="number"
+                min="1"
+                max="7"
+                value={settings.max_advance_days}
+                onChange={(event) =>
+                  setSettings({ ...settings, max_advance_days: Number(event.target.value) })
+                }
+                style={baseStyles.input}
+              />
+            </label>
+            <label style={styles.field}>
+              <span style={styles.label}>Limite por horário</span>
+              <input
+                type="number"
+                min="0"
+                value={settings.order_slot_limit}
+                onChange={(event) =>
+                  setSettings({ ...settings, order_slot_limit: Number(event.target.value) })
+                }
+                style={baseStyles.input}
               />
             </label>
           </div>

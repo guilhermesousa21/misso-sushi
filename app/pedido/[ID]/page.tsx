@@ -2,14 +2,27 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
+import { formatAddonSummary, getOrderPickupLabel } from "../../../lib/orderFeatures";
 import { supabase } from "../../../lib/supabase";
+import { useCart } from "../../context/CartContext";
 
 type Order = {
   id: number;
   status: string;
   created_at: string;
   payment_status?: string | null;
+  fulfillment_type?: string | null;
+  scheduled_for?: string | null;
+  addons?: { id: string; name: string; quantity: number }[] | null;
+  items?: {
+    id: number;
+    name: string;
+    price: number;
+    category?: string;
+    quantity?: number;
+  }[] | null;
 };
 
 const steps = [
@@ -48,6 +61,8 @@ export default function PedidoPage({
 }) {
   const [order, setOrder] = useState<Order | null>(null);
   const { ID: orderId } = use(params);
+  const router = useRouter();
+  const { clear, addToCart } = useCart();
 
   useEffect(() => {
     async function loadOrder() {
@@ -95,6 +110,22 @@ export default function PedidoPage({
   const isPaid = isPaymentConfirmed(order);
   const customerStatus = getCustomerStatus(order);
   const current = statusIndex(customerStatus);
+  const addonSummary = formatAddonSummary(order.addons);
+  const handleRepeatOrder = () => {
+    clear();
+    (order.items || []).forEach((item) => {
+      const quantity = item.quantity ?? 1;
+      for (let index = 0; index < quantity; index += 1) {
+        addToCart({
+          id: item.id,
+          name: item.name,
+          price: Number(item.price || 0),
+          category: item.category || "",
+        });
+      }
+    });
+    router.push("/checkout");
+  };
 
   return (
     <main style={styles.page}>
@@ -115,6 +146,17 @@ export default function PedidoPage({
           </strong>
         </div>
 
+        <div style={styles.infoGrid}>
+          <div style={styles.infoBox}>
+            <span>Retirada</span>
+            <strong>{getOrderPickupLabel(order)}</strong>
+          </div>
+          <div style={styles.infoBox}>
+            <span>Complementos</span>
+            <strong>{addonSummary || "Nenhum"}</strong>
+          </div>
+        </div>
+
         <div style={styles.timeline}>
           {steps.map((step, index) => {
             const isPaymentStep = step.key === "aguardando_pagamento";
@@ -131,6 +173,11 @@ export default function PedidoPage({
             );
           })}
         </div>
+        {(order.items || []).length > 0 && (
+          <button type="button" onClick={handleRepeatOrder} style={styles.repeatButton}>
+            Repetir este pedido
+          </button>
+        )}
       </section>
     </main>
   );
@@ -269,6 +316,22 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 6,
     fontSize: 26,
   },
+  infoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: 10,
+    marginTop: 12,
+  },
+  infoBox: {
+    display: "grid",
+    gap: 5,
+    borderRadius: 8,
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    background: "#fffaf2",
+    padding: 12,
+    color: "#514a43",
+    fontSize: 13,
+  },
   timeline: {
     marginTop: 24,
     display: "grid",
@@ -311,5 +374,16 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 4,
     color: "#766e64",
     fontSize: 13,
+  },
+  repeatButton: {
+    marginTop: 18,
+    width: "100%",
+    border: "none",
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "14px 18px",
+    cursor: "pointer",
+    fontWeight: 850,
   },
 };

@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { formatAddonSummary, getOrderPickupLabel } from "../../lib/orderFeatures";
 import { printOrder } from "../../lib/printOrder";
 import { supabase } from "../../lib/supabase";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -28,6 +29,11 @@ type Order = {
   created_at: string;
   payment_method?: string;
   payment_status?: string;
+  fulfillment_type?: string;
+  scheduled_for?: string;
+  addons?: { id: string; name: string; quantity: number }[];
+  service_fee?: number;
+  service_fee_label?: string;
 };
 
 type ConfirmationState =
@@ -216,7 +222,9 @@ export default function AdminPanel() {
     const bDone = ["retirado"].includes(b.status);
     if (aDone && !bDone) return 1;
     if (bDone && !aDone) return -1;
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    const aPickup = a.scheduled_for || a.created_at;
+    const bPickup = b.scheduled_for || b.created_at;
+    return new Date(aPickup).getTime() - new Date(bPickup).getTime();
   });
 
   const activeOrders = visibleOrders.filter(
@@ -300,7 +308,10 @@ export default function AdminPanel() {
               <div style={styles.customerBox}>
                 <strong>{order.name || "Cliente"}</strong>
                 <span>{order.phone || "Telefone não informado"}</span>
-                <span style={styles.fulfillmentBadge}>Retirada no balcão</span>
+                <span style={styles.fulfillmentBadge}>{getOrderPickupLabel(order)}</span>
+                {formatAddonSummary(order.addons) && (
+                  <p>Complementos: {formatAddonSummary(order.addons)}</p>
+                )}
                 {order.note && <p>Obs: {order.note}</p>}
               </div>
 

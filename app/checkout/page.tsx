@@ -13,6 +13,18 @@ import {
   weeklyBusinessHours,
   type BusinessHours,
 } from "../../lib/storeHours";
+import {
+  buildPickupSlots,
+  checkoutAddons,
+  formatPickupTime,
+  getOrderSlotLimit,
+  getPickupSlotMinutes,
+  getServiceFee,
+  getServiceFeeLabel,
+  toLocalInputValue,
+  type OperationalSettings,
+  type OrderFulfillmentType,
+} from "../../lib/orderFeatures";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import type { MenuItem } from "../../types";
 import { useCart } from "../context/CartContext";
@@ -26,6 +38,11 @@ type Promotion = {
   description?: string | null;
   discount_type: "percent" | "fixed";
   discount_value: number;
+  min_order_value?: number | null;
+  usage_limit?: number | null;
+  used_count?: number | null;
+  starts_at?: string | null;
+  expires_at?: string | null;
 };
 
 type CheckoutState = "form" | "generating" | "awaiting_pix" | "paid";
@@ -72,6 +89,13 @@ const optionalOrderColumns = [
   "coupon_code",
   "promotion_id",
   "fulfillment",
+  "fulfillment_type",
+  "scheduled_for",
+  "addons",
+  "service_fee",
+  "service_fee_label",
+  "inventory_consumed_at",
+  "coupon_redeemed_at",
   "payment_method",
   "payment_status",
   "mercado_pago_payment_id",
@@ -95,6 +119,9 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("pix");
   const [note, setNote] = useState("");
+  const [fulfillmentType, setFulfillmentType] = useState<OrderFulfillmentType>("asap");
+  const [scheduledFor, setScheduledFor] = useState("");
+  const [selectedAddons, setSelectedAddons] = useState<Record<string, number>>({});
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<Promotion | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -112,22 +139,32 @@ export default function CheckoutPage() {
   const [manualOpen, setManualOpen] = useState(true);
   const [averageTime, setAverageTime] = useState("35 a 50 min");
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
+  const [operationalSettings, setOperationalSettings] = useState<OperationalSettings | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [cartNotice, setCartNotice] = useState("");
+  const [scheduledOrderCounts, setScheduledOrderCounts] = useState<Record<string, number>>({});
 
+  const serviceFee = getServiceFee(operationalSettings);
+  const serviceFeeLabel = getServiceFeeLabel(operationalSettings);
+  const pickupSlots = buildPickupSlots(operationalSettings);
+  const slotLimit = getOrderSlotLimit(operationalSettings);
+  const selectedAddonList = checkoutAddons
+    .map((addon) => ({ ...addon, quantity: selectedAddons[addon.id] || 0 }))
+    .filter((addon) => addon.quantity > 0);
   const discountAmount = calculateDiscount(appliedCoupon, total);
-  const finalTotal = Math.max(0, total - discountAmount);
+  const finalTotal = Math.max(0, total + serviceFee - discountAmount);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
     async function fetchStoreStatus() {
       const { data } = await supabase
         .from("store_settings")
-        .select("is_open,average_time,business_hours")
+        .select("*")
         .limit(1)
         .maybeSingle();
       const savedBusinessHours = getBusinessHours(data?.business_hours);
       const manuallyOpen = data?.is_open !== false;
+      setOperationalSettings(data as OperationalSettings | null);
       setBusinessHours(savedBusinessHours);
       setManualOpen(manuallyOpen);
       setAverageTime(data?.average_time || "35 a 50 min");
@@ -137,10 +174,35 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (scheduledFor || pickupSlots.length === 0) return;
+    setScheduledFor(toLocalInputValue(pickupSlots[0]));
+  }, [pickupSlots, scheduledFor]);
+
+  useEffect(() => {
+    async function fetchScheduledCounts() {
+      const { data } = await supabase
+        .from("orders")
+        .select("scheduled_for,payment_status")
+        .not("scheduled_for", "is", null)
+        .in("payment_status", ["pendente", "pago"]);
+
+      const counts: Record<string, number> = {};
+      (data || []).forEach((order: { scheduled_for?: string | null; payment_status?: string | null }) => {
+        if (!order.scheduled_for || order.payment_status === "falhou") return;
+        const key = toLocalInputValue(new Date(order.scheduled_for));
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      setScheduledOrderCounts(counts);
+    }
+
+    fetchScheduledCounts();
+  }, []);
+
+  useEffect(() => {
     async function fetchMenuAvailability() {
       const { data } = await supabase
         .from("menu")
-        .select("id,name,active,available,unavailable,availability_status");
+        .select("id,name,active,available,unavailable,availability_status,stock_quantity");
       if (data) setMenuItems(data as MenuItem[]);
     }
     fetchMenuAvailability();
@@ -163,6 +225,15 @@ export default function CheckoutPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [cart, menuItems, remove]);
+
+  const stockIssue = cart.find((cartItem) => {
+    const menuItem = menuItems.find((item) => item.id === cartItem.id);
+    return (
+      typeof menuItem?.stock_quantity === "number" &&
+      menuItem.stock_quantity >= 0 &&
+      cartItem.quantity > menuItem.stock_quantity
+    );
+  });
 
   useEffect(() => {
     if (!pendingOrderId || checkoutState !== "awaiting_pix") return;
@@ -216,11 +287,18 @@ export default function CheckoutPage() {
     return () => window.clearInterval(countdown);
   }, [checkoutState, pendingOrderId]);
 
+  const selectedSlotIsAvailable =
+    fulfillmentType !== "scheduled" ||
+    (Boolean(scheduledFor) &&
+      pickupSlots.some((slot) => toLocalInputValue(slot) === scheduledFor) &&
+      (slotLimit <= 0 || (scheduledOrderCounts[scheduledFor] || 0) < slotLimit));
   const isFormValid =
     cart.length > 0 &&
     hasFirstAndLastName(name) &&
     [10, 11].includes(onlyDigits(phone).length) &&
-    storeOpen;
+    storeOpen &&
+    !stockIssue &&
+    selectedSlotIsAvailable;
   const nextOpening = getNextOpeningLabel(new Date(), businessHours);
   const storeStatusMessage = storeOpen
     ? `Loja aberta para retirada. Tempo médio: ${averageTime}.`
@@ -229,11 +307,15 @@ export default function CheckoutPage() {
       : `A loja está pausada no momento e ${nextOpening}.`;
   const formHelp = !storeOpen
     ? "Os pedidos estão bloqueados até a loja reabrir."
-    : !hasFirstAndLastName(name)
+    : stockIssue
+      ? `${stockIssue.name} tem estoque menor que a quantidade no carrinho.`
+      : !hasFirstAndLastName(name)
       ? "Informe nome e sobrenome para continuar."
       : ![10, 11].includes(onlyDigits(phone).length)
         ? "Informe um telefone com DDD."
-        : "Tudo certo para enviar o pedido.";
+        : !selectedSlotIsAvailable
+          ? "Escolha um horário de retirada disponível."
+          : "Tudo certo para enviar o pedido.";
 
   const insertOrder = async (extra: Record<string, unknown>) => {
     const base: Record<string, unknown> = {
@@ -247,6 +329,14 @@ export default function CheckoutPage() {
       coupon_code: appliedCoupon?.code || null,
       promotion_id: appliedCoupon?.id || null,
       fulfillment: "retirada",
+      fulfillment_type: fulfillmentType,
+      scheduled_for:
+        fulfillmentType === "scheduled" && scheduledFor
+          ? new Date(scheduledFor).toISOString()
+          : null,
+      addons: selectedAddonList,
+      service_fee: serviceFee,
+      service_fee_label: serviceFeeLabel,
     };
     const payload: Record<string, unknown> = { ...base, ...extra };
 
@@ -305,6 +395,11 @@ export default function CheckoutPage() {
     setCheckoutState("generating");
     try {
       const savedOrder = await insertOrder({ status: "preparando", payment_method: "card", payment_status: "pago" });
+      await fetch("/api/orders/paid-side-effects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: savedOrder.id }),
+      }).catch(() => null);
       fetch("/api/whatsapp/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(savedOrder) }).catch(() => {});
       clear();
       router.push(`/pedido/${savedOrder.id}`);
@@ -540,6 +635,47 @@ export default function CheckoutPage() {
               <span>Tempo médio</span>
               <strong>{averageTime}</strong>
             </div>
+            <div style={styles.scheduleChoice}>
+              {(["asap", "scheduled"] as OrderFulfillmentType[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setFulfillmentType(option)}
+                  style={{
+                    ...styles.fulfillmentButton,
+                    ...(fulfillmentType === option ? styles.fulfillmentButtonActive : {}),
+                  }}
+                >
+                  {option === "asap" ? "Retirar o quanto antes" : "Agendar retirada"}
+                </button>
+              ))}
+            </div>
+            {fulfillmentType === "scheduled" && (
+              <label style={styles.field}>
+                <span style={styles.label}>Horário de retirada</span>
+                <select
+                  value={scheduledFor}
+                  onChange={(event) => setScheduledFor(event.target.value)}
+                  style={styles.select}
+                >
+                  {pickupSlots.map((slot) => {
+                    const value = toLocalInputValue(slot);
+                    const count = scheduledOrderCounts[value] || 0;
+                    const full = slotLimit > 0 && count >= slotLimit;
+                    return (
+                      <option key={value} value={value} disabled={full}>
+                        {formatPickupTime(slot.toISOString())}
+                        {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
+                        {full ? " - lotado" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p style={styles.mutedSmall}>
+                  Grade de {getPickupSlotMinutes(operationalSettings)} em {getPickupSlotMinutes(operationalSettings)} minutos.
+                </p>
+              </label>
+            )}
             {!storeOpen && (
               <p style={styles.error}>
                 {manualOpen
@@ -547,6 +683,54 @@ export default function CheckoutPage() {
                   : `A loja está fechada manualmente e ${getNextOpeningLabel(new Date(), businessHours)}.`}
               </p>
             )}
+          </div>
+
+          {/* Complementos */}
+          <div style={styles.card}>
+            <div style={styles.cardHeader}>
+              <div>
+                <p style={styles.cardEyebrow}>Complementos</p>
+                <h2 style={styles.cardTitle}>Itens para acompanhar</h2>
+              </div>
+              <span style={styles.pill}>Opcional</span>
+            </div>
+            <div style={styles.addonGrid}>
+              {checkoutAddons.map((addon) => {
+                const quantity = selectedAddons[addon.id] || 0;
+                return (
+                  <div key={addon.id} style={styles.addonRow}>
+                    <span>{addon.name}</span>
+                    <div style={styles.qtyControl}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedAddons((current) => ({
+                            ...current,
+                            [addon.id]: Math.max(0, (current[addon.id] || 0) - 1),
+                          }))
+                        }
+                        style={styles.qtyButton}
+                      >
+                        -
+                      </button>
+                      <strong>{quantity}</strong>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedAddons((current) => ({
+                            ...current,
+                            [addon.id]: Math.min(9, (current[addon.id] || 0) + 1),
+                          }))
+                        }
+                        style={styles.qtyButton}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Cupom */}
@@ -657,18 +841,32 @@ export default function CheckoutPage() {
               ))}
             </div>
             <div style={styles.summaryTotalBox}>
-              {discountAmount > 0 && (
-                <>
-                  <div style={styles.summaryTotalLine}>
-                    <span>Subtotal</span>
-                    <strong>{money(total)}</strong>
-                  </div>
-                  <div style={styles.summaryTotalLine}>
-                    <span>Desconto</span>
-                    <strong style={styles.discountText}>-{money(discountAmount)}</strong>
-                  </div>
-                </>
+              {(discountAmount > 0 || serviceFee > 0) && (
+                <div style={styles.summaryTotalLine}>
+                  <span>Subtotal</span>
+                  <strong>{money(total)}</strong>
+                </div>
               )}
+              {serviceFee > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>{serviceFeeLabel}</span>
+                  <strong>{money(serviceFee)}</strong>
+                </div>
+              )}
+              {discountAmount > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>Desconto</span>
+                  <strong style={styles.discountText}>-{money(discountAmount)}</strong>
+                </div>
+              )}
+              {selectedAddonList.length > 0 && (
+                <div style={styles.addonSummary}>
+                  Complementos: {selectedAddonList.map((addon) => `${addon.quantity}x ${addon.name}`).join(", ")}
+                </div>
+              )}
+              <div style={styles.addonSummary}>
+                Retirada: {fulfillmentType === "scheduled" && scheduledFor ? formatPickupTime(new Date(scheduledFor).toISOString()) : "O quanto antes"}
+              </div>
               <div style={styles.summaryGrandTotalLine}>
                 <span>Total</span>
                 <strong>{money(finalTotal)}</strong>
@@ -710,12 +908,20 @@ const styles: Record<string, CSSProperties> = {
   formHelp: { marginTop: 12, color: "#991b1b", fontSize: 13, fontWeight: 850, lineHeight: 1.4 },
   formHelpOk: { color: "#0f7a4a" },
   operationalInfoGrid: { marginTop: 12, display: "flex", justifyContent: "space-between", gap: 12, borderRadius: 8, background: "#f0ebe2", color: "#514a43", padding: "12px 14px", fontWeight: 850 },
+  scheduleChoice: { marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
+  fulfillmentButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 13, color: "#1c1a17", cursor: "pointer", fontWeight: 850 },
+  fulfillmentButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
   couponRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center" },
   couponRowMobile: { gridTemplateColumns: "1fr" },
   field: { display: "grid", gap: 7 },
   label: { display: "block", marginBottom: 8, fontSize: 14, fontWeight: 850 },
   input: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
+  select: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
   textarea: { width: "100%", minHeight: 96, resize: "vertical", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
+  addonGrid: { display: "grid", gap: 10 },
+  addonRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 8, padding: "12px 14px", background: "#fff" },
+  qtyControl: { display: "inline-flex", alignItems: "center", gap: 10 },
+  qtyButton: { width: 30, height: 30, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", cursor: "pointer", fontWeight: 850 },
   methods: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 },
   methodButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 15, color: "#1c1a17", cursor: "pointer", fontWeight: 850, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: "0 6px 16px rgba(28, 26, 23, 0.04)" },
   methodButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
@@ -733,6 +939,7 @@ const styles: Record<string, CSSProperties> = {
   summaryTotalBox: { display: "grid", gap: 10, marginTop: 18, padding: "0" },
   summaryTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255, 253, 248, 0.78)", fontSize: 15 },
   summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },
+  addonSummary: { color: "rgba(255, 253, 248, 0.66)", fontSize: 13, lineHeight: 1.45 },
   discountText: { color: "#0f7a4a" },
   muted: { color: "#625b53", lineHeight: 1.55 },
   mutedSmall: { marginTop: 4, color: "#766e64", fontSize: 13, lineHeight: 1.4 },
