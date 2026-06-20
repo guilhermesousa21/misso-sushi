@@ -41,6 +41,8 @@ type ConfirmationState =
   | { action: "ready"; order: Order }
   | null;
 
+type KitchenFilter = "recebidos" | "prontos" | "atrasados";
+
 const statusLabels: Record<string, string> = {
   recebido: "Recebido",
   pronto: "Pronto",
@@ -107,6 +109,7 @@ export default function AdminPanel() {
   const [now, setNow] = useState(() => new Date());
   const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
   const [confirming, setConfirming] = useState(false);
+  const [filter, setFilter] = useState<KitchenFilter | null>(null);
   const previousOrderIds = useRef<Set<number>>(new Set());
 
   useEffect(() => {
@@ -240,6 +243,41 @@ export default function AdminPanel() {
     (order) => minutesSinceAt(order.created_at, now) > 35
   );
 
+  const orderMatchesFilter = (order: Order, filterValue: KitchenFilter | null) => {
+    if (!filterValue) return true;
+
+    const kitchenStatus = normalizeKitchenStatus(order.status);
+    if (filterValue === "recebidos") return kitchenStatus === "recebido";
+    if (filterValue === "prontos") return kitchenStatus === "pronto";
+    return (
+      minutesSinceAt(order.created_at, now) > 35 && !["retirado"].includes(order.status)
+    );
+  };
+
+  const filteredOrders = sorted.filter((order) => orderMatchesFilter(order, filter));
+
+  const filterEmptyMessages: Record<KitchenFilter, string> = {
+    recebidos: "Nenhum pedido recebido no momento.",
+    prontos: "Nenhum pedido pronto no momento.",
+    atrasados: "Nenhum pedido atrasado no momento.",
+  };
+
+  const kitchenFilters: {
+    key: KitchenFilter;
+    label: string;
+    count: number;
+    alert?: boolean;
+  }[] = [
+    { key: "recebidos", label: "Recebidos", count: receivedOrders.length },
+    { key: "prontos", label: "Prontos", count: readyOrders.length },
+    {
+      key: "atrasados",
+      label: "Atrasados",
+      count: delayedOrders.length,
+      alert: delayedOrders.length > 0,
+    },
+  ];
+
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
@@ -249,29 +287,43 @@ export default function AdminPanel() {
         </div>
         <div style={{ ...styles.headerSide, ...(isMobile ? styles.headerSideMobile : {}) }}>
           <div style={{ ...styles.headerStats, ...(isMobile ? styles.headerStatsMobile : {}) }}>
-            <div style={styles.headerStat}>
-              <span>Recebidos</span>
-              <strong>{receivedOrders.length}</strong>
-            </div>
-            <div style={styles.headerStat}>
-              <span>Prontos</span>
-              <strong>{readyOrders.length}</strong>
-            </div>
-            <div style={{ ...styles.headerStat, ...(delayedOrders.length > 0 ? styles.headerStatAlert : {}) }}>
-              <span>Atrasados</span>
-              <strong>{delayedOrders.length}</strong>
-            </div>
+            {kitchenFilters.map((item) => {
+              const isActive = filter === item.key;
+
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  aria-pressed={isActive}
+                  style={{
+                    ...styles.headerStatButton,
+                    ...(item.alert ? styles.headerStatAlert : {}),
+                    ...(isActive ? styles.headerStatActive : styles.headerStatInactive),
+                  }}
+                  onClick={() =>
+                    setFilter((current) => (current === item.key ? null : item.key))
+                  }
+                >
+                  <span>{item.label}</span>
+                  <strong>{item.count}</strong>
+                </button>
+              );
+            })}
           </div>
         </div>
       </header>
 
-      {sorted.length === 0 ? (
+      {visibleOrders.length === 0 ? (
         <section style={styles.emptyState}>
           <h2>Nenhum pedido na cozinha hoje.</h2>
         </section>
+      ) : filteredOrders.length === 0 ? (
+        <section style={styles.emptyState}>
+          <h2>{filter ? filterEmptyMessages[filter] : "Nenhum pedido encontrado."}</h2>
+        </section>
       ) : (
         <section style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
-          {sorted.map((order) => (
+          {filteredOrders.map((order) => (
             (() => {
               const kitchenStatus = normalizeKitchenStatus(order.status);
               const minutesInQueue = minutesSinceAt(order.created_at, now);
@@ -501,13 +553,26 @@ const styles: Record<string, CSSProperties> = {
     width: "100%",
     minWidth: 0,
   },
-  headerStat: {
+  headerStatButton: {
     background: "#1c1a17",
     color: "#fffdf8",
     borderRadius: 8,
     padding: "12px 14px",
     display: "grid",
     gap: 4,
+    border: "none",
+    textAlign: "left",
+    cursor: "pointer",
+    font: "inherit",
+    transition: "transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease",
+  },
+  headerStatInactive: {
+    opacity: 0.72,
+  },
+  headerStatActive: {
+    opacity: 1,
+    boxShadow: "inset 0 0 0 2px #fffdf8",
+    transform: "translateY(-1px)",
   },
   headerStatAlert: {
     background: "#991b1b",
