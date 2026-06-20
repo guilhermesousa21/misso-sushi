@@ -2,7 +2,6 @@
 
 import type { CSSProperties } from "react";
 import { Skeleton } from "./Skeleton";
-import { storeStatusBannerHeight } from "./StoreStatusBanner";
 
 type CheckoutFormSkeletonProps = {
   isMobile?: boolean;
@@ -14,13 +13,10 @@ export function CheckoutFormSkeleton({ isMobile = false }: CheckoutFormSkeletonP
       style={{
         ...styles.page,
         ...(isMobile ? styles.pageMobile : {}),
-        paddingTop: storeStatusBannerHeight + (isMobile ? 18 : 20),
       }}
       aria-busy="true"
       aria-label="Carregando checkout"
     >
-      <Skeleton height={storeStatusBannerHeight} borderRadius={0} style={styles.banner} />
-
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <Skeleton width={132} height={38} borderRadius={999} />
         <div style={styles.headerTitle}>
@@ -95,13 +91,6 @@ const styles: Record<string, CSSProperties> = {
   pageMobile: {
     padding: "18px 14px 38px",
   },
-  banner: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-  },
   header: {
     maxWidth: 1180,
     margin: "0 auto 16px",
@@ -158,7 +147,7 @@ const styles: Record<string, CSSProperties> = {
   },
   summaryColumn: {
     position: "sticky",
-    top: storeStatusBannerHeight + 20,
+    top: 20,
   },
   summaryCard: {
     background: "#171512",

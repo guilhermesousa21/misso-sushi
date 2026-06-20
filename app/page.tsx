@@ -25,10 +25,6 @@ import {
 import { MenuItem } from "../types";
 import { useCart, type CartItem } from "./context/CartContext";
 import { money, isItemOrderable } from "../lib/orderUtils";
-import {
-  StoreStatusBanner,
-  storeStatusBannerHeight,
-} from "./components/StoreStatusBanner";
 import { MenuPageSkeleton } from "./components/MenuPageSkeleton";
 
 type CartLine = CartItem;
@@ -276,14 +272,8 @@ export default function Page() {
   };
 
   return (
-    <main style={{ ...styles.page, paddingTop: storeStatusBannerHeight }}>
-      <StoreStatusBanner
-        storeOpen={storeOpen}
-        manualOpen={manualOpen}
-        businessHours={businessHours}
-        averageTime={averageTime}
-      />
-      <header style={{ ...styles.header, top: storeStatusBannerHeight }}>
+    <main style={styles.page}>
+      <header style={styles.header}>
         <div style={{ ...styles.headerInner, ...(isMobile ? styles.headerInnerMobile : {}) }}>
           <div>
             <h1 style={styles.brand}>Missô Sushi</h1>

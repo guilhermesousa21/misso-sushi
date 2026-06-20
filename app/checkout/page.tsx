@@ -38,10 +38,6 @@ import {
   CheckoutStepper,
   type CheckoutStep,
 } from "../components/CheckoutStepper";
-import {
-  StoreStatusBanner,
-  storeStatusBannerHeight,
-} from "../components/StoreStatusBanner";
 import { CheckoutFormSkeleton } from "../components/CheckoutFormSkeleton";
 
 type PaymentMethod = "pix" | "card";
@@ -669,19 +665,7 @@ export default function CheckoutPage() {
         : isFormValid;
 
   return (
-    <main
-      style={{
-        ...styles.page,
-        ...(isMobile ? styles.pageMobile : {}),
-        paddingTop: storeStatusBannerHeight + (isMobile ? 18 : 20),
-      }}
-    >
-      <StoreStatusBanner
-        storeOpen={storeOpen}
-        manualOpen={manualOpen}
-        businessHours={businessHours}
-        averageTime={averageTime}
-      />
+    <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <Link href="/" style={styles.backLink}>Voltar ao cardápio</Link>
         <div style={styles.headerTitle}>
@@ -1008,7 +992,7 @@ export default function CheckoutPage() {
           {error && <p style={styles.error}>{error}</p>}
         </section>
 
-        <aside style={{ ...styles.summaryColumn, top: storeStatusBannerHeight + 20 }}>
+        <aside style={styles.summaryColumn}>
           <div style={styles.summaryCard}>
             <div style={styles.cardHeader}>
               <div>
