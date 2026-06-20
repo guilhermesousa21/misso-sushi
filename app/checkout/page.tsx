@@ -32,6 +32,7 @@ import {
   type LoyaltyStatus,
 } from "../../lib/loyalty";
 import { useIsMobile } from "../../lib/useMediaQuery";
+import { parseBrasiliaInputValue } from "../../lib/brasiliaTime";
 import type { MenuItem } from "../../types";
 import { useCart } from "../context/CartContext";
 import { money, isItemOrderable } from "../../lib/orderUtils";
@@ -415,7 +416,7 @@ export default function CheckoutPage() {
       fulfillment: "retirada",
       fulfillment_type: wantsScheduledPickup ? "scheduled" : "asap",
       scheduled_for:
-        wantsScheduledPickup && scheduledFor ? new Date(scheduledFor).toISOString() : null,
+        wantsScheduledPickup && scheduledFor ? parseBrasiliaInputValue(scheduledFor).toISOString() : null,
       addons: selectedAddonList,
       service_fee: serviceFee,
       service_fee_label: serviceFeeLabel,

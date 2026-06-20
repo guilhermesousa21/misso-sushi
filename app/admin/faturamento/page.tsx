@@ -16,6 +16,11 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { supabase } from "../../../lib/supabase";
+import {
+  addDaysInBrasilia,
+  formatBrasiliaDateTimeShort,
+  toBrasiliaDateKey,
+} from "../../../lib/brasiliaTime";
 import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import { AdminShell } from "../AdminShell";
 
@@ -81,33 +86,12 @@ const normalize = (value: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-const parseSupabaseDate = (value: string) => {
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
-  return new Date(hasTimezone ? value : `${value}Z`);
-};
-
-const toDateKey = (value: string | Date) => {
-  const date = typeof value === "string" ? parseSupabaseDate(value) : value;
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-  return `${year}-${month}-${day}`;
-};
-
 const getRangeStart = (range: RangePreset) => {
   if (range === "custom") return "";
-  if (range === "today") return toDateKey(new Date());
+  if (range === "today") return toBrasiliaDateKey(new Date());
 
-  const start = new Date();
-  start.setDate(start.getDate() - Number(range.replace("d", "")) + 1);
-  return toDateKey(start);
+  const days = Number(range.replace("d", "")) - 1;
+  return toBrasiliaDateKey(addDaysInBrasilia(new Date(), -days));
 };
 
 const formatDateKey = (value: string) => {
@@ -116,14 +100,7 @@ const formatDateKey = (value: string) => {
   return `${day}/${month}`;
 };
 
-const formatDateTime = (value: string) =>
-  parseSupabaseDate(value).toLocaleString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const formatDateTime = formatBrasiliaDateTimeShort;
 
 const calcTotal = (order: Order) =>
   typeof order.total === "number"
@@ -183,10 +160,10 @@ export default function FaturamentoPage() {
 
   const filteredOrders = useMemo(() => {
     const rangeStart = range === "custom" ? dateFrom : getRangeStart(range);
-    const rangeEnd = range === "custom" ? dateTo : range === "today" ? toDateKey(new Date()) : "";
+    const rangeEnd = range === "custom" ? dateTo : range === "today" ? toBrasiliaDateKey(new Date()) : "";
 
     return orders.filter((order) => {
-      const orderDate = toDateKey(order.created_at);
+      const orderDate = toBrasiliaDateKey(order.created_at);
       const inRangeStart = !rangeStart || orderDate >= rangeStart;
       const inRangeEnd = !rangeEnd || orderDate <= rangeEnd;
       const query = normalize(search.trim());
@@ -207,9 +184,9 @@ export default function FaturamentoPage() {
     );
     const ticketMedio =
       filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
-    const todayKey = toDateKey(new Date().toISOString());
+    const todayKey = toBrasiliaDateKey(new Date());
     const todayRevenue = filteredOrders
-      .filter((order) => toDateKey(order.created_at) === todayKey)
+      .filter((order) => toBrasiliaDateKey(order.created_at) === todayKey)
       .reduce((sum, order) => sum + calcTotal(order), 0);
     const totalDiscount = filteredOrders.reduce(
       (sum, order) => sum + calcDiscount(order),
@@ -217,7 +194,7 @@ export default function FaturamentoPage() {
     );
 
     const revenueByDay = filteredOrders.reduce((acc, order) => {
-      const day = toDateKey(order.created_at);
+      const day = toBrasiliaDateKey(order.created_at);
       acc[day] = (acc[day] || 0) + calcTotal(order);
       return acc;
     }, {} as Record<string, number>);

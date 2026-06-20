@@ -1,3 +1,5 @@
+import { getBrasiliaDateParts } from "./brasiliaTime";
+
 export type BusinessDay = {
   label: string;
   open: string;
@@ -44,9 +46,9 @@ export const isWithinBusinessHours = (
   date = new Date(),
   businessHours: BusinessHours = weeklyBusinessHours
 ) => {
-  const today = businessHours[date.getDay()];
-  const yesterday = businessHours[(date.getDay() + 6) % 7];
-  const currentMinutes = date.getHours() * 60 + date.getMinutes();
+  const { dayOfWeek, minutesSinceMidnight: currentMinutes } = getBrasiliaDateParts(date);
+  const today = businessHours[dayOfWeek];
+  const yesterday = businessHours[(dayOfWeek + 6) % 7];
 
   const todayOpen = timeToMinutes(today.open);
   const todayClose = timeToMinutes(today.close);
@@ -83,7 +85,7 @@ export const getTodayBusinessHoursLabel = (
   date = new Date(),
   businessHours: BusinessHours = weeklyBusinessHours
 ) => {
-  const today = businessHours[date.getDay()];
+  const today = businessHours[getBrasiliaDateParts(date).dayOfWeek];
   return `${today.label}: ${today.open}-${today.close}`;
 };
 
@@ -97,10 +99,10 @@ export const getNextOpeningLabel = (
   date = new Date(),
   businessHours: BusinessHours = weeklyBusinessHours
 ) => {
-  const currentMinutes = date.getHours() * 60 + date.getMinutes();
+  const { dayOfWeek, minutesSinceMidnight: currentMinutes } = getBrasiliaDateParts(date);
 
   for (let offset = 0; offset < 7; offset += 1) {
-    const day = (date.getDay() + offset) % 7;
+    const day = (dayOfWeek + offset) % 7;
     const hours = businessHours[day];
     const openMinutes = timeToMinutes(hours.open);
 

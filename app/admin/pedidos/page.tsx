@@ -6,6 +6,11 @@ import { printOrder } from "../../../lib/printOrder";
 import { formatAddonSummary, getOrderPickupLabel } from "../../../lib/orderFeatures";
 import { formatOrderItemLabel } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
+import {
+  addDaysInBrasilia,
+  formatBrasiliaDateTime,
+  toBrasiliaDateKey,
+} from "../../../lib/brasiliaTime";
 import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import {
   AdminShell,
@@ -28,44 +33,13 @@ const dateRangeLabels: Record<DateRange, string> = {
   custom: "Período",
 };
 
-const parseSupabaseDate = (value: string) => {
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
-  return new Date(hasTimezone ? value : `${value}Z`);
-};
-
-const toBrasiliaDateKey = (value: string | Date) => {
-  const date = typeof value === "string" ? parseSupabaseDate(value) : value;
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-  return `${year}-${month}-${day}`;
-};
-
 const getDateRangeStart = (range: DateRange) => {
   if (range === "all" || range === "custom") return "";
 
-  const start = new Date();
-  if (range === "7d") start.setDate(start.getDate() - 6);
-  if (range === "30d") start.setDate(start.getDate() - 29);
-  return toBrasiliaDateKey(start);
+  if (range === "7d") return toBrasiliaDateKey(addDaysInBrasilia(new Date(), -6));
+  if (range === "30d") return toBrasiliaDateKey(addDaysInBrasilia(new Date(), -29));
+  return toBrasiliaDateKey(new Date());
 };
-
-const formatBrasiliaDateTime = (value: string) =>
-  parseSupabaseDate(value).toLocaleString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 const isPaidOrder = (order: AdminOrder) => order.payment_status === "pago";
 

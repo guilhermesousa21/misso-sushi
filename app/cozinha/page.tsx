@@ -7,6 +7,11 @@ import { formatAddonSummary, getOrderPickupLabel } from "../../lib/orderFeatures
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { printOrder } from "../../lib/printOrder";
 import { supabase } from "../../lib/supabase";
+import {
+  formatBrasiliaDateTime,
+  parseSupabaseDate,
+  toBrasiliaDateKey,
+} from "../../lib/brasiliaTime";
 import { useIsMobile, useIsTablet } from "../../lib/useMediaQuery";
 
 type OrderItem = {
@@ -76,42 +81,12 @@ const calcTotal = (items: OrderItem[]) =>
     0
   );
 
-const parseSupabaseDate = (value: string) => {
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
-  return new Date(hasTimezone ? value : `${value}Z`);
-};
-
 const minutesSinceAt = (value: string, now: Date) =>
   Math.max(0, Math.floor((now.getTime() - parseSupabaseDate(value).getTime()) / 60000));
 
 const isKitchenOrderDelayed = (order: Order, now: Date) =>
   normalizeKitchenStatus(order.status) === "recebido" &&
   minutesSinceAt(order.created_at, now) > 35;
-
-const formatBrasiliaDateTime = (value: string) =>
-  parseSupabaseDate(value).toLocaleString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-const toBrasiliaDateKey = (value: string | Date) => {
-  const date = typeof value === "string" ? parseSupabaseDate(value) : value;
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-  return `${year}-${month}-${day}`;
-};
 
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);

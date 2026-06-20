@@ -7,6 +7,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { formatAddonSummary, getOrderPickupLabel, money } from "../../../lib/orderFeatures";
 import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
+import { formatBrasiliaDateTimeShort } from "../../../lib/brasiliaTime";
 import { useCart } from "../../context/CartContext";
 import { BackToMenuLink } from "../../components/BackToMenuLink";
 import { useIsMobile } from "../../../lib/useMediaQuery";
@@ -249,7 +250,7 @@ export default function PedidoPage({
         <p style={styles.eyebrow}>Acompanhe em tempo real</p>
         <h1 style={styles.title}>Pedido #{order.id}</h1>
         <p style={styles.muted}>
-          Atualizado em {new Date(order.created_at).toLocaleString("pt-BR")}
+          Atualizado em {formatBrasiliaDateTimeShort(order.created_at)}
         </p>
 
         {(order.items || []).length > 0 && (

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { formatCustomerPhone, isValidCustomerPhone, onlyDigits } from "../../lib/customerPhone";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { getOrderPickupLabel, money } from "../../lib/orderFeatures";
+import { formatBrasiliaDateTimeShort } from "../../lib/brasiliaTime";
 import { useIsMobile } from "../../lib/useMediaQuery";
 
 type CustomerOrder = {
@@ -277,7 +278,7 @@ export default function MeusPedidosPage() {
                       <strong style={styles.orderId}>Pedido #{order.id}</strong>
                       <p style={styles.mutedSmall}>
                         {order.created_at
-                          ? new Date(order.created_at).toLocaleString("pt-BR")
+                          ? formatBrasiliaDateTimeShort(order.created_at)
                           : "Data não informada"}
                       </p>
                     </div>

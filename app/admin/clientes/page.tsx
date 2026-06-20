@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabase";
+import { formatBrasiliaDateTimeShort } from "../../../lib/brasiliaTime";
 import { useIsMobile } from "../../../lib/useMediaQuery";
 import {
   AdminShell,
@@ -246,13 +247,7 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-const formatCustomerDate = (value: string) =>
-  new Date(value).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const formatCustomerDate = formatBrasiliaDateTimeShort;
 
 const localStyles: Record<string, CSSProperties> = {
   summaryGrid: {
