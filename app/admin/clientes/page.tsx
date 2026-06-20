@@ -111,9 +111,9 @@ export default function AdminCustomersPage() {
       action={<span style={styles.pill}>{loading ? "Carregando" : `${number(filteredCustomers.length)} clientes`}</span>}
     >
       <section style={{ ...localStyles.summaryGrid, ...(isMobile ? localStyles.summaryGridMobile : {}) }}>
-        <MetricCard label="Clientes" value={number(customers.length)} detail="com pedidos pagos" />
+        <MetricCard label="Clientes" value={number(customers.length)} detail="com pedidos" />
         <MetricCard label="Pedidos" value={number(summary.totalOrders)} detail="no histórico" />
-        <MetricCard label="Receita" value={money(summary.totalRevenue)} detail="clientes pagos" />
+        <MetricCard label="Receita" value={money(summary.totalRevenue)} detail="clientes" />
         <MetricCard
           label="Ticket médio"
           value={money(summary.averageTicket)}
