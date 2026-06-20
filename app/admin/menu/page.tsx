@@ -536,7 +536,7 @@ export default function AdminMenuPage() {
                       aria-label={`${categoryExpanded ? "Fechar" : "Abrir"} ${getCategoryLabel(category, categories)}`}
                       style={styles.categoryToggle}
                     >
-                      {categoryExpanded ? "−" : "+"}
+                      {categoryExpanded ? "v" : ">"}
                     </button>
                     <div>
                       <h2 style={styles.categoryTitle}>
