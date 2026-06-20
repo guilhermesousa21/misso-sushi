@@ -441,6 +441,9 @@ export default function AdminPanel() {
                   order.items.map((item, index) => (
                     <div key={`${item.id}-${index}`} style={styles.itemRow}>
                       <span style={styles.itemName}>{formatOrderItemLabel(item)}</span>
+                      <strong style={styles.itemPrice}>
+                        {money(item.price * (item.quantity ?? 1))}
+                      </strong>
                     </div>
                   ))
                 ) : (
