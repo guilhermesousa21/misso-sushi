@@ -15,6 +15,11 @@ type Promotion = {
   active: boolean;
 };
 
+const basePromotionColumns =
+  "id,code,description,discount_type,discount_value,active";
+const advancedPromotionColumns =
+  "id,code,description,discount_type,discount_value,min_order_value,usage_limit,used_count,starts_at,expires_at,active";
+
 const calculateDiscount = (promotion: Promotion, subtotal: number) => {
   const value = Number(promotion.discount_value || 0);
   const discount =
@@ -31,18 +36,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Código inválido." }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from("promotions")
-    .select("id,code,description,discount_type,discount_value,min_order_value,usage_limit,used_count,starts_at,expires_at,active")
-    .eq("code", code.toUpperCase())
-    .eq("active", true)
-    .maybeSingle();
+  const queryPromotion = (columns: string) =>
+    supabase
+      .from("promotions")
+      .select(columns)
+      .eq("code", code.toUpperCase())
+      .eq("active", true)
+      .maybeSingle();
+
+  let { data, error } = await queryPromotion(advancedPromotionColumns);
+
+  if (error?.code === "42703") {
+    const fallback = await queryPromotion(basePromotionColumns);
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !data) {
     return NextResponse.json({ error: "Cupom inválido ou inativo." }, { status: 404 });
   }
 
-  const promotion = data as Promotion;
+  const promotion = data as unknown as Promotion;
   const now = new Date();
   const minOrder = Number(promotion.min_order_value || 0);
   if (minOrder > 0 && orderSubtotal < minOrder) {
