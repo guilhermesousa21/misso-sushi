@@ -522,6 +522,27 @@ export default function AdminMenuPage() {
                   }}
                 >
                   <div style={styles.categoryTitleGroup}>
+                    <button
+                      type="button"
+                      onClick={() => toggleCategoryExpanded(category)}
+                      aria-expanded={categoryExpanded}
+                      aria-label={`${categoryExpanded ? "Fechar" : "Abrir"} ${getCategoryLabel(category, categories)}`}
+                      style={styles.categoryToggle}
+                    >
+                      {categoryExpanded ? "−" : "+"}
+                    </button>
+                    <div>
+                      <h2 style={styles.categoryTitle}>
+                        {getCategoryLabel(category, categories)}
+                      </h2>
+                      <p style={styles.categoryMeta}>
+                        {categoryActive
+                          ? `${itemsInCategory.length} ${itemsInCategory.length === 1 ? "item" : "itens"}`
+                          : "Categoria pausada"}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ ...styles.categoryHeaderActions, ...(isMobile ? styles.categoryHeaderActionsMobile : {}) }}>
                     <span
                       onPointerDown={(event) => {
                         if (!canReorder) return;
@@ -556,51 +577,30 @@ export default function AdminMenuPage() {
                         clearDragState();
                       }}
                       onPointerCancel={clearDragState}
-                      style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}
+                      title="Arrastar categoria"
+                      style={canReorder ? styles.categoryDragHandle : styles.categoryDragHandleDisabled}
                     >
-                      ::
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => toggleCategoryExpanded(category)}
-                      aria-expanded={categoryExpanded}
-                      aria-label={`${categoryExpanded ? "Fechar" : "Abrir"} ${getCategoryLabel(category, categories)}`}
-                      style={styles.categoryToggle}
-                    >
-                      {categoryExpanded ? "↑" : "↓"}
-                    </button>
-                    <div>
-                      <p style={styles.cardEyebrow}>Categoria</p>
-                      <h2 style={styles.categoryTitle}>
-                        {getCategoryLabel(category, categories)}
-                      </h2>
-                    </div>
-                  </div>
-                  <div style={{ ...styles.categoryHeaderActions, ...(isMobile ? styles.categoryHeaderActionsMobile : {}) }}>
-                    <span style={styles.pill}>
-                      {categoryActive ? `${itemsInCategory.length} itens` : "Pausada"}
+                      ⋮⋮
                     </span>
                     <button
                       type="button"
                       onClick={() => handleAddItem(category)}
                       style={{
-                        ...styles.primaryButton,
-                        ...styles.categoryAddButton,
+                        ...styles.categoryActionButton,
                         ...(isMobile ? styles.fullWidthMobile : {}),
                       }}
                     >
-                      + Adicionar item
+                      + Item
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditingCategory(editableCategory)}
                       style={{
-                        ...styles.secondaryButton,
-                        ...styles.categoryEditButton,
+                        ...styles.categoryActionButton,
                         ...(isMobile ? styles.fullWidthMobile : {}),
                       }}
                     >
-                      Editar categoria
+                      Editar
                     </button>
                   </div>
                 </div>
@@ -1647,9 +1647,10 @@ const styles: Record<string, CSSProperties> = {
   categoryCard: {
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 14,
-    padding: 18,
-    boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
+    borderRadius: 12,
+    padding: 0,
+    overflow: "hidden",
+    boxShadow: "0 10px 24px rgba(28, 26, 23, 0.035)",
     transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border 140ms ease",
   },
   categoryCardMobile: {
@@ -1658,12 +1659,14 @@ const styles: Record<string, CSSProperties> = {
   categoryHeader: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "start",
+    alignItems: "center",
     gap: 16,
-    marginBottom: 14,
+    padding: "16px 18px",
+    borderBottom: "1px solid rgba(28, 26, 23, 0.06)",
+    background: "#fffdf8",
   },
   categoryHeaderClosed: {
-    marginBottom: 0,
+    borderBottom: "none",
   },
   categoryHeaderMobile: {
     display: "grid",
@@ -1684,20 +1687,39 @@ const styles: Record<string, CSSProperties> = {
   categoryTitleGroup: {
     display: "flex",
     gap: 12,
-    alignItems: "start",
+    alignItems: "center",
+    minWidth: 0,
   },
   categoryToggle: {
-    width: 34,
-    height: 34,
+    width: 30,
+    height: 30,
     border: "1px solid rgba(28, 26, 23, 0.12)",
-    borderRadius: 999,
-    background: "#f0ebe2",
-    color: "#9f1d2f",
+    borderRadius: 8,
+    background: "#fff",
+    color: "#1c1a17",
     cursor: "pointer",
     fontWeight: 900,
     display: "grid",
     placeItems: "center",
     flex: "0 0 auto",
+  },
+  categoryDragHandle: {
+    color: "#b8afa4",
+    cursor: "grab",
+    fontWeight: 900,
+    letterSpacing: -3,
+    lineHeight: 1,
+    touchAction: "none",
+    userSelect: "none",
+    padding: "8px 4px",
+  },
+  categoryDragHandleDisabled: {
+    color: "#ded7cf",
+    fontWeight: 900,
+    letterSpacing: -3,
+    lineHeight: 1,
+    userSelect: "none",
+    padding: "8px 4px",
   },
   dragHandle: {
     color: "#9f1d2f",
@@ -1720,29 +1742,29 @@ const styles: Record<string, CSSProperties> = {
     textTransform: "uppercase",
   },
   categoryTitle: {
+    fontSize: 21,
+    lineHeight: 1.15,
+  },
+  categoryMeta: {
     marginTop: 3,
-    fontSize: 24,
+    color: "#766e64",
+    fontSize: 13,
+    fontWeight: 750,
   },
-  pill: {
+  categoryActionButton: {
+    border: "1px solid rgba(28, 26, 23, 0.1)",
     borderRadius: 999,
-    background: "#f0ebe2",
-    padding: "7px 10px",
-    color: "#625b53",
-    fontSize: 13,
+    background: "#fff",
+    color: "#1c1a17",
+    padding: "8px 11px",
+    cursor: "pointer",
     fontWeight: 850,
-    whiteSpace: "nowrap",
-  },
-  categoryAddButton: {
-    padding: "8px 11px",
-    fontSize: 13,
-  },
-  categoryEditButton: {
-    padding: "8px 11px",
     fontSize: 13,
   },
   itemList: {
     display: "grid",
     gap: 10,
+    padding: 14,
   },
   emptyCategoryText: {
     color: "#766e64",
