@@ -458,9 +458,6 @@ export default function AdminMenuPage() {
           <div>
             <p style={styles.eyebrow}>Operação</p>
             <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>Cardápio</h1>
-            <p style={styles.headerSubtitle}>
-              Organize categorias, estoque, disponibilidade e fotos do cardápio em um só lugar.
-            </p>
           </div>
           <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
             <button
@@ -1565,13 +1562,6 @@ const styles: Record<string, CSSProperties> = {
   },
   titleMobile: {
     fontSize: 32,
-  },
-  headerSubtitle: {
-    marginTop: 10,
-    maxWidth: 620,
-    color: "rgba(255, 253, 248, 0.76)",
-    lineHeight: 1.5,
-    fontWeight: 650,
   },
   headerActions: {
     display: "flex",
