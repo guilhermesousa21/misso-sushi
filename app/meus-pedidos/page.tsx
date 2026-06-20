@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { BackToMenuLink } from "../components/BackToMenuLink";
 import { useCallback, useEffect, useState } from "react";
 import { formatCustomerPhone, isValidCustomerPhone, onlyDigits } from "../../lib/customerPhone";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
@@ -152,9 +153,7 @@ export default function MeusPedidosPage() {
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <header style={styles.header}>
-        <Link href="/" style={styles.backLink}>
-          Voltar ao cardápio
-        </Link>
+        <BackToMenuLink variant="header" />
         <div style={styles.headerTitle}>
           <p style={styles.eyebrow}>Missô Sushi</p>
           <h1 style={styles.title}>Meus pedidos</h1>
@@ -318,19 +317,6 @@ const styles: Record<string, CSSProperties> = {
   pageMobile: { padding: "18px 14px 38px" },
   header: { maxWidth: 760, margin: "0 auto 20px", position: "relative", textAlign: "center", paddingTop: 18 },
   headerTitle: { textAlign: "center" },
-  backLink: {
-    position: "absolute",
-    left: 0,
-    top: 18,
-    color: "#8f1728",
-    textDecoration: "none",
-    fontSize: 14,
-    fontWeight: 850,
-    background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 999,
-    padding: "9px 13px",
-  },
   eyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
   title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },
   muted: { marginTop: 10, color: "#625b53", lineHeight: 1.55 },

@@ -1,13 +1,13 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { formatAddonSummary, getOrderPickupLabel, money } from "../../../lib/orderFeatures";
 import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import { useCart } from "../../context/CartContext";
+import { BackToMenuLink } from "../../components/BackToMenuLink";
 
 type Order = {
   id: number;
@@ -166,9 +166,7 @@ export default function PedidoPage({
   return (
     <main style={styles.page}>
       <section style={styles.panel}>
-        <Link href="/" style={styles.backLink}>
-          Voltar ao cardápio
-        </Link>
+        <BackToMenuLink />
         <p style={styles.eyebrow}>Acompanhe em tempo real</p>
         <h1 style={styles.title}>Pedido #{order.id}</h1>
         <p style={styles.muted}>
@@ -370,13 +368,6 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 8,
     padding: 28,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.08)",
-  },
-  backLink: {
-    display: "inline-flex",
-    marginBottom: 24,
-    color: "#9f1d2f",
-    textDecoration: "none",
-    fontWeight: 850,
   },
   eyebrow: {
     color: "#9f1d2f",

@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { BackToMenuLink } from "../components/BackToMenuLink";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -667,7 +668,7 @@ export default function CheckoutPage() {
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
-        <Link href="/" style={styles.backLink}>Voltar ao cardápio</Link>
+        <BackToMenuLink variant="header" />
         <div style={styles.headerTitle}>
           <p style={styles.eyebrow}>Missô Sushi</p>
           <h1 style={styles.title}>Finalizar pedido</h1>
@@ -1073,8 +1074,6 @@ const styles: Record<string, CSSProperties> = {
   header: { maxWidth: 1180, margin: "0 auto 16px", position: "relative", display: "grid", justifyItems: "center", textAlign: "center", paddingTop: 18 },
   headerMobile: { paddingTop: 46 },
   headerTitle: { textAlign: "center" },
-  backLink: { position: "absolute", left: 0, top: 18, color: "#8f1728", textDecoration: "none", fontSize: 14, fontWeight: 850, background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 999, padding: "9px 13px" },
-  eyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
   title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },
   shell: { maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 378px", gap: 20, alignItems: "start" },
   shellMobile: { gridTemplateColumns: "1fr" },
