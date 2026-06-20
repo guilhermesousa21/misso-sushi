@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { formatAddonSummary, getOrderPickupLabel, money } from "../../../lib/orderFeatures";
 import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
@@ -14,6 +15,10 @@ type Order = {
   status: string;
   created_at: string;
   payment_status?: string | null;
+  payment_method?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  mercado_pago_payment_id?: string | null;
   fulfillment_type?: string | null;
   scheduled_for?: string | null;
   subtotal?: number | null;
@@ -62,12 +67,20 @@ const getCustomerStatus = (order: Order) => {
   return order.status;
 };
 
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
 export default function PedidoPage({
   params,
 }: {
   params: Promise<{ ID: string }>;
 }) {
   const [order, setOrder] = useState<Order | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [pixCode, setPixCode] = useState("");
+  const [pixQr, setPixQr] = useState("");
+  const [showPix, setShowPix] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const { ID: orderId } = use(params);
   const router = useRouter();
   const { clear, addToCart } = useCart();
@@ -133,6 +146,70 @@ export default function PedidoPage({
   const serviceFee = Number(order.service_fee || 0);
   const serviceFeeLabel = order.service_fee_label?.trim() || "Taxa de embalagem";
   const orderTotal = Number(order.total || 0);
+  const paymentMethod = (order.payment_method || "pix").toLowerCase();
+  const isPaymentPending =
+    !isPaid && (order.payment_status || "pendente").trim().toLowerCase() === "pendente";
+
+  const handleContinuePayment = async () => {
+    setPaymentError("");
+    setPaymentLoading(true);
+
+    try {
+      if (paymentMethod === "card") {
+        const preferenceRes = await fetch("/api/checkout/preference", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: order.id,
+            amount: orderTotal,
+            title: `Missô Sushi #${order.id}`,
+            payer: { name: order.name || "Cliente", email: "cliente@email.com" },
+          }),
+        });
+        const preferenceData = await preferenceRes.json();
+        if (!preferenceRes.ok || !preferenceData.init_point) {
+          throw new Error(preferenceData.error || preferenceData.detail || "Não foi possível iniciar o pagamento.");
+        }
+        window.location.assign(String(preferenceData.init_point));
+        return;
+      }
+
+      const pixRes = await fetch("/api/pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: orderTotal,
+          note: `Missô Sushi #${order.id}`,
+          payer: { name: order.name || "Cliente", phone: onlyDigits(order.phone || "") },
+        }),
+      });
+      const pixData = await pixRes.json();
+      if (!pixRes.ok || !pixData.payment_id || (!pixData.qr_code_base64 && !pixData.qr_code)) {
+        throw new Error(pixData.error || pixData.detail || "Não foi possível gerar o PIX.");
+      }
+
+      await supabase
+        .from("orders")
+        .update({ mercado_pago_payment_id: String(pixData.payment_id) })
+        .eq("id", order.id);
+
+      setPixQr(pixData.qr_code_base64 || "");
+      setPixCode(pixData.qr_code || "");
+      setShowPix(true);
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : "Não foi possível continuar o pagamento.");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleCopyPix = async () => {
+    if (!pixCode) return;
+    await navigator.clipboard.writeText(pixCode);
+    setCopyFeedback(true);
+    window.setTimeout(() => setCopyFeedback(false), 2000);
+  };
+
   const handleRepeatOrder = () => {
     clear();
     (order.items || []).forEach((item) => {
@@ -267,7 +344,62 @@ export default function PedidoPage({
             );
           })}
         </div>
-        {(order.items || []).length > 0 && (
+
+        {isPaymentPending && showPix && (pixCode || pixQr) && (
+          <div style={styles.pixPanel}>
+            <p style={styles.pixPanelTitle}>Pagamento PIX</p>
+            <p style={styles.pixPanelHint}>
+              Escaneie o QR Code ou copie o código. Esta página atualiza sozinha quando o pagamento for confirmado.
+            </p>
+            <div style={styles.pixQrBox}>
+              {pixCode ? (
+                <QRCodeSVG value={pixCode} size={220} level="M" includeMargin />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`data:image/png;base64,${pixQr}`} alt="QR Code PIX" width={220} height={220} />
+              )}
+              <strong style={styles.pixAmount}>{money(orderTotal)}</strong>
+            </div>
+            {pixCode && (
+              <>
+                <label htmlFor="pixCode" style={styles.pixLabel}>
+                  Código copia e cola
+                </label>
+                <textarea id="pixCode" value={pixCode} readOnly style={styles.pixCodeArea} />
+                <button type="button" onClick={handleCopyPix} style={styles.copyPixButton}>
+                  {copyFeedback ? "Código PIX copiado" : "Copiar código PIX"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {isPaymentPending && !showPix && (
+          <>
+            <button
+              type="button"
+              onClick={handleContinuePayment}
+              disabled={paymentLoading}
+              style={{
+                ...styles.payButton,
+                ...(paymentLoading ? styles.payButtonDisabled : {}),
+              }}
+            >
+              {paymentLoading
+                ? "Preparando pagamento..."
+                : `Pagar pedido · ${money(orderTotal)}`}
+            </button>
+            <p style={styles.payHint}>
+              {paymentMethod === "card"
+                ? "Você será redirecionado ao Mercado Pago para concluir o pagamento."
+                : "Seu pedido só entra na cozinha após a confirmação do pagamento."}
+            </p>
+          </>
+        )}
+
+        {paymentError && <p style={styles.paymentError}>{paymentError}</p>}
+
+        {isPaid && (order.items || []).length > 0 && (
           <button type="button" onClick={handleRepeatOrder} style={styles.repeatButton}>
             Repetir este pedido
           </button>
@@ -513,6 +645,95 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 4,
     color: "#766e64",
     fontSize: 13,
+  },
+  payButton: {
+    marginTop: 18,
+    width: "100%",
+    border: "none",
+    borderRadius: 999,
+    background: "#9f1d2f",
+    color: "#fffdf8",
+    padding: "15px 18px",
+    cursor: "pointer",
+    fontWeight: 850,
+    fontSize: 16,
+    boxShadow: "0 14px 28px rgba(159, 29, 47, 0.22)",
+  },
+  payButtonDisabled: {
+    opacity: 0.6,
+    cursor: "not-allowed",
+    boxShadow: "none",
+  },
+  payHint: {
+    marginTop: 10,
+    color: "#766e64",
+    fontSize: 13,
+    lineHeight: 1.45,
+    textAlign: "center",
+  },
+  paymentError: {
+    marginTop: 12,
+    borderRadius: 8,
+    background: "#fee2e2",
+    color: "#991b1b",
+    padding: 12,
+    fontWeight: 800,
+    fontSize: 13,
+    lineHeight: 1.4,
+  },
+  pixPanel: {
+    marginTop: 18,
+    borderRadius: 8,
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    background: "#fffaf2",
+    padding: 18,
+    display: "grid",
+    gap: 12,
+  },
+  pixPanelTitle: {
+    fontSize: 18,
+    fontWeight: 850,
+    lineHeight: 1.2,
+  },
+  pixPanelHint: {
+    color: "#625b53",
+    fontSize: 13,
+    lineHeight: 1.45,
+  },
+  pixQrBox: {
+    display: "grid",
+    justifyItems: "center",
+    gap: 10,
+    padding: "8px 0",
+  },
+  pixAmount: {
+    fontSize: 24,
+    color: "#1c1a17",
+  },
+  pixLabel: {
+    fontSize: 14,
+    fontWeight: 850,
+  },
+  pixCodeArea: {
+    width: "100%",
+    minHeight: 96,
+    resize: "none",
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 8,
+    padding: 12,
+    color: "#514a43",
+    background: "#fff",
+    lineHeight: 1.45,
+  },
+  copyPixButton: {
+    width: "100%",
+    border: "none",
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "14px 18px",
+    cursor: "pointer",
+    fontWeight: 850,
   },
   repeatButton: {
     marginTop: 18,
