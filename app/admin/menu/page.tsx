@@ -131,11 +131,18 @@ export default function AdminMenuPage() {
             .order("sort_order", { ascending: true }),
         ]);
 
-      if (categoryData?.length) {
-        setCategories(sortCategories(categoryData as MenuCategory[]));
-      }
+      const nextCategories = categoryData?.length
+        ? sortCategories(categoryData as MenuCategory[])
+        : defaultMenuCategories;
+      setCategories(nextCategories);
 
-      if (!menuError && menuData) setItems(uniqueById(menuData as MenuItem[]));
+      if (!menuError && menuData) {
+        const nextItems = uniqueById(menuData as MenuItem[]);
+        setItems(nextItems);
+        setExpandedCategories(new Set(getOrderedCategorySlugs(nextItems, nextCategories)));
+      } else {
+        setExpandedCategories(new Set(nextCategories.map((category) => category.slug)));
+      }
     }
 
     fetchMenuData();
