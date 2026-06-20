@@ -42,7 +42,10 @@ type ConfirmationState =
   | { action: "picked_up"; order: Order }
   | null;
 
-type KitchenFilter = "recebidos" | "prontos" | "atrasados";
+type KitchenFilter = "recebidos" | "prontos" | "atrasados" | "retirados";
+
+const isOrderPickedUp = (order: Order) =>
+  normalizeKitchenStatus(order.status) === "retirado" || order.status === "retirado";
 
 const statusLabels: Record<string, string> = {
   recebido: "Recebido",
@@ -237,35 +240,34 @@ export default function AdminPanel() {
   }
 
   const todayKey = toBrasiliaDateKey(now);
-  const visibleOrders = orders.filter(
-    (order) =>
-      toBrasiliaDateKey(order.created_at) === todayKey &&
-      normalizeKitchenStatus(order.status) !== "retirado" &&
-      order.status !== "retirado"
+  const todayOrders = orders.filter(
+    (order) => toBrasiliaDateKey(order.created_at) === todayKey
   );
+  const queueOrders = todayOrders.filter((order) => !isOrderPickedUp(order));
+  const pickedUpOrders = todayOrders.filter(isOrderPickedUp);
 
-  const sorted = [...visibleOrders].sort((a, b) => {
-    const aDone = ["retirado"].includes(a.status);
-    const bDone = ["retirado"].includes(b.status);
-    if (aDone && !bDone) return 1;
-    if (bDone && !aDone) return -1;
-    const aPickup = a.scheduled_for || a.created_at;
-    const bPickup = b.scheduled_for || b.created_at;
-    return new Date(aPickup).getTime() - new Date(bPickup).getTime();
-  });
+  const sortQueueOrders = (items: Order[]) =>
+    [...items].sort((a, b) => {
+      const aPickup = a.scheduled_for || a.created_at;
+      const bPickup = b.scheduled_for || b.created_at;
+      return new Date(aPickup).getTime() - new Date(bPickup).getTime();
+    });
 
-  const activeOrders = visibleOrders.filter(
-    (order) => !["retirado"].includes(order.status)
-  );
-  const receivedOrders = activeOrders.filter(
+  const sortPickedUpOrders = (items: Order[]) =>
+    [...items].sort(
+      (a, b) =>
+        parseSupabaseDate(b.created_at).getTime() - parseSupabaseDate(a.created_at).getTime()
+    );
+
+  const receivedOrders = queueOrders.filter(
     (order) =>
       normalizeKitchenStatus(order.status) === "recebido" &&
       !isKitchenOrderDelayed(order, now)
   );
-  const readyOrders = activeOrders.filter(
+  const readyOrders = queueOrders.filter(
     (order) => normalizeKitchenStatus(order.status) === "pronto"
   );
-  const delayedOrders = activeOrders.filter((order) => isKitchenOrderDelayed(order, now));
+  const delayedOrders = queueOrders.filter((order) => isKitchenOrderDelayed(order, now));
 
   const orderMatchesFilter = (order: Order, filterValue: KitchenFilter | null) => {
     if (!filterValue) return true;
@@ -275,15 +277,20 @@ export default function AdminPanel() {
       return kitchenStatus === "recebido" && !isKitchenOrderDelayed(order, now);
     }
     if (filterValue === "prontos") return kitchenStatus === "pronto";
+    if (filterValue === "retirados") return isOrderPickedUp(order);
     return isKitchenOrderDelayed(order, now);
   };
 
-  const filteredOrders = sorted.filter((order) => orderMatchesFilter(order, filter));
+  const filteredOrders =
+    filter === "retirados"
+      ? sortPickedUpOrders(pickedUpOrders)
+      : sortQueueOrders(queueOrders).filter((order) => orderMatchesFilter(order, filter));
 
   const filterEmptyMessages: Record<KitchenFilter, string> = {
     recebidos: "Nenhum pedido recebido no momento.",
     prontos: "Nenhum pedido pronto no momento.",
     atrasados: "Nenhum pedido atrasado no momento.",
+    retirados: "Nenhum pedido retirado hoje.",
   };
 
   const kitchenFilters: {
@@ -292,6 +299,7 @@ export default function AdminPanel() {
     count: number;
     alert?: boolean;
     success?: boolean;
+    pickedUp?: boolean;
   }[] = [
     { key: "recebidos", label: "Recebidos", count: receivedOrders.length },
     { key: "prontos", label: "Prontos", count: readyOrders.length, success: true },
@@ -301,7 +309,20 @@ export default function AdminPanel() {
       count: delayedOrders.length,
       alert: delayedOrders.length > 0,
     },
+    {
+      key: "retirados",
+      label: "Retirados",
+      count: pickedUpOrders.length,
+      pickedUp: pickedUpOrders.length > 0,
+    },
   ];
+
+  const showEmptyBoard =
+    filter === "retirados"
+      ? pickedUpOrders.length === 0
+      : filter
+        ? filteredOrders.length === 0
+        : queueOrders.length === 0;
 
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
@@ -324,6 +345,7 @@ export default function AdminPanel() {
                     ...styles.headerStatButton,
                     ...(item.success ? styles.headerStatSuccess : {}),
                     ...(item.alert ? styles.headerStatAlert : {}),
+                    ...(item.pickedUp ? styles.headerStatPickedUp : {}),
                     ...(isActive ? styles.headerStatActive : styles.headerStatInactive),
                   }}
                   onClick={() =>
@@ -339,13 +361,13 @@ export default function AdminPanel() {
         </div>
       </header>
 
-      {visibleOrders.length === 0 ? (
+      {showEmptyBoard ? (
         <section style={styles.emptyState}>
-          <h2>Nenhum pedido na cozinha hoje.</h2>
-        </section>
-      ) : filteredOrders.length === 0 ? (
-        <section style={styles.emptyState}>
-          <h2>{filter ? filterEmptyMessages[filter] : "Nenhum pedido encontrado."}</h2>
+          <h2>
+            {filter
+              ? filterEmptyMessages[filter]
+              : "Nenhum pedido na cozinha hoje."}
+          </h2>
         </section>
       ) : (
         <section style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
@@ -432,27 +454,31 @@ export default function AdminPanel() {
                   type="button"
                   style={{
                     ...styles.actionStatusButton,
-                    ...(kitchenStatus === "pronto"
+                    ...(kitchenStatus === "retirado"
                       ? styles.actionMarkReadyDone
-                      : styles.actionMarkReady),
+                      : kitchenStatus === "pronto"
+                        ? styles.actionMarkReadyDone
+                        : styles.actionMarkReady),
                   }}
                   onClick={() => setConfirmation({ action: "ready", order })}
-                  disabled={kitchenStatus === "pronto"}
+                  disabled={kitchenStatus === "pronto" || kitchenStatus === "retirado"}
                 >
-                  {kitchenStatus === "pronto" ? "Pronto" : "Marcar pronto"}
+                  {kitchenStatus === "pronto" || kitchenStatus === "retirado" ? "Pronto" : "Marcar pronto"}
                 </button>
                 <button
                   type="button"
                   style={{
                     ...styles.actionStatusButton,
-                    ...(kitchenStatus === "pronto"
-                      ? styles.actionPickedUp
-                      : styles.actionPickedUpDisabled),
+                    ...(kitchenStatus === "retirado"
+                      ? styles.actionPickedUpDone
+                      : kitchenStatus === "pronto"
+                        ? styles.actionPickedUp
+                        : styles.actionPickedUpDisabled),
                   }}
                   onClick={() => setConfirmation({ action: "picked_up", order })}
                   disabled={kitchenStatus !== "pronto"}
                 >
-                  Marcar retirado
+                  {kitchenStatus === "retirado" ? "Retirado" : "Marcar retirado"}
                 </button>
               </div>
             </article>
@@ -604,9 +630,9 @@ const styles: Record<string, CSSProperties> = {
   },
   headerStats: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
     gap: 8,
-    minWidth: 360,
+    minWidth: 480,
   },
   headerStatsMobile: {
     width: "100%",
@@ -638,6 +664,9 @@ const styles: Record<string, CSSProperties> = {
   },
   headerStatSuccess: {
     background: "#15803d",
+  },
+  headerStatPickedUp: {
+    background: "#3730a3",
   },
   grid: {
     maxWidth: 1180,
@@ -810,6 +839,11 @@ const styles: Record<string, CSSProperties> = {
   },
   actionPickedUp: {
     background: "#3730a3",
+  },
+  actionPickedUpDone: {
+    background: "#e0e7ff",
+    color: "#3730a3",
+    cursor: "not-allowed",
   },
   actionPickedUpDisabled: {
     background: "#e0e7ff",
