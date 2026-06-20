@@ -78,6 +78,10 @@ const parseSupabaseDate = (value: string) => {
 const minutesSinceAt = (value: string, now: Date) =>
   Math.max(0, Math.floor((now.getTime() - parseSupabaseDate(value).getTime()) / 60000));
 
+const isKitchenOrderDelayed = (order: Order, now: Date) =>
+  normalizeKitchenStatus(order.status) === "recebido" &&
+  minutesSinceAt(order.created_at, now) > 35;
+
 const formatBrasiliaDateTime = (value: string) =>
   parseSupabaseDate(value).toLocaleString("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -234,24 +238,24 @@ export default function AdminPanel() {
     (order) => !["retirado"].includes(order.status)
   );
   const receivedOrders = activeOrders.filter(
-    (order) => normalizeKitchenStatus(order.status) === "recebido"
+    (order) =>
+      normalizeKitchenStatus(order.status) === "recebido" &&
+      !isKitchenOrderDelayed(order, now)
   );
   const readyOrders = activeOrders.filter(
     (order) => normalizeKitchenStatus(order.status) === "pronto"
   );
-  const delayedOrders = activeOrders.filter(
-    (order) => minutesSinceAt(order.created_at, now) > 35
-  );
+  const delayedOrders = activeOrders.filter((order) => isKitchenOrderDelayed(order, now));
 
   const orderMatchesFilter = (order: Order, filterValue: KitchenFilter | null) => {
     if (!filterValue) return true;
 
     const kitchenStatus = normalizeKitchenStatus(order.status);
-    if (filterValue === "recebidos") return kitchenStatus === "recebido";
+    if (filterValue === "recebidos") {
+      return kitchenStatus === "recebido" && !isKitchenOrderDelayed(order, now);
+    }
     if (filterValue === "prontos") return kitchenStatus === "pronto";
-    return (
-      minutesSinceAt(order.created_at, now) > 35 && !["retirado"].includes(order.status)
-    );
+    return isKitchenOrderDelayed(order, now);
   };
 
   const filteredOrders = sorted.filter((order) => orderMatchesFilter(order, filter));
@@ -329,7 +333,7 @@ export default function AdminPanel() {
             (() => {
               const kitchenStatus = normalizeKitchenStatus(order.status);
               const minutesInQueue = minutesSinceAt(order.created_at, now);
-              const delayed = minutesInQueue > 35 && !["retirado"].includes(order.status);
+              const delayed = isKitchenOrderDelayed(order, now);
 
               return (
             <article
