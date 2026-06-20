@@ -175,13 +175,6 @@ export default function PedidoPage({
           Atualizado em {new Date(order.created_at).toLocaleString("pt-BR")}
         </p>
 
-        <div style={styles.statusCard}>
-          <span style={styles.statusLabel}>Status atual</span>
-          <strong style={styles.statusValue}>
-            {steps[current]?.label || customerStatus}
-          </strong>
-        </div>
-
         {(order.items || []).length > 0 && (
           <div style={styles.summaryCard}>
             <div style={styles.cardHeader}>
@@ -401,26 +394,8 @@ const styles: Record<string, CSSProperties> = {
     color: "#625b53",
     lineHeight: 1.55,
   },
-  statusCard: {
-    marginTop: 24,
-    background: "#1c1a17",
-    color: "#fffdf8",
-    borderRadius: 8,
-    padding: 18,
-  },
-  statusLabel: {
-    display: "block",
-    color: "#d8d0c4",
-    fontSize: 13,
-    fontWeight: 800,
-  },
-  statusValue: {
-    display: "block",
-    marginTop: 6,
-    fontSize: 26,
-  },
   summaryCard: {
-    marginTop: 12,
+    marginTop: 24,
     background: "#171512",
     color: "#fffdf8",
     border: "1px solid rgba(255, 253, 248, 0.08)",
