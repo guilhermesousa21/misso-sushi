@@ -912,7 +912,7 @@ export default function CheckoutPage() {
                       <div key={addon.id} style={styles.addonRow}>
                         <span>
                           {addon.name}
-                          <small style={styles.addonPrice}> {money(Number(addon.unit_price || 0))} cada</small>
+                          <small style={styles.addonPrice}> {money(Number(addon.unit_price || 0))}</small>
                         </span>
                         <div style={styles.qtyControl}>
                           <button
