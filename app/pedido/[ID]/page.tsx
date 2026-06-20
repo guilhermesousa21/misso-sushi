@@ -4,8 +4,8 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
-import { formatAddonSummary, getOrderPickupLabel } from "../../../lib/orderFeatures";
-import { formatOrderItemLabel } from "../../../lib/itemModifiers";
+import { formatAddonSummary, getOrderPickupLabel, money } from "../../../lib/orderFeatures";
+import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import { useCart } from "../../context/CartContext";
 
@@ -16,6 +16,12 @@ type Order = {
   payment_status?: string | null;
   fulfillment_type?: string | null;
   scheduled_for?: string | null;
+  subtotal?: number | null;
+  discount_amount?: number | null;
+  loyalty_discount?: number | null;
+  service_fee?: number | null;
+  service_fee_label?: string | null;
+  total?: number | null;
   addons?: { id: string; name: string; quantity: number; unit_price?: number | null }[] | null;
   items?: {
     id: number;
@@ -113,6 +119,20 @@ export default function PedidoPage({
   const customerStatus = getCustomerStatus(order);
   const current = statusIndex(customerStatus);
   const addonSummary = formatAddonSummary(order.addons);
+  const itemCount = (order.items || []).reduce(
+    (sum, item) => sum + (item.quantity ?? 1),
+    0
+  );
+  const addonTotal = (order.addons || []).reduce(
+    (sum, addon) => sum + Number(addon.unit_price || 0) * (addon.quantity || 0),
+    0
+  );
+  const subtotal = Number(order.subtotal || 0);
+  const discountAmount = Number(order.discount_amount || 0);
+  const loyaltyDiscount = Number(order.loyalty_discount || 0);
+  const serviceFee = Number(order.service_fee || 0);
+  const serviceFeeLabel = order.service_fee_label?.trim() || "Taxa de embalagem";
+  const orderTotal = Number(order.total || 0);
   const handleRepeatOrder = () => {
     clear();
     (order.items || []).forEach((item) => {
@@ -163,26 +183,82 @@ export default function PedidoPage({
         </div>
 
         {(order.items || []).length > 0 && (
-          <div style={styles.itemsBox}>
-            <strong style={styles.itemsTitle}>Itens do pedido</strong>
-            {(order.items || []).map((item, index) => (
-              <p key={`${item.id}-${index}`} style={styles.itemLine}>
-                {formatOrderItemLabel(item)}
-              </p>
-            ))}
+          <div style={styles.summaryCard}>
+            <div style={styles.cardHeader}>
+              <div>
+                <p style={styles.cardEyebrow}>Resumo</p>
+                <h2 style={styles.cardTitle}>Seu pedido</h2>
+              </div>
+              <span style={styles.summaryPill}>
+                {itemCount} {itemCount === 1 ? "item" : "itens"}
+              </span>
+            </div>
+
+            <div style={styles.orderList}>
+              {(order.items || []).map((item, index) => {
+                const quantity = item.quantity ?? 1;
+                const unitPrice = Number(item.price || 0);
+                const modifierText = formatItemModifiers(item.modifiers);
+
+                return (
+                  <div key={`${item.id}-${index}`} style={styles.summaryOrderRow}>
+                    <div>
+                      <strong style={styles.itemName}>
+                        {quantity}x {item.name}
+                        {modifierText ? ` (${modifierText})` : ""}
+                      </strong>
+                      <p style={styles.summaryMuted}>{money(unitPrice)} cada</p>
+                    </div>
+                    <strong>{money(unitPrice * quantity)}</strong>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={styles.summaryTotalBox}>
+              {(discountAmount > 0 || serviceFee > 0 || addonTotal > 0) && subtotal > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>Subtotal</span>
+                  <strong>{money(subtotal)}</strong>
+                </div>
+              )}
+              {addonTotal > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>Complementos</span>
+                  <strong>{money(addonTotal)}</strong>
+                </div>
+              )}
+              {serviceFee > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>{serviceFeeLabel}</span>
+                  <strong>{money(serviceFee)}</strong>
+                </div>
+              )}
+              {discountAmount > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>Desconto cupom</span>
+                  <strong style={styles.discountText}>-{money(discountAmount)}</strong>
+                </div>
+              )}
+              {loyaltyDiscount > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>Fidelidade</span>
+                  <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
+                </div>
+              )}
+              {addonSummary && (
+                <div style={styles.addonSummary}>Complementos: {addonSummary}</div>
+              )}
+              <div style={styles.addonSummary}>
+                Retirada: {getOrderPickupLabel(order)}
+              </div>
+              <div style={styles.summaryGrandTotalLine}>
+                <span>Total</span>
+                <strong>{money(orderTotal)}</strong>
+              </div>
+            </div>
           </div>
         )}
-
-        <div style={styles.infoGrid}>
-          <div style={styles.infoBox}>
-            <span>Retirada</span>
-            <strong>{getOrderPickupLabel(order)}</strong>
-          </div>
-          <div style={styles.infoBox}>
-            <span>Complementos</span>
-            <strong>{addonSummary || "Nenhum"}</strong>
-          </div>
-        </div>
 
         <div style={styles.timeline}>
           {steps.map((step, index) => {
@@ -343,21 +419,91 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 6,
     fontSize: 26,
   },
-  infoGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: 10,
+  summaryCard: {
     marginTop: 12,
-  },
-  infoBox: {
-    display: "grid",
-    gap: 5,
+    background: "#171512",
+    color: "#fffdf8",
+    border: "1px solid rgba(255, 253, 248, 0.08)",
     borderRadius: 8,
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    background: "#fffaf2",
-    padding: 12,
-    color: "#514a43",
+    padding: 22,
+    boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)",
+  },
+  cardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "start",
+    gap: 16,
+    marginBottom: 18,
+  },
+  cardEyebrow: {
+    color: "#9f1d2f",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+    letterSpacing: 0,
+  },
+  cardTitle: {
+    marginTop: 5,
+    fontSize: 23,
+    lineHeight: 1.12,
+  },
+  summaryPill: {
+    borderRadius: 999,
+    background: "rgba(255, 253, 248, 0.12)",
+    padding: "7px 10px",
+    color: "#fffdf8",
     fontSize: 13,
+    fontWeight: 850,
+    whiteSpace: "nowrap",
+  },
+  orderList: {
+    display: "grid",
+    gap: 13,
+  },
+  summaryOrderRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 18,
+    paddingBottom: 13,
+    borderBottom: "1px solid rgba(255, 253, 248, 0.12)",
+  },
+  itemName: {
+    display: "block",
+    lineHeight: 1.35,
+  },
+  summaryMuted: {
+    marginTop: 4,
+    color: "rgba(255, 253, 248, 0.68)",
+    fontSize: 13,
+    lineHeight: 1.4,
+  },
+  summaryTotalBox: {
+    display: "grid",
+    gap: 10,
+    marginTop: 18,
+  },
+  summaryTotalLine: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 16,
+    color: "rgba(255, 253, 248, 0.78)",
+    fontSize: 15,
+  },
+  addonSummary: {
+    color: "rgba(255, 253, 248, 0.66)",
+    fontSize: 13,
+    lineHeight: 1.45,
+  },
+  discountText: {
+    color: "#0f7a4a",
+  },
+  summaryGrandTotalLine: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 16,
+    color: "#fffdf8",
+    fontSize: 22,
+    fontWeight: 850,
   },
   timeline: {
     marginTop: 24,
@@ -401,25 +547,6 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 4,
     color: "#766e64",
     fontSize: 13,
-  },
-  itemsBox: {
-    marginTop: 12,
-    borderRadius: 8,
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    background: "#fffaf2",
-    padding: 14,
-    display: "grid",
-    gap: 8,
-  },
-  itemsTitle: {
-    fontSize: 14,
-    fontWeight: 850,
-  },
-  itemLine: {
-    margin: 0,
-    color: "#514a43",
-    fontSize: 14,
-    lineHeight: 1.4,
   },
   repeatButton: {
     marginTop: 18,
