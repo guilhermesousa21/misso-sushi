@@ -717,11 +717,6 @@ export default function CheckoutPage() {
             <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
           </div>
         )}
-        {selectedAddonList.length > 0 && (
-          <div style={styles.addonSummary}>
-            Complementos: {selectedAddonList.map((addon) => `${addon.quantity}x ${addon.name}`).join(", ")}
-          </div>
-        )}
         <div style={styles.addonSummary}>
           Retirada:{" "}
           {wantsScheduledPickup && scheduledFor
