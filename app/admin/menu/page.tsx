@@ -266,7 +266,8 @@ export default function AdminMenuPage() {
   const getItemsAfterItemDrop = (
     draggedItem: MenuItem,
     targetCategory: string,
-    targetItemId?: number
+    targetItemId?: number,
+    insertAfterTarget = false
   ) => {
     const orderedCategorySlugs = getOrderedCategorySlugs(items, categories);
     const categoryOrderMap = new Map(orderedCategorySlugs.map((category, index) => [category, index]));
@@ -287,8 +288,14 @@ export default function AdminMenuPage() {
       typeof targetItemId === "number"
         ? targetItems.findIndex((item) => item.id === targetItemId)
         : -1;
+    const insertIndex =
+      targetIndex === -1
+        ? targetItems.length
+        : insertAfterTarget
+          ? targetIndex + 1
+          : targetIndex;
     targetItems.splice(
-      targetIndex === -1 ? targetItems.length : targetIndex,
+      insertIndex,
       0,
       {
         ...draggedItem,
@@ -329,7 +336,23 @@ export default function AdminMenuPage() {
       return;
     }
 
-    await persistDroppedItems(getItemsAfterItemDrop(draggedItem, targetCategory, targetItem.id));
+    const sameCategoryItems = sortItems(items.filter((item) => item.category === targetCategory));
+    const draggedIndex = sameCategoryItems.findIndex((item) => item.id === draggedItem.id);
+    const targetIndex = sameCategoryItems.findIndex((item) => item.id === targetItem.id);
+    const shouldInsertAfterTarget =
+      draggedItem.category === targetCategory &&
+      draggedIndex !== -1 &&
+      targetIndex !== -1 &&
+      draggedIndex < targetIndex;
+
+    await persistDroppedItems(
+      getItemsAfterItemDrop(
+        draggedItem,
+        targetCategory,
+        targetItem.id,
+        shouldInsertAfterTarget
+      )
+    );
   };
 
   const handleItemDropToCategory = async (targetCategory: string) => {
