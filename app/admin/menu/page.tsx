@@ -455,6 +455,9 @@ export default function AdminMenuPage() {
           <AdminLink href="/admin/pedidos" pathname={pathname} compact={isMobile}>
             Pedidos
           </AdminLink>
+          <AdminLink href="/admin/clientes" pathname={pathname} compact={isMobile}>
+            Clientes
+          </AdminLink>
           <AdminLink href="/admin/promocoes" pathname={pathname} compact={isMobile}>
             Promoções
           </AdminLink>
@@ -469,6 +472,25 @@ export default function AdminMenuPage() {
           <div>
             <p style={styles.eyebrow}>Operação</p>
             <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>Cardápio</h1>
+            <p style={styles.headerSubtitle}>
+              Organize categorias, estoque, disponibilidade e fotos do cardápio em um só lugar.
+            </p>
+          </div>
+          <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
+            <button
+              type="button"
+              onClick={() => handleAddItem()}
+              style={{ ...styles.primaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
+            >
+              + Novo item
+            </button>
+            <button
+              type="button"
+              onClick={() => newCategoryInputRef.current?.focus()}
+              style={{ ...styles.secondaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
+            >
+              Nova categoria
+            </button>
           </div>
         </header>
 
@@ -840,6 +862,11 @@ export default function AdminMenuPage() {
                             height={64}
                             style={{ ...styles.itemImage, ...(isMobile ? styles.itemImageMobile : {}) }}
                           />
+                        )}
+                        {!item.image && (
+                          <div style={{ ...styles.itemImagePlaceholder, ...(isMobile ? styles.itemImageMobile : {}) }}>
+                            <span>Sem foto</span>
+                          </div>
                         )}
                         <div>
                           <h3 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h3>
@@ -1463,7 +1490,7 @@ function EditModal({
 const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f7f4ef",
+    background: "#f5f1ea",
     color: "#1c1a17",
     display: "grid",
     gridTemplateColumns: "240px minmax(0, 1fr)",
@@ -1475,10 +1502,14 @@ const styles: Record<string, CSSProperties> = {
     borderRight: "1px solid rgba(28, 26, 23, 0.08)",
     background: "#fffdf8",
     padding: 22,
+    position: "sticky",
+    top: 0,
+    height: "100vh",
   },
   sidebarTop: {
     borderRight: "none",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
+    height: "auto",
   },
   sidebarMobile: {
     padding: "12px 12px 10px",
@@ -1527,6 +1558,9 @@ const styles: Record<string, CSSProperties> = {
   },
   content: {
     padding: "28px 24px 56px",
+    width: "min(1180px, 100%)",
+    margin: "0 auto",
+    boxSizing: "border-box",
   },
   contentMobile: {
     padding: "22px 14px 42px",
@@ -1537,6 +1571,12 @@ const styles: Record<string, CSSProperties> = {
     gap: 16,
     alignItems: "end",
     marginBottom: 18,
+    borderRadius: 16,
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    background: "linear-gradient(135deg, #1c1a17 0%, #33251f 58%, #9f1d2f 140%)",
+    color: "#fffdf8",
+    padding: 22,
+    boxShadow: "0 20px 50px rgba(28, 26, 23, 0.12)",
   },
   headerMobile: {
     display: "grid",
@@ -1545,7 +1585,7 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 12,
   },
   eyebrow: {
-    color: "#9f1d2f",
+    color: "#f6b9c2",
     fontSize: 12,
     fontWeight: 850,
     textTransform: "uppercase",
@@ -1557,6 +1597,24 @@ const styles: Record<string, CSSProperties> = {
   },
   titleMobile: {
     fontSize: 32,
+  },
+  headerSubtitle: {
+    marginTop: 10,
+    maxWidth: 620,
+    color: "rgba(255, 253, 248, 0.76)",
+    lineHeight: 1.5,
+    fontWeight: 650,
+  },
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  headerActionsMobile: {
+    display: "grid",
+    justifyContent: "stretch",
   },
   primaryButton: {
     border: "none",
@@ -1572,6 +1630,9 @@ const styles: Record<string, CSSProperties> = {
     cursor: "not-allowed",
   },
   toolbar: {
+    position: "sticky",
+    top: 12,
+    zIndex: 10,
     display: "grid",
     gridTemplateColumns: "minmax(220px, 1fr) minmax(180px, 280px)",
     gap: 10,
@@ -1587,7 +1648,9 @@ const styles: Record<string, CSSProperties> = {
     gap: 8,
   },
   input: {
+    boxSizing: "border-box",
     width: "100%",
+    minWidth: 0,
     border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 8,
     padding: 12,
@@ -1596,7 +1659,9 @@ const styles: Record<string, CSSProperties> = {
     outlineColor: "#9f1d2f",
   },
   select: {
+    boxSizing: "border-box",
     width: "100%",
+    minWidth: 0,
     border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 8,
     padding: 12,
@@ -1645,7 +1710,7 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: "minmax(180px, 260px) minmax(0, 1fr)",
     gap: 16,
     alignItems: "center",
-    borderRadius: 12,
+    borderRadius: 14,
     border: "1px solid rgba(159, 29, 47, 0.14)",
     background: "linear-gradient(180deg, #fffdf8 0%, #f7f2ea 100%)",
     padding: 16,
@@ -1730,6 +1795,7 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gap: 5,
     boxShadow: "0 10px 24px rgba(28, 26, 23, 0.04)",
+    minHeight: 78,
   },
   categoryListToolbar: {
     display: "flex",
@@ -1765,7 +1831,7 @@ const styles: Record<string, CSSProperties> = {
   categoryCard: {
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
+    borderRadius: 14,
     padding: 18,
     boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
     transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border 140ms ease",
@@ -1875,7 +1941,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     gap: 14,
     border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
     background: "#fff",
     transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border 140ms ease",
@@ -1916,10 +1982,25 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 8,
     objectFit: "cover",
     background: "#f0ebe2",
+    flex: "0 0 auto",
   },
   itemImageMobile: {
     width: 64,
     height: 48,
+  },
+  itemImagePlaceholder: {
+    width: 92,
+    height: 64,
+    borderRadius: 8,
+    background: "linear-gradient(135deg, #f0ebe2, #fff7ed)",
+    border: "1px dashed rgba(28, 26, 23, 0.16)",
+    color: "#766e64",
+    display: "grid",
+    placeItems: "center",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+    flex: "0 0 auto",
   },
   itemName: {
     fontSize: 17,
