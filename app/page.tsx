@@ -91,7 +91,7 @@ export default function Page() {
         const manuallyOpen = settings.is_open !== false;
         const savedBusinessHours = getBusinessHours(settings.business_hours);
         setBusinessHours(savedBusinessHours);
-        setStoreOpen(manuallyOpen && isWithinBusinessHours(new Date(), savedBusinessHours));
+        setStoreOpen(manuallyOpen);
         if (settings.average_time) setAverageTime(String(settings.average_time));
       } else {
         setStoreOpen(isWithinBusinessHours(new Date(), weeklyBusinessHours));

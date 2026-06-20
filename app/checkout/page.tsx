@@ -126,12 +126,12 @@ export default function CheckoutPage() {
         .select("is_open,average_time,business_hours")
         .limit(1)
         .maybeSingle();
-      const manuallyOpen = data?.is_open !== false;
       const savedBusinessHours = getBusinessHours(data?.business_hours);
+      const manuallyOpen = data?.is_open !== false;
       setBusinessHours(savedBusinessHours);
       setManualOpen(manuallyOpen);
       setAverageTime(data?.average_time || "35 a 50 min");
-      setStoreOpen(manuallyOpen && isWithinBusinessHours(new Date(), savedBusinessHours));
+      setStoreOpen(data ? manuallyOpen : isWithinBusinessHours(new Date(), savedBusinessHours));
     }
     fetchStoreStatus();
   }, []);

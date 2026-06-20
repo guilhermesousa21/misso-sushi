@@ -80,6 +80,21 @@ const formatBrasiliaDateTime = (value: string) =>
     minute: "2-digit",
   });
 
+const toBrasiliaDateKey = (value: string | Date) => {
+  const date = typeof value === "string" ? parseSupabaseDate(value) : value;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+};
+
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
   const isMobile = useMediaQuery("(max-width: 720px)");
@@ -191,7 +206,12 @@ export default function AdminPanel() {
     }
   }
 
-  const sorted = [...orders].sort((a, b) => {
+  const todayKey = toBrasiliaDateKey(now);
+  const visibleOrders = orders.filter(
+    (order) => toBrasiliaDateKey(order.created_at) === todayKey
+  );
+
+  const sorted = [...visibleOrders].sort((a, b) => {
     const aDone = ["retirado"].includes(a.status);
     const bDone = ["retirado"].includes(b.status);
     if (aDone && !bDone) return 1;
@@ -199,7 +219,7 @@ export default function AdminPanel() {
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 
-  const activeOrders = orders.filter(
+  const activeOrders = visibleOrders.filter(
     (order) => !["retirado"].includes(order.status)
   );
   const readyOrders = activeOrders.filter(
@@ -216,26 +236,27 @@ export default function AdminPanel() {
           <p style={styles.eyebrow}>Painel em tempo real</p>
           <h1 style={styles.title}>Cozinha</h1>
         </div>
-        <div style={{ ...styles.headerStats, ...(isMobile ? styles.headerStatsMobile : {}) }}>
-          <div style={styles.headerStat}>
-            <span>Ativos</span>
-            <strong>{activeOrders.length}</strong>
-          </div>
-          <div style={styles.headerStat}>
-            <span>Prontos</span>
-            <strong>{readyOrders.length}</strong>
-          </div>
-          <div style={{ ...styles.headerStat, ...(delayedOrders.length > 0 ? styles.headerStatAlert : {}) }}>
-            <span>Atrasados</span>
-            <strong>{delayedOrders.length}</strong>
+        <div style={{ ...styles.headerSide, ...(isMobile ? styles.headerSideMobile : {}) }}>
+          <div style={{ ...styles.headerStats, ...(isMobile ? styles.headerStatsMobile : {}) }}>
+            <div style={styles.headerStat}>
+              <span>Ativos</span>
+              <strong>{activeOrders.length}</strong>
+            </div>
+            <div style={styles.headerStat}>
+              <span>Prontos</span>
+              <strong>{readyOrders.length}</strong>
+            </div>
+            <div style={{ ...styles.headerStat, ...(delayedOrders.length > 0 ? styles.headerStatAlert : {}) }}>
+              <span>Atrasados</span>
+              <strong>{delayedOrders.length}</strong>
+            </div>
           </div>
         </div>
       </header>
 
       {sorted.length === 0 ? (
         <section style={styles.emptyState}>
-          <h2>Nenhum pedido nesta fila</h2>
-          <p>A lista atualiza automaticamente quando um pedido chegar.</p>
+          <h2>Nenhum pedido na cozinha hoje.</h2>
         </section>
       ) : (
         <section style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
@@ -435,6 +456,15 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     alignItems: "start",
     gap: 12,
+  },
+  headerSide: {
+    display: "grid",
+    gap: 10,
+    justifyItems: "end",
+  },
+  headerSideMobile: {
+    width: "100%",
+    justifyItems: "stretch",
   },
   eyebrow: {
     color: "#9f1d2f",

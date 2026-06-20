@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
@@ -95,7 +95,7 @@ export function AdminShell({
           <h2 style={{ ...styles.sidebarTitle, ...(isMobile ? styles.sidebarTitleMobile : {}) }}>Missô Admin</h2>
           <p style={{ ...styles.sidebarMuted, ...(isMobile ? styles.sidebarMutedMobile : {}) }}>Gestão operacional</p>
         </div>
-        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobile : {}) }}>
+        <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobileHidden : {}) }}>
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -113,6 +113,11 @@ export function AdminShell({
             Sair
           </button>
         </nav>
+        {isMobile && (
+          <button type="button" onClick={handleLogout} style={styles.mobileLogoutButton}>
+            Sair
+          </button>
+        )}
       </aside>
 
       <section style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
@@ -125,6 +130,22 @@ export function AdminShell({
         </header>
         {children}
       </section>
+      {isMobile && (
+        <nav style={styles.mobileTabBar} aria-label="Navegação principal">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                ...styles.mobileTab,
+                ...(pathname === item.href ? styles.mobileTabActive : {}),
+              }}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      )}
     </main>
   );
 }
@@ -309,8 +330,13 @@ function baseStyles(): Record<string, CSSProperties> {
       position: "sticky",
       top: 0,
       zIndex: 30,
-      padding: "12px 12px 10px",
+      padding: "12px 14px",
       gap: 10,
+      display: "flex",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      boxShadow: "0 10px 26px rgba(28, 26, 23, 0.08)",
     },
     sidebarTitle: {
       fontSize: 20,
@@ -335,11 +361,8 @@ function baseStyles(): Record<string, CSSProperties> {
       display: "flex",
       flexWrap: "wrap",
     },
-    navMobile: {
-      flexWrap: "nowrap",
-      gap: 6,
-      overflowX: "auto",
-      paddingBottom: 2,
+    navMobileHidden: {
+      display: "none",
     },
     navLink: {
       color: "#514a43",
@@ -374,12 +397,23 @@ function baseStyles(): Record<string, CSSProperties> {
       fontSize: 13,
       whiteSpace: "nowrap",
     },
+    mobileLogoutButton: {
+      border: "1px solid rgba(28, 26, 23, 0.12)",
+      borderRadius: 999,
+      background: "#fffdf8",
+      color: "#514a43",
+      padding: "8px 12px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 850,
+      whiteSpace: "nowrap",
+    },
     content: {
       padding: "28px 24px 56px",
       minWidth: 0,
     },
     contentMobile: {
-      padding: "18px 12px 42px",
+      padding: "16px 10px 96px",
     },
     header: {
       display: "flex",
@@ -391,8 +425,8 @@ function baseStyles(): Record<string, CSSProperties> {
     headerMobile: {
       display: "grid",
       alignItems: "start",
-      gap: 10,
-      marginBottom: 14,
+      gap: 8,
+      marginBottom: 12,
     },
     headerActionMobile: {
       width: "100%",
@@ -413,13 +447,47 @@ function baseStyles(): Record<string, CSSProperties> {
       lineHeight: 1,
     },
     titleMobile: {
-      fontSize: 32,
+      fontSize: 30,
     },
     muted: {
       color: "#625b53",
       lineHeight: 1.5,
     },
+    mobileTabBar: {
+      position: "fixed",
+      left: 10,
+      right: 10,
+      bottom: 10,
+      zIndex: 80,
+      display: "grid",
+      gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+      gap: 4,
+      border: "1px solid rgba(28, 26, 23, 0.1)",
+      borderRadius: 18,
+      background: "rgba(255, 253, 248, 0.96)",
+      padding: 6,
+      boxShadow: "0 18px 45px rgba(28, 26, 23, 0.18)",
+      backdropFilter: "blur(14px)",
+    },
+    mobileTab: {
+      minWidth: 0,
+      borderRadius: 13,
+      color: "#625b53",
+      padding: "9px 5px",
+      textAlign: "center",
+      textDecoration: "none",
+      fontSize: 11,
+      fontWeight: 850,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    },
+    mobileTabActive: {
+      background: "#1c1a17",
+      color: "#fffdf8",
+    },
   };
 }
 
 const styles = baseStyles();
+
