@@ -307,13 +307,13 @@ export default function AdminPanel() {
       key: "atrasados",
       label: "Atrasados",
       count: delayedOrders.length,
-      alert: delayedOrders.length > 0,
+      alert: true,
     },
     {
       key: "retirados",
       label: "Retirados",
       count: pickedUpOrders.length,
-      pickedUp: pickedUpOrders.length > 0,
+      pickedUp: true,
     },
   ];
 
