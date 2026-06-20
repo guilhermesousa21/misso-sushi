@@ -1632,10 +1632,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
   },
   headerSecondaryButton: {
-    border: "1px solid rgba(255, 253, 248, 0.2)",
+    border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 999,
-    background: "rgba(255, 253, 248, 0.1)",
-    color: "#fffdf8",
+    background: "#fffdf8",
+    color: "#1c1a17",
     padding: "12px 16px",
     cursor: "pointer",
     fontWeight: 850,
