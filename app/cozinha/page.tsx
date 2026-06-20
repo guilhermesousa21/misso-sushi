@@ -267,9 +267,10 @@ export default function AdminPanel() {
     label: string;
     count: number;
     alert?: boolean;
+    success?: boolean;
   }[] = [
     { key: "recebidos", label: "Recebidos", count: receivedOrders.length },
-    { key: "prontos", label: "Prontos", count: readyOrders.length },
+    { key: "prontos", label: "Prontos", count: readyOrders.length, success: true },
     {
       key: "atrasados",
       label: "Atrasados",
@@ -297,6 +298,7 @@ export default function AdminPanel() {
                   aria-pressed={isActive}
                   style={{
                     ...styles.headerStatButton,
+                    ...(item.success ? styles.headerStatSuccess : {}),
                     ...(item.alert ? styles.headerStatAlert : {}),
                     ...(isActive ? styles.headerStatActive : styles.headerStatInactive),
                   }}
@@ -576,6 +578,9 @@ const styles: Record<string, CSSProperties> = {
   },
   headerStatAlert: {
     background: "#991b1b",
+  },
+  headerStatSuccess: {
+    background: "#15803d",
   },
   grid: {
     maxWidth: 1180,
