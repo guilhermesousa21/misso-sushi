@@ -726,12 +726,6 @@ export default function CheckoutPage() {
             <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
           </div>
         )}
-        <div style={styles.addonSummary}>
-          Retirada:{" "}
-          {wantsScheduledPickup && scheduledFor
-            ? formatPickupTime(new Date(scheduledFor).toISOString())
-            : "Padrão"}
-        </div>
         <div style={styles.summaryGrandTotalLine}>
           <span>Total</span>
           <strong>{money(finalTotal)}</strong>
@@ -1263,6 +1257,7 @@ const styles: Record<string, CSSProperties> = {
   summaryTotalBox: { display: "grid", gap: 10, marginTop: 18, padding: "0" },
   summaryTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255, 253, 248, 0.78)", fontSize: 15 },
   summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },
+  addonSummaryList: { display: "grid", gap: 4 },
   addonSummary: { color: "rgba(255, 253, 248, 0.66)", fontSize: 13, lineHeight: 1.45 },
   discountText: { color: "#0f7a4a" },
   loyaltyProgressTrack: {
