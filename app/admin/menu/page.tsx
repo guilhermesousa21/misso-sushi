@@ -419,39 +419,6 @@ export default function AdminMenuPage() {
     toast.success(nextActive ? "Item ativado." : "Item pausado.");
   };
 
-  const updateItemFields = async (
-    item: MenuItem,
-    patch: Partial<MenuItem>,
-    successMessage: string
-  ) => {
-    setItems((current) =>
-      current.map((currentItem) =>
-        currentItem.id === item.id ? { ...currentItem, ...patch } : currentItem
-      )
-    );
-
-    const { error } = await supabase.from("menu").update(patch).eq("id", Number(item.id));
-
-    if (error) {
-      setItems((current) =>
-        current.map((currentItem) => (currentItem.id === item.id ? item : currentItem))
-      );
-      toast.error("Não foi possível atualizar o item.");
-      return;
-    }
-
-    toast.success(successMessage);
-  };
-
-  const toggleItemFeatured = async (item: MenuItem) => {
-    const featured = !item.featured;
-    await updateItemFields(
-      item,
-      { featured },
-      featured ? "Item marcado como destaque." : "Destaque removido."
-    );
-  };
-
   const headerActions = (
     <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
       <button
@@ -750,7 +717,6 @@ export default function AdminMenuPage() {
                           <p style={styles.itemPrice}>{money(Number(item.price))}</p>
                           <div style={styles.itemStatusLine}>
                             {!itemActive && <span style={styles.itemStatusBadgePaused}>Pausado</span>}
-                            {item.featured && <span style={styles.itemStatusBadgeFeatured}>Destaque</span>}
                           </div>
                           {item.description && (
                             <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>{item.description}</p>
@@ -781,16 +747,6 @@ export default function AdminMenuPage() {
                         <span style={styles.itemSwitchLabel}>
                           {itemActive ? "Ativo" : "Pausado"}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => void toggleItemFeatured(item)}
-                          style={{
-                            ...styles.tagButton,
-                            ...(item.featured ? styles.tagButtonActiveFeatured : {}),
-                          }}
-                        >
-                          {item.featured ? "Destaque" : "Destacar"}
-                        </button>
                         <button
                           type="button"
                           onClick={() => setEditingItem(item)}
@@ -1218,7 +1174,6 @@ function EditModal({
         active: form.active !== false && form.availability_status !== "inativo",
         availability_status:
           form.availability_status === "esgotado" ? "inativo" : form.availability_status || "ativo",
-        featured: Boolean(form.featured),
       };
 
       const { data, error } = isNewItem
@@ -1355,38 +1310,24 @@ function EditModal({
               />
             </label>
 
-            <div style={{ ...styles.formGrid, ...(compact ? styles.formGridCompact : {}) }}>
-              <label style={styles.field}>
-                <span style={styles.label}>Disponibilidade</span>
-                <select
-                  value={
-                    form.availability_status === "esgotado"
-                      ? "inativo"
-                      : form.availability_status || "ativo"
-                  }
-                  onChange={(event) => {
-                    setConfirmDelete(false);
-                    setForm({ ...form, availability_status: event.target.value });
-                  }}
-                  style={styles.select}
-                >
-                  <option value="ativo">Ativo</option>
-                  <option value="inativo">Pausado</option>
-                </select>
-              </label>
-
-              <label style={styles.featuredField}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(form.featured)}
-                  onChange={(event) => {
-                    setConfirmDelete(false);
-                    setForm({ ...form, featured: event.target.checked });
-                  }}
-                />
-                Exibir nos destaques do cardápio
-              </label>
-            </div>
+            <label style={styles.field}>
+              <span style={styles.label}>Disponibilidade</span>
+              <select
+                value={
+                  form.availability_status === "esgotado"
+                    ? "inativo"
+                    : form.availability_status || "ativo"
+                }
+                onChange={(event) => {
+                  setConfirmDelete(false);
+                  setForm({ ...form, availability_status: event.target.value });
+                }}
+                style={styles.select}
+              >
+                <option value="ativo">Ativo</option>
+                <option value="inativo">Pausado</option>
+              </select>
+            </label>
 
             <div style={styles.pricePreview}>
               <span>Prévia do preço</span>
@@ -1880,39 +1821,6 @@ const styles: Record<string, CSSProperties> = {
     padding: "4px 8px",
     fontSize: 11,
     fontWeight: 850,
-  },
-  itemStatusBadgeFeatured: {
-    borderRadius: 999,
-    background: "#fff1f2",
-    color: "#9f1d2f",
-    padding: "4px 8px",
-    fontSize: 11,
-    fontWeight: 850,
-  },
-  tagButton: {
-    border: "1px solid rgba(28, 26, 23, 0.12)",
-    borderRadius: 999,
-    background: "#fffdf8",
-    color: "#514a43",
-    padding: "8px 10px",
-    cursor: "pointer",
-    fontWeight: 850,
-    fontSize: 12,
-    whiteSpace: "nowrap",
-  },
-  tagButtonActiveFeatured: {
-    background: "#fff1f2",
-    color: "#9f1d2f",
-    borderColor: "transparent",
-  },
-  featuredField: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    color: "#514a43",
-    fontSize: 13,
-    fontWeight: 850,
-    paddingTop: 28,
   },
   itemCardMobile: {
     display: "grid",

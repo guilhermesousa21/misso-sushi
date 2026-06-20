@@ -233,16 +233,7 @@ export default function Page() {
         .slice(0, 4),
     [orderableItems, topItems]
   );
-  const featuredItems = useMemo(
-    () =>
-      items
-        .filter((item) => item.featured && item.active !== false && item.availability_status !== "inativo")
-        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-        .slice(0, 8),
-    [items]
-  );
   const showPopular = !searchTerm.trim() && popularItems.length > 0;
-  const showFeatured = !searchTerm.trim() && featuredItems.length > 0;
 
   const handleCategoryClick = (category: string) => {
     setActiveCategory(category);
@@ -355,92 +346,6 @@ export default function Page() {
       </nav>
 
       <div style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
-        {showFeatured && (
-          <section style={{ ...styles.categorySection, ...(isMobile ? styles.categorySectionMobile : {}) }}>
-            <div style={{ ...styles.sectionHeader, ...(isMobile ? styles.sectionHeaderMobile : {}) }}>
-              <div>
-                <p style={styles.sectionEyebrow}>Seleção da casa</p>
-                <h3 style={{ ...styles.sectionTitle, ...(isMobile ? styles.sectionTitleMobile : {}) }}>Destaques</h3>
-              </div>
-              <span style={styles.sectionCount}>{featuredItems.length} itens</span>
-            </div>
-            <div style={{ ...styles.menuGrid, ...(isMobile ? styles.menuGridMobile : {}) }}>
-              {featuredItems.map((item) => {
-                const quantity = getQuantity(item.id);
-                const unavailable = !isItemOrderable(item);
-
-                return (
-                  <article
-                    key={`featured-${item.id}`}
-                    style={{
-                      ...styles.menuCard,
-                      ...(isMobile ? styles.menuCardMobile : {}),
-                      ...(unavailable ? styles.menuCardUnavailable : {}),
-                      ...(addedPulseId === item.id ? styles.menuCardPulse : {}),
-                    }}
-                  >
-                    <div style={{ ...styles.imageWrap, ...(isMobile ? styles.imageWrapMobile : {}) }}>
-                      {item.image ? (
-                        <Image
-                          src={item.image}
-                          alt={item.name}
-                          fill
-                          sizes="(max-width: 720px) 34vw, 160px"
-                          style={styles.dishImage}
-                        />
-                      ) : (
-                        <div style={styles.imageFallback}>
-                          <span>Missô</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={{ ...styles.cardBody, ...(isMobile ? styles.cardBodyMobile : {}) }}>
-                      <div>
-                        <h4 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h4>
-                        <div style={styles.badgeLine}>
-                          <span style={styles.featuredBadge}>Destaque</span>
-                          {unavailable && <span style={styles.unavailableBadge}>Indisponível</span>}
-                        </div>
-                        {item.description && (
-                          <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div style={{ ...styles.cardFooter, ...(isMobile ? styles.cardFooterMobile : {}) }}>
-                        <strong style={{ ...styles.price, ...(isMobile ? styles.priceMobile : {}) }}>{money(Number(item.price))}</strong>
-                        {quantity === 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => handleAddToCart(item)}
-                            disabled={unavailable || !storeOpen}
-                            style={{
-                              ...styles.addButton,
-                              ...(isMobile ? styles.addButtonMobile : {}),
-                              ...(unavailable || !storeOpen ? styles.addButtonDisabled : {}),
-                            }}
-                            aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
-                          >
-                            {unavailable ? "Indisponível" : "Adicionar"}
-                          </button>
-                        ) : (
-                          <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
-                            <button type="button" onClick={() => decrease(item.id)} style={{ ...styles.quantityButton, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Remover ${item.name}`}>-</button>
-                            <span style={{ ...styles.quantityValue, ...(isMobile ? styles.quantityValueMobile : {}) }}>{quantity}</span>
-                            <button type="button" onClick={() => handleIncrease(item.id)} style={{ ...styles.quantityButton, ...styles.quantityButtonDark, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Adicionar ${item.name}`}>+</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
         {showPopular && (
           <section style={{ ...styles.categorySection, ...(isMobile ? styles.categorySectionMobile : {}) }}>
             <div style={{ ...styles.sectionHeader, ...(isMobile ? styles.sectionHeaderMobile : {}) }}>
@@ -1122,14 +1027,6 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 999,
     background: "#fee2e2",
     color: "#991b1b",
-    padding: "4px 8px",
-    fontSize: 11,
-    fontWeight: 850,
-  },
-  featuredBadge: {
-    borderRadius: 999,
-    background: "#fff1f2",
-    color: "#9f1d2f",
     padding: "4px 8px",
     fontSize: 11,
     fontWeight: 850,
