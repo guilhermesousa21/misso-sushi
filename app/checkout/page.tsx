@@ -291,12 +291,6 @@ export default function CheckoutPage() {
     [10, 11].includes(onlyDigits(phone).length) &&
     storeOpen &&
     selectedSlotIsAvailable;
-  const nextOpening = getNextOpeningLabel(new Date(), businessHours);
-  const storeStatusMessage = storeOpen
-    ? `Loja aberta para retirada. Tempo médio: ${averageTime}.`
-    : manualOpen
-      ? `A loja está fechada pelo horário cadastrado e ${nextOpening}.`
-      : `A loja está pausada no momento e ${nextOpening}.`;
   const formHelp = !storeOpen
     ? "Os pedidos estão bloqueados até a loja reabrir."
     : !hasFirstAndLastName(name)
@@ -565,9 +559,6 @@ export default function CheckoutPage() {
         <div style={styles.headerTitle}>
           <p style={styles.eyebrow}>Missô Sushi</p>
           <h1 style={styles.title}>Finalizar pedido</h1>
-          <p style={{ ...styles.storeStatus, ...(storeOpen ? styles.storeStatusOpen : styles.storeStatusClosed) }}>
-            {storeStatusMessage}
-          </p>
         </div>
       </header>
 
@@ -662,7 +653,7 @@ export default function CheckoutPage() {
           </div>
 
           {/* Complementos */}
-          <details style={styles.compactDetails}>
+          <details open style={styles.compactDetails}>
             <summary style={styles.detailsSummary}>
               Complementos <span>R$ 2,50 cada</span>
             </summary>
@@ -736,7 +727,7 @@ export default function CheckoutPage() {
           </div>
 
           {/* Observação */}
-          <details style={styles.compactDetails}>
+          <details open style={styles.compactDetails}>
             <summary style={styles.detailsSummary}>Observação do pedido</summary>
             <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex: sem cebolinha, enviar shoyu extra..." style={{ ...styles.textarea, ...styles.detailsContent }} />
           </details>
@@ -860,9 +851,6 @@ const styles: Record<string, CSSProperties> = {
   backLink: { position: "absolute", left: 0, top: 18, color: "#8f1728", textDecoration: "none", fontSize: 14, fontWeight: 850, background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 999, padding: "9px 13px" },
   eyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
   title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },
-  storeStatus: { marginTop: 10, borderRadius: 999, padding: "8px 11px", fontSize: 13, fontWeight: 850, lineHeight: 1.35 },
-  storeStatusOpen: { background: "#ecfdf5", color: "#0f7a4a" },
-  storeStatusClosed: { background: "#fee2e2", color: "#991b1b" },
   shell: { maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 378px", gap: 20, alignItems: "start" },
   shellMobile: { gridTemplateColumns: "1fr" },
   mainColumn: { display: "grid", gap: 10 },
