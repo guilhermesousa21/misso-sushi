@@ -34,6 +34,21 @@ const money = (value: number) =>
     currency: "BRL",
   });
 
+const formatBrDecimal = (value: number) =>
+  Number(value || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const parseBrDecimal = (value: string) => {
+  const normalized = value.trim().replace(/\./g, "").replace(",", ".");
+  if (!normalized) return 0;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+};
+
+const sanitizePriceDraft = (value: string) => value.replace(/[^\d,]/g, "");
+
 const normalize = (str: string) =>
   str
     .toLowerCase()
@@ -97,6 +112,7 @@ export default function AdminMenuPage() {
   const [checkoutAddons, setCheckoutAddons] = useState<CheckoutAddonConfig[]>(defaultCheckoutAddons);
   const [storeSettingsId, setStoreSettingsId] = useState<number | undefined>();
   const [savingAddons, setSavingAddons] = useState(false);
+  const [addonPriceDrafts, setAddonPriceDrafts] = useState<Record<string, string>>({});
   const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
   const [creatingCategoryModalOpen, setCreatingCategoryModalOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -823,8 +839,8 @@ export default function AdminMenuPage() {
           })}
         </section>
 
-        <section style={{ ...baseStyles.card, ...(isMobile ? styles.addonsCardMobile : {}) }}>
-          <div style={{ ...baseStyles.cardHeader, ...(isMobile ? styles.addonsHeaderMobile : {}) }}>
+        <section style={{ ...baseStyles.card, ...styles.addonsCard, ...(isMobile ? styles.addonsCardMobile : {}) }}>
+          <div style={styles.addonsHeader}>
             <div>
               <p style={baseStyles.cardEyebrow}>Checkout</p>
               <h2 style={baseStyles.cardTitle}>Complementos</h2>
@@ -832,88 +848,161 @@ export default function AdminMenuPage() {
                 Itens extras que o cliente pode adicionar no checkout (ex.: hashi, shoyu).
               </p>
             </div>
+          </div>
+
+          {checkoutAddons.length === 0 ? (
+            <div style={styles.addonEmpty}>
+              <p style={styles.addonEmptyTitle}>Nenhum complemento cadastrado</p>
+              <p style={styles.addonEmptyText}>
+                Adicione itens como hashi, shoyu extra ou gengibre para o cliente escolher no checkout.
+              </p>
+            </div>
+          ) : (
+            <>
+              {!isMobile && (
+                <div style={styles.addonTableHead}>
+                  <span>Nome</span>
+                  <span>Preço</span>
+                  <span>Status</span>
+                  <span aria-hidden="true" />
+                </div>
+              )}
+              <div style={styles.addonList}>
+                {checkoutAddons.map((addon, index) => {
+                  const addonActive = addon.active !== false;
+                  const priceKey = addon.id || String(index);
+                  const priceValue =
+                    priceKey in addonPriceDrafts
+                      ? addonPriceDrafts[priceKey]
+                      : formatBrDecimal(Number(addon.unit_price || 0));
+
+                  return (
+                    <div key={addon.id || index} style={{ ...styles.addonRow, ...(isMobile ? styles.addonRowMobile : {}) }}>
+                      <label style={styles.addonField}>
+                        {isMobile && <span style={styles.addonLabel}>Nome</span>}
+                        <input
+                          value={addon.name}
+                          onChange={(event) => {
+                            const next = [...checkoutAddons];
+                            next[index] = { ...addon, name: event.target.value };
+                            setCheckoutAddons(next);
+                          }}
+                          placeholder="Ex.: Hashi"
+                          style={styles.input}
+                        />
+                      </label>
+                      <label style={styles.addonField}>
+                        {isMobile && <span style={styles.addonLabel}>Preço</span>}
+                        <div style={styles.addonPriceWrap}>
+                          <span style={styles.addonPricePrefix}>R$</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={priceValue}
+                            onFocus={() => {
+                              if (priceKey in addonPriceDrafts) return;
+                              setAddonPriceDrafts((prev) => ({
+                                ...prev,
+                                [priceKey]: formatBrDecimal(Number(addon.unit_price || 0)),
+                              }));
+                            }}
+                            onChange={(event) => {
+                              const draft = sanitizePriceDraft(event.target.value);
+                              setAddonPriceDrafts((prev) => ({ ...prev, [priceKey]: draft }));
+                            }}
+                            onBlur={() => {
+                              const draft = addonPriceDrafts[priceKey];
+                              if (draft === undefined) return;
+                              const next = [...checkoutAddons];
+                              next[index] = { ...addon, unit_price: parseBrDecimal(draft) };
+                              setCheckoutAddons(next);
+                              setAddonPriceDrafts((prev) => {
+                                const next = { ...prev };
+                                delete next[priceKey];
+                                return next;
+                              });
+                            }}
+                            style={styles.addonPriceInput}
+                            aria-label={`Preço de ${addon.name || "complemento"}`}
+                          />
+                        </div>
+                      </label>
+                      <div style={styles.addonStatusCell}>
+                        {isMobile && <span style={styles.addonLabel}>Status</span>}
+                        <div style={styles.addonStatusControls}>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={addonActive}
+                            aria-label={`${addonActive ? "Desativar" : "Ativar"} ${addon.name || "complemento"}`}
+                            onClick={() => {
+                              const next = [...checkoutAddons];
+                              next[index] = { ...addon, active: !addonActive };
+                              setCheckoutAddons(next);
+                            }}
+                            style={{
+                              ...styles.itemSwitch,
+                              ...(addonActive ? styles.itemSwitchActive : styles.itemSwitchPaused),
+                            }}
+                          >
+                            <span
+                              style={{
+                                ...styles.itemSwitchThumb,
+                                ...(addonActive ? styles.itemSwitchThumbActive : {}),
+                              }}
+                            />
+                          </button>
+                          <span style={styles.itemSwitchLabel}>{addonActive ? "Ativo" : "Pausado"}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCheckoutAddons(checkoutAddons.filter((_, itemIndex) => itemIndex !== index))
+                        }
+                        style={styles.addonRemoveButton}
+                        aria-label={`Remover ${addon.name || "complemento"}`}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          <div style={{ ...styles.addonFooter, ...(isMobile ? styles.addonFooterMobile : {}) }}>
+            <button
+              type="button"
+              style={{ ...styles.addonAddButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
+              onClick={() =>
+                setCheckoutAddons([
+                  ...checkoutAddons,
+                  {
+                    id: `addon-${Date.now()}`,
+                    name: "Novo complemento",
+                    unit_price: 2.5,
+                    active: true,
+                  },
+                ])
+              }
+            >
+              + Adicionar complemento
+            </button>
             <button
               type="button"
               onClick={() => void saveCheckoutAddons()}
               disabled={savingAddons}
-              style={{ ...baseStyles.primaryLink, ...(isMobile ? styles.fullWidthMobile : {}) }}
+              style={{
+                ...baseStyles.primaryLink,
+                ...(savingAddons ? styles.disabledSoftButton : {}),
+                ...(isMobile ? styles.fullWidthMobile : {}),
+              }}
             >
               {savingAddons ? "Salvando..." : "Salvar complementos"}
             </button>
           </div>
-
-          <div style={styles.addonList}>
-            {checkoutAddons.map((addon, index) => (
-              <div key={addon.id || index} style={{ ...styles.addonRow, ...(isMobile ? styles.addonRowMobile : {}) }}>
-                <label style={styles.addonField}>
-                  <span style={styles.addonLabel}>Nome</span>
-                  <input
-                    value={addon.name}
-                    onChange={(event) => {
-                      const next = [...checkoutAddons];
-                      next[index] = { ...addon, name: event.target.value };
-                      setCheckoutAddons(next);
-                    }}
-                    style={styles.input}
-                  />
-                </label>
-                <label style={styles.addonField}>
-                  <span style={styles.addonLabel}>Preço</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={addon.unit_price}
-                    onChange={(event) => {
-                      const next = [...checkoutAddons];
-                      next[index] = { ...addon, unit_price: Number(event.target.value) };
-                      setCheckoutAddons(next);
-                    }}
-                    style={styles.input}
-                  />
-                </label>
-                <label style={styles.addonActiveField}>
-                  <input
-                    type="checkbox"
-                    checked={addon.active !== false}
-                    onChange={(event) => {
-                      const next = [...checkoutAddons];
-                      next[index] = { ...addon, active: event.target.checked };
-                      setCheckoutAddons(next);
-                    }}
-                  />
-                  Ativo
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCheckoutAddons(checkoutAddons.filter((_, itemIndex) => itemIndex !== index))
-                  }
-                  style={styles.secondaryButton}
-                >
-                  Remover
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            style={{ ...styles.secondaryButton, marginTop: 12 }}
-            onClick={() =>
-              setCheckoutAddons([
-                ...checkoutAddons,
-                {
-                  id: `addon-${Date.now()}`,
-                  name: "Novo complemento",
-                  unit_price: 2.5,
-                  active: true,
-                },
-              ])
-            }
-          >
-            + Adicionar complemento
-          </button>
         </section>
       </AdminShell>
 
@@ -1703,10 +1792,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
   },
   headerSecondaryButton: {
-    border: "1px solid rgba(28, 26, 23, 0.14)",
+    border: "none",
     borderRadius: 999,
-    background: "#fffdf8",
-    color: "#1c1a17",
+    background: "#1c1a17",
+    color: "#fffdf8",
     padding: "12px 16px",
     cursor: "pointer",
     fontWeight: 850,
@@ -2323,12 +2412,14 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.5,
     cursor: "not-allowed",
   },
-  addonsCardMobile: {
-    marginTop: 16,
+  addonsCard: {
+    marginTop: 32,
   },
-  addonsHeaderMobile: {
-    flexDirection: "column",
-    alignItems: "stretch",
+  addonsCardMobile: {
+    marginTop: 24,
+  },
+  addonsHeader: {
+    marginBottom: 16,
   },
   addonsHint: {
     marginTop: 6,
@@ -2336,23 +2427,59 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
     lineHeight: 1.45,
   },
+  addonEmpty: {
+    border: "1px dashed rgba(28, 26, 23, 0.14)",
+    borderRadius: 10,
+    background: "#f7f4ef",
+    padding: "18px 16px",
+    display: "grid",
+    gap: 6,
+  },
+  addonEmptyTitle: {
+    margin: 0,
+    color: "#1c1a17",
+    fontSize: 15,
+    fontWeight: 850,
+  },
+  addonEmptyText: {
+    margin: 0,
+    color: "#766e64",
+    fontSize: 13,
+    lineHeight: 1.45,
+  },
+  addonTableHead: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1.4fr) minmax(120px, 0.7fr) 140px 92px",
+    gap: 10,
+    padding: "0 14px 8px",
+    color: "#766e64",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+  },
   addonList: {
     display: "grid",
-    gap: 10,
+    gap: 8,
   },
   addonRow: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1.4fr) minmax(120px, 0.7fr) auto auto",
+    gridTemplateColumns: "minmax(0, 1.4fr) minmax(120px, 0.7fr) 140px 92px",
     gap: 10,
-    alignItems: "end",
+    alignItems: "center",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 10,
+    background: "#fff",
+    padding: "12px 14px",
   },
   addonRowMobile: {
     gridTemplateColumns: "1fr",
     alignItems: "stretch",
+    gap: 12,
   },
   addonField: {
     display: "grid",
     gap: 5,
+    minWidth: 0,
   },
   addonLabel: {
     color: "#766e64",
@@ -2360,13 +2487,73 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     textTransform: "uppercase",
   },
-  addonActiveField: {
+  addonPriceWrap: {
+    display: "grid",
+    gridTemplateColumns: "auto minmax(0, 1fr)",
+    alignItems: "center",
+    gap: 8,
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 8,
+    background: "#fffdf8",
+    padding: "0 12px",
+    minHeight: 46,
+  },
+  addonPricePrefix: {
+    color: "#766e64",
+    fontSize: 14,
+    fontWeight: 850,
+    whiteSpace: "nowrap",
+  },
+  addonPriceInput: {
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    color: "#1c1a17",
+    outline: "none",
+    fontSize: 15,
+    padding: "12px 0",
+  },
+  addonStatusCell: {
+    display: "grid",
+    gap: 5,
+  },
+  addonStatusControls: {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    paddingBottom: 10,
+  },
+  addonRemoveButton: {
+    border: "1px solid rgba(153, 27, 27, 0.18)",
+    borderRadius: 999,
+    background: "#fff7f7",
+    color: "#991b1b",
+    padding: "10px 12px",
+    cursor: "pointer",
     fontWeight: 850,
-    color: "#514a43",
+    fontSize: 13,
+    whiteSpace: "nowrap",
+  },
+  addonFooter: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
+  },
+  addonFooterMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
+  addonAddButton: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "12px 16px",
+    cursor: "pointer",
+    fontWeight: 850,
     whiteSpace: "nowrap",
   },
 };
