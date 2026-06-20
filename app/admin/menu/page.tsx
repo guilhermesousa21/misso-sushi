@@ -443,18 +443,6 @@ export default function AdminMenuPage() {
     toast.success(successMessage);
   };
 
-  const toggleItemSoldOut = async (item: MenuItem) => {
-    const isSoldOut = item.availability_status === "esgotado";
-    await updateItemFields(
-      item,
-      {
-        availability_status: isSoldOut ? "ativo" : "esgotado",
-        active: true,
-      },
-      isSoldOut ? "Item disponível novamente." : "Item marcado como esgotado."
-    );
-  };
-
   const toggleItemFeatured = async (item: MenuItem) => {
     const featured = !item.featured;
     await updateItemFields(
@@ -794,16 +782,6 @@ export default function AdminMenuPage() {
                         <span style={styles.itemSwitchLabel}>
                           {itemActive ? "Ativo" : "Pausado"}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => void toggleItemSoldOut(item)}
-                          style={{
-                            ...styles.tagButton,
-                            ...(itemSoldOut ? styles.tagButtonActiveSoldOut : {}),
-                          }}
-                        >
-                          {itemSoldOut ? "Esgotado" : "Marcar esgotado"}
-                        </button>
                         <button
                           type="button"
                           onClick={() => void toggleItemFeatured(item)}
@@ -1929,11 +1907,6 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     fontSize: 12,
     whiteSpace: "nowrap",
-  },
-  tagButtonActiveSoldOut: {
-    background: "#fee2e2",
-    color: "#991b1b",
-    borderColor: "transparent",
   },
   tagButtonActiveFeatured: {
     background: "#fff1f2",
