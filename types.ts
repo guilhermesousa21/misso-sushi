@@ -12,7 +12,6 @@ export type MenuItem = {
   available?: boolean | null;
   unavailable?: boolean | null;
   availability_status?: string | null;
-  stock_quantity?: number | null;
   featured?: boolean | null;
   created_at?: string;
 };

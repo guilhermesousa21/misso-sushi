@@ -12,7 +12,4 @@ export const isItemOrderable = (item?: MenuItem) =>
   item?.available !== false &&
   item?.unavailable !== true &&
   item?.availability_status !== "inativo" &&
-  item?.availability_status !== "esgotado" &&
-  (item?.stock_quantity === null ||
-    item?.stock_quantity === undefined ||
-    Number(item.stock_quantity) > 0);
+  item?.availability_status !== "esgotado";

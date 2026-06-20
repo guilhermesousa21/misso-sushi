@@ -157,7 +157,6 @@ export default function AdminMenuPage() {
       description: "",
       active: true,
       availability_status: "ativo",
-      stock_quantity: null,
       isNew: true,
     });
   };
@@ -702,9 +701,6 @@ export default function AdminMenuPage() {
                         <div>
                           <h3 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h3>
                           <p style={styles.itemPrice}>{money(Number(item.price))}</p>
-                          <p style={styles.itemStockText}>
-                            Estoque: {typeof item.stock_quantity === "number" ? item.stock_quantity : "ilimitado"}
-                          </p>
                           {!itemActive && <p style={styles.itemPausedText}>Pausado</p>}
                           {item.description && (
                             <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>{item.description}</p>
@@ -1182,12 +1178,6 @@ function EditModal({
         image: form.image || null,
         active: form.active !== false && form.availability_status !== "inativo",
         availability_status: form.availability_status || "ativo",
-        stock_quantity:
-          form.stock_quantity === null ||
-          form.stock_quantity === undefined ||
-          Number.isNaN(Number(form.stock_quantity))
-            ? null
-            : Math.max(0, Math.round(Number(form.stock_quantity))),
       };
 
       const { data, error } = isNewItem
@@ -1307,25 +1297,6 @@ function EditModal({
                     </option>
                   ))}
                 </select>
-              </label>
-
-              <label style={styles.field}>
-                <span style={styles.label}>Estoque</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={form.stock_quantity ?? ""}
-                  onChange={(event) => {
-                    setConfirmDelete(false);
-                    setForm({
-                      ...form,
-                      stock_quantity:
-                        event.target.value === "" ? null : Number(event.target.value),
-                    });
-                  }}
-                  placeholder="Ilimitado"
-                  style={styles.input}
-                />
               </label>
 
             </div>
@@ -1859,12 +1830,6 @@ const styles: Record<string, CSSProperties> = {
     color: "#625b53",
     marginTop: 4,
     fontWeight: 850,
-  },
-  itemStockText: {
-    marginTop: 3,
-    color: "#766e64",
-    fontSize: 12,
-    fontWeight: 750,
   },
   itemPausedText: {
     marginTop: 4,

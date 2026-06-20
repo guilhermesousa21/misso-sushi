@@ -94,7 +94,6 @@ on conflict (slug) do nothing;
 alter table if exists public.menu
   add column if not exists active boolean not null default true,
   add column if not exists availability_status text not null default 'ativo',
-  add column if not exists stock_quantity integer,
   add column if not exists featured boolean not null default false;
 
 alter table if exists public.orders
@@ -107,7 +106,6 @@ alter table if exists public.orders
   add column if not exists addons jsonb not null default '[]'::jsonb,
   add column if not exists service_fee numeric not null default 0,
   add column if not exists service_fee_label text,
-  add column if not exists inventory_consumed_at timestamptz,
   add column if not exists coupon_redeemed_at timestamptz,
   add column if not exists mercado_pago_payment_id text,
   add column if not exists subtotal numeric not null default 0,
@@ -120,7 +118,6 @@ create index if not exists orders_mercado_pago_payment_id_idx on public.orders (
 create index if not exists orders_coupon_code_idx on public.orders (coupon_code);
 create index if not exists orders_scheduled_for_idx on public.orders (scheduled_for);
 create index if not exists menu_availability_status_idx on public.menu (availability_status);
-create index if not exists menu_stock_quantity_idx on public.menu (stock_quantity);
 create index if not exists menu_categories_sort_order_idx on public.menu_categories (sort_order);
 
 alter table if exists public.store_settings

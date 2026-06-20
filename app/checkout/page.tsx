@@ -94,7 +94,6 @@ const optionalOrderColumns = [
   "addons",
   "service_fee",
   "service_fee_label",
-  "inventory_consumed_at",
   "coupon_redeemed_at",
   "payment_method",
   "payment_status",
@@ -201,7 +200,7 @@ export default function CheckoutPage() {
     async function fetchMenuAvailability() {
       const { data } = await supabase
         .from("menu")
-        .select("id,name,active,available,unavailable,availability_status,stock_quantity");
+        .select("id,name,active,available,unavailable,availability_status");
       if (data) setMenuItems(data as MenuItem[]);
     }
     fetchMenuAvailability();
@@ -224,15 +223,6 @@ export default function CheckoutPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [cart, menuItems, remove]);
-
-  const stockIssue = cart.find((cartItem) => {
-    const menuItem = menuItems.find((item) => item.id === cartItem.id);
-    return (
-      typeof menuItem?.stock_quantity === "number" &&
-      menuItem.stock_quantity >= 0 &&
-      cartItem.quantity > menuItem.stock_quantity
-    );
-  });
 
   useEffect(() => {
     if (!pendingOrderId || checkoutState !== "awaiting_pix") return;
@@ -296,7 +286,6 @@ export default function CheckoutPage() {
     hasFirstAndLastName(name) &&
     [10, 11].includes(onlyDigits(phone).length) &&
     storeOpen &&
-    !stockIssue &&
     selectedSlotIsAvailable;
   const nextOpening = getNextOpeningLabel(new Date(), businessHours);
   const storeStatusMessage = storeOpen
@@ -306,9 +295,7 @@ export default function CheckoutPage() {
       : `A loja está pausada no momento e ${nextOpening}.`;
   const formHelp = !storeOpen
     ? "Os pedidos estão bloqueados até a loja reabrir."
-    : stockIssue
-      ? `${stockIssue.name} tem estoque menor que a quantidade no carrinho.`
-      : !hasFirstAndLastName(name)
+    : !hasFirstAndLastName(name)
       ? "Informe nome e sobrenome para continuar."
       : ![10, 11].includes(onlyDigits(phone).length)
         ? "Informe um telefone com DDD."
