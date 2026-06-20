@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseConfigured } from "../lib/supabase";
 import {
   getBusinessHours,
   getNextOpeningLabel,
@@ -53,9 +53,17 @@ export default function Page() {
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
   const [averageTime, setAverageTime] = useState("35 a 50 min");
   const [topItems, setTopItems] = useState<Record<number, number>>({});
+  const [menuError, setMenuError] = useState("");
 
   useEffect(() => {
     async function fetchMenuData() {
+      if (!supabaseConfigured) {
+        setMenuError(
+          "Supabase não configurado neste ambiente. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY para carregar o cardápio."
+        );
+        return;
+      }
+
       const [{ data: menuData, error: menuError }, { data: categoryData }] =
         await Promise.all([
           supabase
@@ -73,7 +81,13 @@ export default function Page() {
         setCategories(sortCategories(categoryData as MenuCategory[]));
       }
 
-      if (!menuError && menuData) setItems(menuData as MenuItem[]);
+      if (menuError) {
+        setMenuError(`Não foi possível carregar o cardápio: ${menuError.message}`);
+        return;
+      }
+
+      setMenuError("");
+      if (menuData) setItems(menuData as MenuItem[]);
     }
 
     fetchMenuData();
@@ -412,7 +426,14 @@ export default function Page() {
           </section>
         )}
 
-        {orderedCategories.length === 0 && (
+        {menuError && (
+          <section style={styles.emptySearch}>
+            <h3>Cardápio não carregou</h3>
+            <p>{menuError}</p>
+          </section>
+        )}
+
+        {!menuError && orderedCategories.length === 0 && (
           <section style={styles.emptySearch}>
             <h3>Nenhum prato encontrado</h3>
             <p>Confira o termo digitado ou escolha outra categoria.</p>
