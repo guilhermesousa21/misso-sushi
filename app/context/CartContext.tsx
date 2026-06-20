@@ -9,7 +9,8 @@ import {
   ReactNode,
 } from "react";
 
-type CartItem = {
+export type CartItem = {
+  lineKey: string;
   id: number;
   name: string;
   price: number;
@@ -17,15 +18,20 @@ type CartItem = {
   description?: string;
   image?: string;
   quantity: number;
+  modifiers?: string[];
 };
 
 type CartContextType = {
   cart: CartItem[];
   cartLoaded: boolean;
-  addToCart: (item: Omit<CartItem, "quantity">) => void;
-  increase: (id: number) => void;
-  decrease: (id: number) => void;
-  remove: (id: number) => void;
+  addToCart: (item: Omit<CartItem, "quantity" | "lineKey" | "modifiers">, modifiers?: string[]) => void;
+  increase: (lineKey: string) => void;
+  decrease: (lineKey: string) => void;
+  increaseById: (id: number) => void;
+  decreaseById: (id: number) => void;
+  remove: (lineKey: string) => void;
+  removeById: (id: number) => void;
+  updateModifiers: (lineKey: string, modifiers: string[]) => void;
   clear: () => void;
   total: number;
 };
@@ -34,6 +40,9 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const cartStorageKey = "misso-sushi-cart";
 const cartStorageEvent = "misso-sushi-cart-change";
 const emptyCartSnapshot = "[]";
+
+export const buildCartLineKey = (id: number, modifiers: string[] = []) =>
+  `${id}:${[...modifiers].sort().join("|")}`;
 
 const isCartItem = (item: unknown): item is CartItem => {
   if (!item || typeof item !== "object") return false;
@@ -50,11 +59,18 @@ const isCartItem = (item: unknown): item is CartItem => {
   );
 };
 
-const normalizeCartItem = (item: CartItem): CartItem => ({
-  ...item,
-  price: Number(item.price),
-  category: item.category || "",
-});
+const normalizeCartItem = (item: CartItem): CartItem => {
+  const modifiers = item.modifiers || [];
+  const lineKey = item.lineKey || buildCartLineKey(item.id, modifiers);
+
+  return {
+    ...item,
+    lineKey,
+    modifiers,
+    price: Number(item.price),
+    category: item.category || "",
+  };
+};
 
 const parseCartSnapshot = (snapshot: string) => {
   try {
@@ -103,6 +119,7 @@ export function useCart() {
   }
   return ctx;
 }
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartLoaded, setCartLoaded] = useState(false);
   const cartSnapshot = useSyncExternalStore(
@@ -121,47 +138,130 @@ export function CartProvider({ children }: { children: ReactNode }) {
     writeCartSnapshot(updater(cart));
   };
 
-  const addToCart = (item: Omit<CartItem, "quantity">) => {
+  const addToCart = (
+    item: Omit<CartItem, "quantity" | "lineKey" | "modifiers">,
+    modifiers: string[] = []
+  ) => {
+    const lineKey = buildCartLineKey(item.id, modifiers);
     updateCart((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
+      const existing = prev.find((entry) => entry.lineKey === lineKey);
       if (existing) {
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+        return prev.map((entry) =>
+          entry.lineKey === lineKey ? { ...entry, quantity: entry.quantity + 1 } : entry
         );
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, lineKey, modifiers, quantity: 1 }];
     });
   };
 
-  const increase = (id: number) => {
+  const increase = (lineKey: string) => {
     updateCart((prev) =>
-      prev.map((i) =>
-        i.id === id ? { ...i, quantity: i.quantity + 1 } : i
+      prev.map((entry) =>
+        entry.lineKey === lineKey ? { ...entry, quantity: entry.quantity + 1 } : entry
       )
     );
   };
 
-  const decrease = (id: number) => {
+  const decrease = (lineKey: string) => {
     updateCart((prev) =>
       prev
-        .map((i) =>
-          i.id === id ? { ...i, quantity: i.quantity - 1 } : i
+        .map((entry) =>
+          entry.lineKey === lineKey ? { ...entry, quantity: entry.quantity - 1 } : entry
         )
-        .filter((i) => i.quantity > 0)
+        .filter((entry) => entry.quantity > 0)
     );
   };
 
-  const remove = (id: number) => {
-    updateCart((prev) => prev.filter((i) => i.id !== id));
+  const findPreferredLineById = (items: CartItem[], id: number) =>
+    items.find((entry) => entry.id === id && !(entry.modifiers || []).length) ||
+    items.find((entry) => entry.id === id);
+
+  const increaseById = (id: number) => {
+    updateCart((prev) => {
+      const target = findPreferredLineById(prev, id);
+      if (target) {
+        return prev.map((entry) =>
+          entry.lineKey === target.lineKey
+            ? { ...entry, quantity: entry.quantity + 1 }
+            : entry
+        );
+      }
+      return prev;
+    });
+  };
+
+  const decreaseById = (id: number) => {
+    updateCart((prev) => {
+      const candidates = prev.filter((entry) => entry.id === id);
+      const target = [...candidates].reverse().find((entry) => entry.quantity > 0);
+      if (!target) return prev;
+
+      return prev
+        .map((entry) =>
+          entry.lineKey === target.lineKey
+            ? { ...entry, quantity: entry.quantity - 1 }
+            : entry
+        )
+        .filter((entry) => entry.quantity > 0);
+    });
+  };
+
+  const remove = (lineKey: string) => {
+    updateCart((prev) => prev.filter((entry) => entry.lineKey !== lineKey));
+  };
+
+  const removeById = (id: number) => {
+    updateCart((prev) => prev.filter((entry) => entry.id !== id));
+  };
+
+  const updateModifiers = (lineKey: string, modifiers: string[]) => {
+    updateCart((prev) => {
+      const current = prev.find((entry) => entry.lineKey === lineKey);
+      if (!current) return prev;
+
+      const nextKey = buildCartLineKey(current.id, modifiers);
+      const withoutCurrent = prev.filter((entry) => entry.lineKey !== lineKey);
+      const existing = withoutCurrent.find((entry) => entry.lineKey === nextKey);
+
+      if (existing) {
+        return withoutCurrent.map((entry) =>
+          entry.lineKey === nextKey
+            ? { ...entry, quantity: entry.quantity + current.quantity }
+            : entry
+        );
+      }
+
+      return [
+        ...withoutCurrent,
+        {
+          ...current,
+          lineKey: nextKey,
+          modifiers,
+        },
+      ];
+    });
   };
 
   const clear = () => writeCartSnapshot([]);
 
-  const total = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const total = cart.reduce((sum, entry) => sum + entry.price * entry.quantity, 0);
 
   return (
     <CartContext.Provider
-      value={{ cart, cartLoaded, addToCart, increase, decrease, remove, clear, total }}
+      value={{
+        cart,
+        cartLoaded,
+        addToCart,
+        increase,
+        decrease,
+        increaseById,
+        decreaseById,
+        remove,
+        removeById,
+        updateModifiers,
+        clear,
+        total,
+      }}
     >
       {children}
     </CartContext.Provider>

@@ -44,6 +44,7 @@ export type AdminOrderItem = {
   name: string;
   price: number;
   quantity?: number;
+  modifiers?: string[] | null;
 };
 
 export type AdminOrder = {
@@ -55,6 +56,7 @@ export type AdminOrder = {
   total?: number | null;
   subtotal?: number | null;
   discount_amount?: number | null;
+  loyalty_discount?: number | null;
   coupon_code?: string | null;
   status?: string | null;
   created_at: string;

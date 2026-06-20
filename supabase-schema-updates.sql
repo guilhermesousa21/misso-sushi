@@ -175,3 +175,24 @@ drop policy if exists "Public can read active menu categories" on public.menu_ca
 create policy "Public can read active menu categories"
 on public.menu_categories for select
 using (active is true);
+
+create table if not exists public.customer_otp_challenges (
+  phone text primary key,
+  code text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+alter table if exists public.store_settings
+  add column if not exists item_modifiers jsonb not null default '[
+    { "id": "sem-wasabi", "label": "Sem wasabi", "active": true },
+    { "id": "sem-gengibre", "label": "Sem gengibre", "active": true },
+    { "id": "extra-shoyu", "label": "Extra shoyu", "active": true },
+    { "id": "extra-picante", "label": "Extra picante", "active": true }
+  ]'::jsonb;
+
+alter table if exists public.orders
+  add column if not exists loyalty_discount numeric not null default 0;
+
+create index if not exists orders_phone_idx on public.orders (phone);
+create index if not exists customer_otp_challenges_expires_at_idx on public.customer_otp_challenges (expires_at);

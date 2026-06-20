@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { formatAddonSummary, getOrderPickupLabel } from "../../../lib/orderFeatures";
+import { formatOrderItemLabel } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import { useCart } from "../../context/CartContext";
 
@@ -22,6 +23,7 @@ type Order = {
     price: number;
     category?: string;
     quantity?: number;
+    modifiers?: string[] | null;
   }[] | null;
 };
 
@@ -115,13 +117,27 @@ export default function PedidoPage({
     clear();
     (order.items || []).forEach((item) => {
       const quantity = item.quantity ?? 1;
-      for (let index = 0; index < quantity; index += 1) {
-        addToCart({
+      addToCart(
+        {
           id: item.id,
           name: item.name,
           price: Number(item.price || 0),
           category: item.category || "",
-        });
+        },
+        item.modifiers || []
+      );
+      if (quantity > 1) {
+        for (let index = 1; index < quantity; index += 1) {
+          addToCart(
+            {
+              id: item.id,
+              name: item.name,
+              price: Number(item.price || 0),
+              category: item.category || "",
+            },
+            item.modifiers || []
+          );
+        }
       }
     });
     router.push("/checkout");
@@ -173,6 +189,16 @@ export default function PedidoPage({
             );
           })}
         </div>
+        {(order.items || []).length > 0 && (
+          <div style={styles.itemsBox}>
+            <strong style={styles.itemsTitle}>Itens do pedido</strong>
+            {(order.items || []).map((item, index) => (
+              <p key={`${item.id}-${index}`} style={styles.itemLine}>
+                {formatOrderItemLabel(item)}
+              </p>
+            ))}
+          </div>
+        )}
         {(order.items || []).length > 0 && (
           <button type="button" onClick={handleRepeatOrder} style={styles.repeatButton}>
             Repetir este pedido
@@ -374,6 +400,25 @@ const styles: Record<string, CSSProperties> = {
     marginTop: 4,
     color: "#766e64",
     fontSize: 13,
+  },
+  itemsBox: {
+    marginTop: 18,
+    borderRadius: 8,
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    background: "#fffaf2",
+    padding: 14,
+    display: "grid",
+    gap: 8,
+  },
+  itemsTitle: {
+    fontSize: 14,
+    fontWeight: 850,
+  },
+  itemLine: {
+    margin: 0,
+    color: "#514a43",
+    fontSize: 14,
+    lineHeight: 1.4,
   },
   repeatButton: {
     marginTop: 18,

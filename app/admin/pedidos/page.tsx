@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { printOrder } from "../../../lib/printOrder";
 import { formatAddonSummary, getOrderPickupLabel } from "../../../lib/orderFeatures";
+import { formatOrderItemLabel } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
 import {
@@ -277,7 +278,7 @@ export default function AdminOrdersPage() {
             <div style={localStyles.itemList}>
               {(order.items || []).map((item, index) => (
                 <span key={`${order.id}-${item.id}-${index}`} style={localStyles.itemLine}>
-                  {item.quantity ?? 1}x {item.name}
+                  {formatOrderItemLabel(item)}
                 </span>
               ))}
               {(order.items || []).length === 0 && (

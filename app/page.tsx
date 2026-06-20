@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import {
@@ -23,10 +24,10 @@ import {
   type MenuCategory,
 } from "../lib/menuCategories";
 import { MenuItem } from "../types";
-import { useCart } from "./context/CartContext";
+import { useCart, type CartItem } from "./context/CartContext";
 import { money, isItemOrderable } from "../lib/orderUtils";
 
-type CartLine = MenuItem & { quantity: number };
+type CartLine = CartItem;
 
 const sortItems = (menuItems: MenuItem[]) =>
   [...menuItems].sort((a, b) => {
@@ -47,7 +48,7 @@ export default function Page() {
   const [searchTerm, setSearchTerm] = useState("");
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>(defaultMenuCategories);
-  const { addToCart, cart, increase, decrease, remove, total } = useCart();
+  const { addToCart, cart, increase, decrease, increaseById, decreaseById, removeById, total } = useCart();
   const [cartNotice, setCartNotice] = useState("");
   const [addedPulseId, setAddedPulseId] = useState<number | null>(null);
   const [storeOpen, setStoreOpen] = useState(true);
@@ -151,7 +152,7 @@ export default function Page() {
 
     if (unavailableCartItems.length === 0) return;
 
-    unavailableCartItems.forEach((item) => remove(item.id));
+    unavailableCartItems.forEach((item) => removeById(item.id));
     const timer = window.setTimeout(() => {
       setCartNotice(
         unavailableCartItems.length === 1
@@ -161,7 +162,7 @@ export default function Page() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [cart, items, remove]);
+  }, [cart, items, removeById]);
 
   const orderableItems = useMemo(
     () =>
@@ -250,7 +251,7 @@ export default function Page() {
   };
 
   const getQuantity = (id: number) =>
-    cart.find((item) => item.id === id)?.quantity || 0;
+    cart.filter((item) => item.id === id).reduce((sum, item) => sum + item.quantity, 0);
 
   const handleAddToCart = (item: MenuItem) => {
     addToCart(item);
@@ -259,7 +260,7 @@ export default function Page() {
   };
 
   const handleIncrease = (id: number) => {
-    increase(id);
+    increaseById(id);
     setAddedPulseId(id);
     window.setTimeout(() => setAddedPulseId((current) => (current === id ? null : current)), 280);
   };
@@ -286,15 +287,20 @@ export default function Page() {
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setOpenCart(true)}
-            style={styles.headerCartButton}
-            aria-label="Abrir carrinho"
-          >
-            <span style={styles.headerCartCount}>{itemCount}</span>
-            {money(total)}
-          </button>
+          <div style={styles.headerActions}>
+            <Link href="/meus-pedidos" style={styles.headerLink}>
+              Meus pedidos
+            </Link>
+            <button
+              type="button"
+              onClick={() => setOpenCart(true)}
+              style={styles.headerCartButton}
+              aria-label="Abrir carrinho"
+            >
+              <span style={styles.headerCartCount}>{itemCount}</span>
+              {money(total)}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -419,7 +425,7 @@ export default function Page() {
                           </button>
                         ) : (
                           <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
-                            <button type="button" onClick={() => decrease(item.id)} style={{ ...styles.quantityButton, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Remover ${item.name}`}>-</button>
+                            <button type="button" onClick={() => decreaseById(item.id)} style={{ ...styles.quantityButton, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Remover ${item.name}`}>-</button>
                             <span style={{ ...styles.quantityValue, ...(isMobile ? styles.quantityValueMobile : {}) }}>{quantity}</span>
                             <button type="button" onClick={() => handleIncrease(item.id)} style={{ ...styles.quantityButton, ...styles.quantityButtonDark, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Adicionar ${item.name}`}>+</button>
                           </div>
@@ -539,7 +545,7 @@ export default function Page() {
                             <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
                               <button
                                 type="button"
-                                onClick={() => decrease(item.id)}
+                                onClick={() => decreaseById(item.id)}
                                 style={{ ...styles.quantityButton, ...(isMobile ? styles.quantityButtonMobile : {}) }}
                                 aria-label={`Remover ${item.name}`}
                               >
@@ -615,9 +621,12 @@ export default function Page() {
                 <p style={styles.emptyCart}>Seu carrinho está vazio.</p>
               ) : (
                 cart.map((item: CartLine) => (
-                  <div key={item.id} style={styles.cartItem}>
+                  <div key={item.lineKey} style={styles.cartItem}>
                     <div style={styles.cartItemMain}>
                       <strong style={styles.cartItemName}>{item.name}</strong>
+                      {item.modifiers?.length ? (
+                        <p style={styles.cartItemModifiers}>{item.modifiers.join(", ")}</p>
+                      ) : null}
                       <p style={styles.cartItemPrice}>
                         {money(item.price * item.quantity)}
                       </p>
@@ -625,7 +634,7 @@ export default function Page() {
                     <div style={styles.quantityControl}>
                       <button
                         type="button"
-                        onClick={() => decrease(item.id)}
+                        onClick={() => decrease(item.lineKey)}
                         style={styles.quantityButton}
                         aria-label={`Remover ${item.name}`}
                       >
@@ -634,7 +643,7 @@ export default function Page() {
                       <span style={styles.quantityValue}>{item.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => handleIncrease(item.id)}
+                        onClick={() => increase(item.lineKey)}
                         style={{
                           ...styles.quantityButton,
                           ...styles.quantityButtonDark,
@@ -704,6 +713,24 @@ const styles: Record<string, CSSProperties> = {
   headerInnerMobile: {
     alignItems: "flex-start",
     gap: 10,
+  },
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  headerLink: {
+    color: "#8f1728",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 850,
+    background: "#fffdf8",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 999,
+    padding: "9px 13px",
+    whiteSpace: "nowrap",
   },
   eyebrow: {
     color: "#766e64",
@@ -1231,6 +1258,12 @@ const styles: Record<string, CSSProperties> = {
   cartItemName: {
     display: "block",
     lineHeight: 1.3,
+  },
+  cartItemModifiers: {
+    marginTop: 4,
+    color: "#766e64",
+    fontSize: 12,
+    lineHeight: 1.35,
   },
   cartItemPrice: {
     marginTop: 5,

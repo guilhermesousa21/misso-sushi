@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { PrintableOrder } from "../../../../lib/printOrder";
+import { formatOrderItemLabel } from "../../../../lib/itemModifiers";
 import { formatAddonSummary, getOrderPickupLabel } from "../../../../lib/orderFeatures";
 
 const money = (value: number) =>
@@ -20,7 +21,7 @@ const buildOrderMessage = (order: PrintableOrder) => {
   const items = (order.items || [])
     .map((item) => {
       const quantity = item.quantity ?? 1;
-      return `${quantity}x ${item.name} - ${money(Number(item.price || 0) * quantity)}`;
+      return `${formatOrderItemLabel(item)} - ${money(Number(item.price || 0) * quantity)}`;
     })
     .join("\n");
 
@@ -43,6 +44,9 @@ const buildOrderMessage = (order: PrintableOrder) => {
     }`,
     order.coupon_code
       ? `Cupom: ${order.coupon_code} (-${money(Number(order.discount_amount || 0))})`
+      : "",
+    Number(order.loyalty_discount || 0) > 0
+      ? `Fidelidade: -${money(Number(order.loyalty_discount || 0))}`
       : "",
     Number(order.service_fee || 0) > 0
       ? `${order.service_fee_label || "Taxa de embalagem"}: ${money(Number(order.service_fee || 0))}`

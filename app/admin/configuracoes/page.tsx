@@ -15,6 +15,7 @@ import {
   defaultCheckoutAddons,
   type CheckoutAddonConfig,
 } from "../../../lib/orderFeatures";
+import { defaultItemModifiers, type ItemModifierOption } from "../../../lib/itemModifiers";
 import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
 
 type StoreSettings = {
@@ -29,6 +30,7 @@ type StoreSettings = {
   order_slot_limit: number;
   business_hours: BusinessHours;
   checkout_addons: CheckoutAddonConfig[];
+  item_modifiers: ItemModifierOption[];
 };
 
 const defaultSettings: StoreSettings = {
@@ -42,6 +44,7 @@ const defaultSettings: StoreSettings = {
   order_slot_limit: 0,
   business_hours: weeklyBusinessHours,
   checkout_addons: defaultCheckoutAddons,
+  item_modifiers: defaultItemModifiers,
 };
 
 const orderedWeekDays = [1, 2, 3, 4, 5, 6, 0];
@@ -111,6 +114,9 @@ export default function AdminSettingsPage() {
           checkout_addons: (data as StoreSettings).checkout_addons?.length
             ? (data as StoreSettings).checkout_addons
             : defaultCheckoutAddons,
+          item_modifiers: (data as StoreSettings).item_modifiers?.length
+            ? (data as StoreSettings).item_modifiers
+            : defaultItemModifiers,
         });
       }
     }
@@ -153,6 +159,7 @@ export default function AdminSettingsPage() {
       order_slot_limit: Number(settings.order_slot_limit || 0),
       business_hours: settings.business_hours,
       checkout_addons: settings.checkout_addons,
+      item_modifiers: settings.item_modifiers,
     };
     const legacyPayload = {
       is_open: settings.is_open,
@@ -190,6 +197,9 @@ export default function AdminSettingsPage() {
         checkout_addons: (data[0] as StoreSettings).checkout_addons?.length
           ? (data[0] as StoreSettings).checkout_addons
           : defaultCheckoutAddons,
+        item_modifiers: (data[0] as StoreSettings).item_modifiers?.length
+          ? (data[0] as StoreSettings).item_modifiers
+          : defaultItemModifiers,
       });
     }
     setMessage("Configurações salvas.");
@@ -595,6 +605,81 @@ export default function AdminSettingsPage() {
           >
             + Adicionar complemento
           </button>
+        </section>
+
+        <section style={{ ...baseStyles.card, ...(isMobile ? styles.cardMobile : {}) }}>
+          <div style={{ ...baseStyles.cardHeader, ...(isMobile ? styles.cardHeaderMobile : {}) }}>
+            <div>
+              <p style={baseStyles.cardEyebrow}>Checkout</p>
+              <h2 style={baseStyles.cardTitle}>Modificadores por prato</h2>
+            </div>
+          </div>
+
+          <div style={styles.addonList}>
+            {settings.item_modifiers.map((modifier, index) => (
+              <div key={modifier.id || index} style={styles.addonRow}>
+                <label style={styles.field}>
+                  <span style={styles.timeLabel}>Rótulo</span>
+                  <input
+                    value={modifier.label}
+                    onChange={(event) => {
+                      const next = [...settings.item_modifiers];
+                      next[index] = { ...modifier, label: event.target.value };
+                      setSettings({ ...settings, item_modifiers: next });
+                    }}
+                    style={baseStyles.input}
+                  />
+                </label>
+                <label style={styles.addonActiveField}>
+                  <input
+                    type="checkbox"
+                    checked={modifier.active !== false}
+                    onChange={(event) => {
+                      const next = [...settings.item_modifiers];
+                      next[index] = { ...modifier, active: event.target.checked };
+                      setSettings({ ...settings, item_modifiers: next });
+                    }}
+                  />
+                  Ativo
+                </label>
+                <button
+                  type="button"
+                  style={baseStyles.secondaryButton}
+                  onClick={() => {
+                    setSettings({
+                      ...settings,
+                      item_modifiers: settings.item_modifiers.filter((_, itemIndex) => itemIndex !== index),
+                    });
+                  }}
+                >
+                  Remover
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            style={{ ...baseStyles.secondaryButton, marginTop: 12 }}
+            onClick={() =>
+              setSettings({
+                ...settings,
+                item_modifiers: [
+                  ...settings.item_modifiers,
+                  {
+                    id: `modifier-${Date.now()}`,
+                    label: "Novo modificador",
+                    active: true,
+                  },
+                ],
+              })
+            }
+          >
+            + Adicionar modificador
+          </button>
+          <p style={styles.hint}>
+            Ex.: Sem wasabi, Extra shoyu. Aparecem no checkout para o cliente marcar por prato.
+          </p>
         </section>
 
         <div style={{ ...styles.saveBar, ...(isMobile ? styles.saveBarMobile : {}) }}>

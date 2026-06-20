@@ -16,6 +16,12 @@ export type CheckoutAddonConfig = {
   active?: boolean;
 };
 
+export type ItemModifierConfig = {
+  id: string;
+  label: string;
+  active?: boolean;
+};
+
 export type OperationalSettings = {
   business_hours?: unknown;
   average_time?: string | null;
@@ -26,6 +32,7 @@ export type OperationalSettings = {
   max_advance_days?: number | null;
   order_slot_limit?: number | null;
   checkout_addons?: CheckoutAddonConfig[] | null;
+  item_modifiers?: ItemModifierConfig[] | null;
 };
 
 export const defaultServiceFeeLabel = "Taxa de embalagem";

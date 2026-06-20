@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { formatAddonSummary, getOrderPickupLabel } from "../../lib/orderFeatures";
+import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { printOrder } from "../../lib/printOrder";
 import { supabase } from "../../lib/supabase";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -13,6 +14,7 @@ type OrderItem = {
   name: string;
   price: number;
   quantity?: number;
+  modifiers?: string[] | null;
 };
 
 type Order = {
@@ -423,9 +425,7 @@ export default function AdminPanel() {
                 {order.items.length > 0 ? (
                   order.items.map((item, index) => (
                     <div key={`${item.id}-${index}`} style={styles.itemRow}>
-                      <span>
-                        {item.quantity ?? 1}x {item.name}
-                      </span>
+                      <span>{formatOrderItemLabel(item)}</span>
                       <strong>{money(item.price * (item.quantity ?? 1))}</strong>
                     </div>
                   ))

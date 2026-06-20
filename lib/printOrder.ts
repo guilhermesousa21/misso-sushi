@@ -3,6 +3,7 @@ type PrintableItem = {
   name: string;
   price: number;
   quantity?: number;
+  modifiers?: string[] | null;
 };
 
 type PrintableAddon = {
@@ -21,6 +22,7 @@ export type PrintableOrder = {
   total?: number | null;
   subtotal?: number | null;
   discount_amount?: number | null;
+  loyalty_discount?: number | null;
   coupon_code?: string | null;
   service_fee?: number | null;
   service_fee_label?: string | null;
@@ -46,6 +48,12 @@ const escapeHtml = (value: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+
+const formatItemLine = (item: PrintableItem) => {
+  const quantity = item.quantity ?? 1;
+  const modifiers = (item.modifiers || []).filter(Boolean).join(", ");
+  return `${quantity}x ${item.name}${modifiers ? ` (${modifiers})` : ""}`;
+};
 
 const getTotal = (order: PrintableOrder) =>
   typeof order.total === "number"
@@ -84,6 +92,7 @@ export function printOrder(order: PrintableOrder) {
   const items = order.items || [];
   const subtotal = getSubtotal(order);
   const discount = Number(order.discount_amount || 0);
+  const loyaltyDiscount = Number(order.loyalty_discount || 0);
   const serviceFee = Number(order.service_fee || 0);
   const addonTotal = (order.addons || []).reduce(
     (sum, addon) => sum + Number(addon.unit_price || 0) * (addon.quantity ?? 1),
@@ -105,7 +114,7 @@ export function printOrder(order: PrintableOrder) {
             return `
               <tr>
                 <td>
-                  <strong>${quantity}x ${escapeHtml(item.name)}</strong>
+                  <strong>${escapeHtml(formatItemLine(item))}</strong>
                   <span>${money(Number(item.price || 0))} cada</span>
                 </td>
                 <td>${money(lineTotal)}</td>
@@ -260,6 +269,11 @@ export function printOrder(order: PrintableOrder) {
             ${
               discount > 0
                 ? `<div class="line"><span>Desconto${order.coupon_code ? ` (${escapeHtml(order.coupon_code)})` : ""}</span><strong>-${money(discount)}</strong></div>`
+                : ""
+            }
+            ${
+              loyaltyDiscount > 0
+                ? `<div class="line"><span>Fidelidade</span><strong>-${money(loyaltyDiscount)}</strong></div>`
                 : ""
             }
             <div class="line total"><span>Total</span><strong>${money(total)}</strong></div>

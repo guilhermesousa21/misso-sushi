@@ -26,6 +26,12 @@ import {
   type OperationalSettings,
   type OrderFulfillmentType,
 } from "../../lib/orderFeatures";
+import { getItemModifierOptions, formatItemModifiers } from "../../lib/itemModifiers";
+import {
+  LOYALTY_DISCOUNT_VALUE,
+  LOYALTY_ORDER_INTERVAL,
+  type LoyaltyStatus,
+} from "../../lib/loyalty";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import type { MenuItem } from "../../types";
 import { useCart } from "../context/CartContext";
@@ -99,6 +105,7 @@ const optionalOrderColumns = [
   "payment_method",
   "payment_status",
   "mercado_pago_payment_id",
+  "loyalty_discount",
 ];
 
 const getMissingSchemaColumn = (message: string) =>
@@ -112,7 +119,7 @@ const formatCountdown = (seconds: number) => {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, cartLoaded, total, clear, remove } = useCart();
+  const { cart, cartLoaded, total, clear, removeById, updateModifiers } = useCart();
   const isMobile = useMediaQuery("(max-width: 760px)");
 
   const [name, setName] = useState("");
@@ -145,10 +152,14 @@ export default function CheckoutPage() {
   const [cartNotice, setCartNotice] = useState("");
   const [scheduledOrderCounts, setScheduledOrderCounts] = useState<Record<string, number>>({});
 
+  const [loyaltyStatus, setLoyaltyStatus] = useState<LoyaltyStatus | null>(null);
+  const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+
   const serviceFee = getServiceFee(operationalSettings);
   const serviceFeeLabel = getServiceFeeLabel(operationalSettings);
   const pickupSlots = buildPickupSlots(operationalSettings);
   const slotLimit = getOrderSlotLimit(operationalSettings);
+  const itemModifierOptions = getItemModifierOptions(operationalSettings);
   const selectedAddonList = availableAddons
     .map((addon) => ({ ...addon, quantity: selectedAddons[addon.id] || 0 }))
     .filter((addon) => addon.quantity > 0);
@@ -157,7 +168,8 @@ export default function CheckoutPage() {
     0
   );
   const discountAmount = calculateDiscount(appliedCoupon, total);
-  const finalTotal = Math.max(0, total + addonTotal + serviceFee - discountAmount);
+  const loyaltyDiscount = loyaltyStatus?.eligibleNow ? LOYALTY_DISCOUNT_VALUE : 0;
+  const finalTotal = Math.max(0, total + addonTotal + serviceFee - discountAmount - loyaltyDiscount);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
@@ -232,7 +244,7 @@ export default function CheckoutPage() {
       return !isItemOrderable(menuItem);
     });
     if (unavailableCartItems.length === 0) return;
-    unavailableCartItems.forEach((item) => remove(item.id));
+    unavailableCartItems.forEach((item) => removeById(item.id));
     const timer = window.setTimeout(() => {
       setCartNotice(
         unavailableCartItems.length === 1
@@ -241,7 +253,40 @@ export default function CheckoutPage() {
       );
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [cart, menuItems, remove]);
+  }, [cart, menuItems, removeById]);
+
+  useEffect(() => {
+    const digits = onlyDigits(phone);
+    if (![10, 11].includes(digits.length)) {
+      const timer = window.setTimeout(() => setLoyaltyStatus(null), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setLoyaltyLoading(true);
+      try {
+        const res = await fetch("/api/customer/loyalty", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: digits }),
+        });
+        const data = await res.json();
+        if (!cancelled && res.ok) {
+          setLoyaltyStatus(data as LoyaltyStatus);
+        }
+      } catch {
+        if (!cancelled) setLoyaltyStatus(null);
+      } finally {
+        if (!cancelled) setLoyaltyLoading(false);
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [phone]);
 
   useEffect(() => {
     if (!pendingOrderId || checkoutState !== "awaiting_pix") return;
@@ -325,10 +370,17 @@ export default function CheckoutPage() {
     const base: Record<string, unknown> = {
       name: normalizeName(name),
       phone: formatPhone(phone),
-      items: cart.map((i) => ({ id: i.id, name: i.name, price: Number(i.price), quantity: i.quantity })),
+      items: cart.map((i) => ({
+        id: i.id,
+        name: i.name,
+        price: Number(i.price),
+        quantity: i.quantity,
+        modifiers: i.modifiers?.length ? i.modifiers : undefined,
+      })),
       note: note.trim(),
       subtotal: total,
       discount_amount: discountAmount,
+      loyalty_discount: loyaltyDiscount,
       total: finalTotal,
       coupon_code: appliedCoupon?.code || null,
       promotion_id: appliedCoupon?.id || null,
@@ -460,6 +512,16 @@ export default function CheckoutPage() {
     setAppliedCoupon(null);
     setCouponCode("");
     setCouponMessage("");
+  };
+
+  const toggleItemModifier = (lineKey: string, label: string) => {
+    const item = cart.find((entry) => entry.lineKey === lineKey);
+    if (!item) return;
+    const current = item.modifiers || [];
+    const next = current.includes(label)
+      ? current.filter((value) => value !== label)
+      : [...current, label];
+    updateModifiers(lineKey, next);
   };
 
   // ── PIX aguardando / pago ────────────────────────────────────────────────────
@@ -733,6 +795,89 @@ export default function CheckoutPage() {
             </div>
           </details>
 
+          {/* Modificadores por item */}
+          {itemModifierOptions.length > 0 && (
+            <div style={styles.card}>
+              <h2 style={styles.sectionTitle}>Modificadores por prato</h2>
+              <p style={styles.mutedSmall}>
+                Marque preferências por item para reduzir erro na cozinha.
+              </p>
+              <div style={styles.modifierList}>
+                {cart.map((item) => (
+                  <div key={item.lineKey} style={styles.modifierItemCard}>
+                    <strong style={styles.modifierItemTitle}>
+                      {item.quantity}x {item.name}
+                    </strong>
+                    <div style={styles.modifierChipRow}>
+                      {itemModifierOptions.map((option) => {
+                        const active = (item.modifiers || []).includes(option.label);
+                        return (
+                          <button
+                            key={`${item.lineKey}-${option.id}`}
+                            type="button"
+                            onClick={() => toggleItemModifier(item.lineKey, option.label)}
+                            style={{
+                              ...styles.modifierChip,
+                              ...(active ? styles.modifierChipActive : {}),
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {item.modifiers?.length ? (
+                      <p style={styles.modifierSummary}>
+                        Selecionado: {formatItemModifiers(item.modifiers)}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fidelidade */}
+          {[10, 11].includes(onlyDigits(phone).length) && (
+            <div style={styles.card}>
+              <div style={styles.inlineHeader}>
+                <h2 style={styles.sectionTitle}>Fidelidade</h2>
+                {loyaltyStatus?.eligibleNow && (
+                  <span style={styles.inlineMeta}>-{money(LOYALTY_DISCOUNT_VALUE)}</span>
+                )}
+              </div>
+              {loyaltyLoading ? (
+                <p style={styles.mutedSmall}>Consultando seu histórico...</p>
+              ) : loyaltyStatus ? (
+                <>
+                  <p style={styles.mutedSmall}>
+                    A cada {LOYALTY_ORDER_INTERVAL} pedidos pagos, você ganha R${" "}
+                    {LOYALTY_DISCOUNT_VALUE.toFixed(0)} off.
+                  </p>
+                  <div style={styles.loyaltyProgressTrack}>
+                    <span
+                      style={{
+                        ...styles.loyaltyProgressFill,
+                        width: `${
+                          loyaltyStatus.eligibleNow
+                            ? 100
+                            : (loyaltyStatus.progressInCycle / LOYALTY_ORDER_INTERVAL) * 100
+                        }%`,
+                      }}
+                    />
+                  </div>
+                  <p style={styles.loyaltyText}>
+                    {loyaltyStatus.eligibleNow
+                      ? `Parabéns! Este é seu ${loyaltyStatus.nextOrderNumber}º pedido — desconto de fidelidade aplicado.`
+                      : `Você já fez ${loyaltyStatus.paidOrderCount} pedidos pagos. Faltam ${loyaltyStatus.ordersUntilReward} para o próximo desconto.`}
+                  </p>
+                </>
+              ) : (
+                <p style={styles.mutedSmall}>Não foi possível carregar o programa de fidelidade.</p>
+              )}
+            </div>
+          )}
+
           {/* Cupom */}
           <div style={styles.card}>
             <div style={styles.inlineHeader}>
@@ -822,9 +967,12 @@ export default function CheckoutPage() {
             {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
             <div style={styles.orderList}>
               {cart.map((item) => (
-                <div key={item.id} style={styles.summaryOrderRow}>
+                <div key={item.lineKey} style={styles.summaryOrderRow}>
                   <div>
                     <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
+                    {item.modifiers?.length ? (
+                      <p style={styles.summaryMuted}>{formatItemModifiers(item.modifiers)}</p>
+                    ) : null}
                     <p style={styles.summaryMuted}>{money(Number(item.price))} cada</p>
                   </div>
                   <strong>{money(item.price * item.quantity)}</strong>
@@ -852,8 +1000,14 @@ export default function CheckoutPage() {
               )}
               {discountAmount > 0 && (
                 <div style={styles.summaryTotalLine}>
-                  <span>Desconto</span>
+                  <span>Desconto cupom</span>
                   <strong style={styles.discountText}>-{money(discountAmount)}</strong>
+                </div>
+              )}
+              {loyaltyDiscount > 0 && (
+                <div style={styles.summaryTotalLine}>
+                  <span>Fidelidade</span>
+                  <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
                 </div>
               )}
               {selectedAddonList.length > 0 && (
@@ -942,6 +1096,47 @@ const styles: Record<string, CSSProperties> = {
   summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },
   addonSummary: { color: "rgba(255, 253, 248, 0.66)", fontSize: 13, lineHeight: 1.45 },
   discountText: { color: "#0f7a4a" },
+  modifierList: { display: "grid", gap: 10 },
+  modifierItemCard: {
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    padding: "12px 14px",
+    background: "#fff",
+    display: "grid",
+    gap: 10,
+  },
+  modifierItemTitle: { fontSize: 15, lineHeight: 1.35 },
+  modifierChipRow: { display: "flex", flexWrap: "wrap", gap: 8 },
+  modifierChip: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    background: "#fff",
+    color: "#1c1a17",
+    padding: "8px 12px",
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 13,
+  },
+  modifierChipActive: {
+    background: "#1c1a17",
+    borderColor: "#1c1a17",
+    color: "#fffdf8",
+  },
+  modifierSummary: { color: "#766e64", fontSize: 13, lineHeight: 1.4 },
+  loyaltyProgressTrack: {
+    marginTop: 10,
+    height: 8,
+    borderRadius: 999,
+    background: "#e7ded2",
+    overflow: "hidden",
+  },
+  loyaltyProgressFill: {
+    display: "block",
+    height: "100%",
+    borderRadius: 999,
+    background: "#9f1d2f",
+  },
+  loyaltyText: { marginTop: 10, color: "#514a43", fontSize: 14, fontWeight: 750, lineHeight: 1.45 },
   muted: { color: "#625b53", lineHeight: 1.55 },
   mutedSmall: { marginTop: 4, color: "#766e64", fontSize: 13, lineHeight: 1.4 },
   noticeError: { borderRadius: 8, background: "#fee2e2", color: "#991b1b", padding: 12, marginBottom: 12, fontSize: 13, fontWeight: 800, lineHeight: 1.4 },
