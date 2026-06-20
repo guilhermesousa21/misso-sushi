@@ -124,6 +124,7 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("pix");
   const [note, setNote] = useState("");
+  const [wantsScheduledPickup, setWantsScheduledPickup] = useState(false);
   const [scheduledFor, setScheduledFor] = useState("");
   const [selectedAddons, setSelectedAddons] = useState<Record<string, number>>({});
   const [couponCode, setCouponCode] = useState("");
@@ -337,9 +338,10 @@ export default function CheckoutPage() {
   }, [checkoutState, pendingOrderId]);
 
   const selectedSlotIsAvailable =
-    Boolean(scheduledFor) &&
-    pickupSlots.some((slot) => toLocalInputValue(slot) === scheduledFor) &&
-    (slotLimit <= 0 || (scheduledOrderCounts[scheduledFor] || 0) < slotLimit);
+    !wantsScheduledPickup ||
+    (Boolean(scheduledFor) &&
+      pickupSlots.some((slot) => toLocalInputValue(slot) === scheduledFor) &&
+      (slotLimit <= 0 || (scheduledOrderCounts[scheduledFor] || 0) < slotLimit));
   const isFormValid =
     cart.length > 0 &&
     hasFirstAndLastName(name) &&
@@ -380,8 +382,9 @@ export default function CheckoutPage() {
       coupon_code: appliedCoupon?.code || null,
       promotion_id: appliedCoupon?.id || null,
       fulfillment: "retirada",
-      fulfillment_type: "scheduled",
-      scheduled_for: scheduledFor ? new Date(scheduledFor).toISOString() : null,
+      fulfillment_type: wantsScheduledPickup ? "scheduled" : "asap",
+      scheduled_for:
+        wantsScheduledPickup && scheduledFor ? new Date(scheduledFor).toISOString() : null,
       addons: selectedAddonList,
       service_fee: serviceFee,
       service_fee_label: serviceFeeLabel,
@@ -677,34 +680,49 @@ export default function CheckoutPage() {
           {/* Retirada */}
           <div style={styles.card}>
             <div style={styles.inlineHeader}>
-              <h2 style={styles.sectionTitle}>Agendar retirada</h2>
+              <h2 style={styles.sectionTitle}>Retirada</h2>
               <span style={styles.inlineMeta}>Tempo médio: {averageTime}</span>
             </div>
-            <label style={styles.field}>
-              <span style={styles.label}>Horário de retirada</span>
-              <select
-                value={scheduledFor}
-                onChange={(event) => setScheduledFor(event.target.value)}
-                style={styles.select}
-              >
-                {pickupSlots.map((slot) => {
-                  const value = toLocalInputValue(slot);
-                  const count = scheduledOrderCounts[value] || 0;
-                  const full = slotLimit > 0 && count >= slotLimit;
-                  return (
-                    <option key={value} value={value} disabled={full}>
-                      {formatPickupTime(slot.toISOString())}
-                      {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
-                      {full ? " - lotado" : ""}
-                    </option>
-                  );
-                })}
-              </select>
-              <p style={styles.mutedSmall}>
-                Grade de {getPickupSlotMinutes(operationalSettings)} em{" "}
-                {getPickupSlotMinutes(operationalSettings)} minutos.
-              </p>
-            </label>
+            <p style={styles.mutedSmall}>
+              Seu pedido entra na fila de preparo imediatamente após o pagamento.
+            </p>
+            <button
+              type="button"
+              onClick={() => setWantsScheduledPickup((current) => !current)}
+              style={{
+                ...styles.scheduleToggle,
+                ...(wantsScheduledPickup ? styles.scheduleToggleActive : {}),
+              }}
+            >
+              {wantsScheduledPickup ? "Retirada imediata" : "Agendar retirada"}
+            </button>
+            {wantsScheduledPickup && (
+              <label style={{ ...styles.field, marginTop: 14 }}>
+                <span style={styles.label}>Horário de retirada</span>
+                <select
+                  value={scheduledFor}
+                  onChange={(event) => setScheduledFor(event.target.value)}
+                  style={styles.select}
+                >
+                  {pickupSlots.map((slot) => {
+                    const value = toLocalInputValue(slot);
+                    const count = scheduledOrderCounts[value] || 0;
+                    const full = slotLimit > 0 && count >= slotLimit;
+                    return (
+                      <option key={value} value={value} disabled={full}>
+                        {formatPickupTime(slot.toISOString())}
+                        {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
+                        {full ? " - lotado" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p style={styles.mutedSmall}>
+                  Grade de {getPickupSlotMinutes(operationalSettings)} em{" "}
+                  {getPickupSlotMinutes(operationalSettings)} minutos.
+                </p>
+              </label>
+            )}
             {!storeOpen && (
               <p style={styles.error}>
                 {manualOpen
@@ -938,9 +956,9 @@ export default function CheckoutPage() {
               )}
               <div style={styles.addonSummary}>
                 Retirada:{" "}
-                {scheduledFor
+                {wantsScheduledPickup && scheduledFor
                   ? formatPickupTime(new Date(scheduledFor).toISOString())
-                  : "Escolha um horário"}
+                  : "O quanto antes"}
               </div>
               <div style={styles.summaryGrandTotalLine}>
                 <span>Total</span>
@@ -984,6 +1002,23 @@ const styles: Record<string, CSSProperties> = {
   formHelpOk: { color: "#0f7a4a" },
   operationalInfoGrid: { marginTop: 12, display: "flex", justifyContent: "space-between", gap: 12, borderRadius: 8, background: "#f0ebe2", color: "#514a43", padding: "12px 14px", fontWeight: 850 },
   scheduleChoice: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 },
+  scheduleToggle: {
+    marginTop: 12,
+    width: "100%",
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 8,
+    background: "#fff",
+    color: "#1c1a17",
+    padding: "12px 14px",
+    cursor: "pointer",
+    fontWeight: 850,
+    textAlign: "left",
+  },
+  scheduleToggleActive: {
+    background: "#1c1a17",
+    borderColor: "#1c1a17",
+    color: "#fffdf8",
+  },
   fulfillmentButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 12, color: "#1c1a17", cursor: "pointer", fontWeight: 850 },
   fulfillmentButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
   couponRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center" },
