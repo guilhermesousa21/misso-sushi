@@ -400,7 +400,7 @@ export default function Page() {
                         <h4 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h4>
                         <div style={styles.badgeLine}>
                           <span style={styles.featuredBadge}>Destaque</span>
-                          {unavailable && <span style={styles.unavailableBadge}>Esgotado</span>}
+                          {unavailable && <span style={styles.unavailableBadge}>Indisponível</span>}
                         </div>
                         {item.description && (
                           <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>
@@ -423,7 +423,7 @@ export default function Page() {
                             }}
                             aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
                           >
-                            {unavailable ? "Esgotado" : "Adicionar"}
+                            {unavailable ? "Indisponível" : "Adicionar"}
                           </button>
                         ) : (
                           <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
@@ -453,12 +453,7 @@ export default function Page() {
             <div style={{ ...styles.menuGrid, ...(isMobile ? styles.menuGridMobile : {}) }}>
               {popularItems.map((item) => {
                 const quantity = getQuantity(item.id);
-                const unavailable =
-                  item.active === false ||
-                  item.available === false ||
-                  item.unavailable === true ||
-                  item.availability_status === "esgotado" ||
-                  item.availability_status === "inativo";
+                const unavailable = !isItemOrderable(item);
 
                 return (
                   <article
@@ -515,7 +510,7 @@ export default function Page() {
                             }}
                             aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
                           >
-                            {unavailable ? "Esgotado" : "Adicionar"}
+                            {unavailable ? "Indisponível" : "Adicionar"}
                           </button>
                         ) : (
                           <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
@@ -573,12 +568,7 @@ export default function Page() {
               <div style={{ ...styles.menuGrid, ...(isMobile ? styles.menuGridMobile : {}) }}>
                 {itemsInCategory.map((item) => {
                   const quantity = getQuantity(item.id);
-                  const unavailable =
-                    item.active === false ||
-                    item.available === false ||
-                    item.unavailable === true ||
-                    item.availability_status === "esgotado" ||
-                    item.availability_status === "inativo";
+                  const unavailable = !isItemOrderable(item);
 
                   return (
                     <article
@@ -638,7 +628,7 @@ export default function Page() {
                               }}
                               aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
                             >
-                              {unavailable ? "Esgotado" : "Adicionar"}
+                              {unavailable ? "Indisponível" : "Adicionar"}
                             </button>
                           ) : (
                             <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>

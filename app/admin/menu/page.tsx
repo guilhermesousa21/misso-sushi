@@ -669,8 +669,9 @@ export default function AdminMenuPage() {
                     {itemsInCategory.map((item) => (
                     (() => {
                       const itemActive =
-                        item.active !== false && item.availability_status !== "inativo";
-                      const itemSoldOut = item.availability_status === "esgotado";
+                        item.active !== false &&
+                        item.availability_status !== "inativo" &&
+                        item.availability_status !== "esgotado";
 
                       return (
                     <div
@@ -712,7 +713,6 @@ export default function AdminMenuPage() {
                         ...styles.itemCard,
                         ...(isMobile ? styles.itemCardMobile : {}),
                         ...(!itemActive ? styles.itemCardPaused : {}),
-                        ...(itemSoldOut ? styles.itemCardSoldOut : {}),
                         ...(dropTarget?.type === "item" &&
                         dropTarget.itemId === item.id &&
                         dragged?.type === "item" &&
@@ -750,7 +750,6 @@ export default function AdminMenuPage() {
                           <p style={styles.itemPrice}>{money(Number(item.price))}</p>
                           <div style={styles.itemStatusLine}>
                             {!itemActive && <span style={styles.itemStatusBadgePaused}>Pausado</span>}
-                            {itemSoldOut && <span style={styles.itemStatusBadgeSoldOut}>Esgotado</span>}
                             {item.featured && <span style={styles.itemStatusBadgeFeatured}>Destaque</span>}
                           </div>
                           {item.description && (
@@ -1217,7 +1216,8 @@ function EditModal({
         description: form.description,
         image: form.image || null,
         active: form.active !== false && form.availability_status !== "inativo",
-        availability_status: form.availability_status || "ativo",
+        availability_status:
+          form.availability_status === "esgotado" ? "inativo" : form.availability_status || "ativo",
         featured: Boolean(form.featured),
       };
 
@@ -1359,7 +1359,11 @@ function EditModal({
               <label style={styles.field}>
                 <span style={styles.label}>Disponibilidade</span>
                 <select
-                  value={form.availability_status || "ativo"}
+                  value={
+                    form.availability_status === "esgotado"
+                      ? "inativo"
+                      : form.availability_status || "ativo"
+                  }
                   onChange={(event) => {
                     setConfirmDelete(false);
                     setForm({ ...form, availability_status: event.target.value });
@@ -1367,7 +1371,6 @@ function EditModal({
                   style={styles.select}
                 >
                   <option value="ativo">Ativo</option>
-                  <option value="esgotado">Esgotado</option>
                   <option value="inativo">Pausado</option>
                 </select>
               </label>
@@ -1864,9 +1867,6 @@ const styles: Record<string, CSSProperties> = {
     background: "#f7f4ef",
     opacity: 0.76,
   },
-  itemCardSoldOut: {
-    borderColor: "rgba(153, 27, 27, 0.18)",
-  },
   itemStatusLine: {
     marginTop: 6,
     display: "flex",
@@ -1877,14 +1877,6 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 999,
     background: "#f0ebe2",
     color: "#625b53",
-    padding: "4px 8px",
-    fontSize: 11,
-    fontWeight: 850,
-  },
-  itemStatusBadgeSoldOut: {
-    borderRadius: 999,
-    background: "#fee2e2",
-    color: "#991b1b",
     padding: "4px 8px",
     fontSize: 11,
     fontWeight: 850,
