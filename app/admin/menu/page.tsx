@@ -1,7 +1,8 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -97,11 +98,26 @@ export default function AdminMenuPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [dragged, setDragged] = useState<DragState | null>(null);
   const [dropTarget, setDropTarget] = useState<DragState | null>(null);
+  const [dragIntent, setDragIntent] = useState<DragState | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const pathname = usePathname();
   const canReorder = !search.trim() && !filterCategory;
   const forceExpandedCategories = Boolean(search.trim() || filterCategory);
+  const prepareDrag = (nextDragIntent: DragState) => {
+    flushSync(() => setDragIntent(nextDragIntent));
+  };
+  const clearDragState = () => {
+    setDragIntent(null);
+    setDragged(null);
+    setDropTarget(null);
+  };
+  const getCategoryDropTargetFromPoint = (event: PointerEvent<HTMLElement>) => {
+    const element = document.elementFromPoint(event.clientX, event.clientY);
+    return element
+      ?.closest<HTMLElement>("[data-category-drop-target]")
+      ?.dataset.categoryDropTarget;
+  };
 
   useEffect(() => {
     async function fetchMenuData() {
@@ -622,12 +638,8 @@ export default function AdminMenuPage() {
             return (
               <article
                 key={category}
-                draggable={canReorder}
-                onDragStart={() => canReorder && setDragged({ type: "category", category })}
-                onDragEnd={() => {
-                  setDragged(null);
-                  setDropTarget(null);
-                }}
+                data-category-drop-target={category}
+                draggable={false}
                 onDragEnter={() =>
                   canReorder && setDropTarget({ type: "category", category })
                 }
@@ -657,7 +669,42 @@ export default function AdminMenuPage() {
                   }}
                 >
                   <div style={styles.categoryTitleGroup}>
-                    <span style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}>
+                    <span
+                      onPointerDown={(event) => {
+                        if (!canReorder) return;
+                        event.preventDefault();
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        flushSync(() => {
+                          setDragged({ type: "category", category });
+                          setDropTarget({ type: "category", category });
+                        });
+                      }}
+                      onPointerMove={(event) => {
+                        if (dragged?.type !== "category" || dragged.category !== category) {
+                          return;
+                        }
+                        const targetCategory = getCategoryDropTargetFromPoint(event);
+                        if (targetCategory) {
+                          setDropTarget({ type: "category", category: targetCategory });
+                        }
+                      }}
+                      onPointerUp={(event) => {
+                        if (dragged?.type !== "category" || dragged.category !== category) {
+                          clearDragState();
+                          return;
+                        }
+                        const targetCategory =
+                          getCategoryDropTargetFromPoint(event) ||
+                          (dropTarget?.type === "category" ? dropTarget.category : null);
+                        if (targetCategory && targetCategory !== category) {
+                          void handleCategoryDrop(targetCategory);
+                          return;
+                        }
+                        clearDragState();
+                      }}
+                      onPointerCancel={clearDragState}
+                      style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}
+                    >
                       ::
                     </span>
                     <button
@@ -667,7 +714,7 @@ export default function AdminMenuPage() {
                       aria-label={`${categoryExpanded ? "Fechar" : "Abrir"} ${getCategoryLabel(category, categories)}`}
                       style={styles.categoryToggle}
                     >
-                      {categoryExpanded ? "-" : "+"}
+                      {categoryExpanded ? "↑" : "↓"}
                     </button>
                     <div>
                       <p style={styles.cardEyebrow}>Categoria</p>
@@ -720,22 +767,39 @@ export default function AdminMenuPage() {
                       key={item.id}
                       draggable={canReorder}
                       onDragStart={(event) => {
-                        if (!canReorder) return;
+                        if (
+                          !canReorder ||
+                          dragIntent?.type !== "item" ||
+                          dragIntent.itemId !== item.id
+                        ) {
+                          event.preventDefault();
+                          return;
+                        }
+                        event.dataTransfer.effectAllowed = "move";
                         event.stopPropagation();
-                        setDragged({ type: "item", itemId: item.id });
+                        setDragged(dragIntent);
                       }}
-                      onDragEnd={() => {
-                        setDragged(null);
-                        setDropTarget(null);
-                      }}
+                      onDragEnd={clearDragState}
                       onDragEnter={(event) => {
                         event.stopPropagation();
                         if (!canReorder) return;
+                        if (dragged?.type === "category") {
+                          setDropTarget({ type: "category", category });
+                          return;
+                        }
                         setDropTarget({ type: "item", itemId: item.id });
                       }}
-                      onDragOver={(event) => canReorder && event.preventDefault()}
+                      onDragOver={(event) => {
+                        if (!canReorder) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
                       onDrop={(event) => {
                         event.stopPropagation();
+                        if (dragged?.type === "category") {
+                          void handleCategoryDrop(category);
+                          return;
+                        }
                         handleItemDrop(item, category);
                       }}
                       style={{
@@ -755,7 +819,16 @@ export default function AdminMenuPage() {
                       }}
                     >
                       <div style={{ ...styles.itemMain, ...(isMobile ? styles.itemMainMobile : {}) }}>
-                        <span style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}>
+                        <span
+                          onPointerDown={() => {
+                            if (!canReorder) return;
+                            prepareDrag({ type: "item", itemId: item.id });
+                          }}
+                          onPointerUp={() => {
+                            if (!dragged) setDragIntent(null);
+                          }}
+                          style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}
+                        >
                           ::
                         </span>
                         {item.image && (
@@ -1720,11 +1793,14 @@ const styles: Record<string, CSSProperties> = {
     cursor: "grab",
     fontWeight: 850,
     lineHeight: 1.2,
+    touchAction: "none",
+    userSelect: "none",
   },
   dragHandleDisabled: {
     color: "#d8d0c4",
     fontWeight: 850,
     lineHeight: 1.2,
+    userSelect: "none",
   },
   cardEyebrow: {
     color: "#9f1d2f",
