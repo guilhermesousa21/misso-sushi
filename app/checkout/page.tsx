@@ -694,10 +694,15 @@ export default function CheckoutPage() {
           </div>
         )}
         {addonTotal > 0 && (
-          <div style={styles.summaryTotalLine}>
-            <span>Complementos</span>
-            <strong>{money(addonTotal)}</strong>
-          </div>
+          <>
+            <div style={styles.summaryTotalLine}>
+              <span>Complementos</span>
+              <strong>{money(addonTotal)}</strong>
+            </div>
+            <div style={styles.addonSummary}>
+              {selectedAddonList.map((addon) => `${addon.quantity}x ${addon.name}`).join(", ")}
+            </div>
+          </>
         )}
         {serviceFee > 0 && (
           <div style={styles.summaryTotalLine}>
