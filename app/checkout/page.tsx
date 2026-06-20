@@ -575,13 +575,7 @@ export default function CheckoutPage() {
         <section style={styles.mainColumn}>
           {/* Dados do cliente */}
           <div style={styles.card}>
-            <div style={styles.cardHeader}>
-              <div>
-                <p style={styles.cardEyebrow}>Cliente</p>
-                <h2 style={styles.cardTitle}>Dados para contato</h2>
-              </div>
-              <span style={styles.stepBadge}>1</span>
-            </div>
+            <h2 style={styles.sectionTitle}>Dados para contato</h2>
             <div style={{ ...styles.formGrid, ...(isMobile ? styles.formGridMobile : {}) }}>
               <label style={styles.field}>
                 <span style={styles.label}>Nome e sobrenome</span>
@@ -613,17 +607,9 @@ export default function CheckoutPage() {
 
           {/* Retirada */}
           <div style={styles.card}>
-            <div style={styles.cardHeader}>
-              <div>
-                <p style={styles.cardEyebrow}>Retirada</p>
-                <h2 style={styles.cardTitle}>Pedido para retirar no balcão</h2>
-              </div>
-              <span style={styles.pill}>Sem entrega</span>
-            </div>
-            <p style={styles.muted}>Acompanhe o status pelo link do pedido e retire quando estiver pronto.</p>
-            <div style={styles.operationalInfoGrid}>
-              <span>Tempo médio</span>
-              <strong>{averageTime}</strong>
+            <div style={styles.inlineHeader}>
+              <h2 style={styles.sectionTitle}>Retirada</h2>
+              <span style={styles.inlineMeta}>Tempo médio: {averageTime}</span>
             </div>
             <div style={styles.scheduleChoice}>
               {(["asap", "scheduled"] as OrderFulfillmentType[]).map((option) => (
@@ -676,14 +662,10 @@ export default function CheckoutPage() {
           </div>
 
           {/* Complementos */}
-          <div style={styles.card}>
-            <div style={styles.cardHeader}>
-              <div>
-                <p style={styles.cardEyebrow}>Complementos</p>
-                <h2 style={styles.cardTitle}>Itens para acompanhar</h2>
-              </div>
-              <span style={styles.pill}>Opcional</span>
-            </div>
+          <details style={styles.compactDetails}>
+            <summary style={styles.detailsSummary}>
+              Complementos <span>R$ 2,50 cada</span>
+            </summary>
             <div style={styles.addonGrid}>
               {checkoutAddons.map((addon) => {
                 const quantity = selectedAddons[addon.id] || 0;
@@ -724,16 +706,13 @@ export default function CheckoutPage() {
                 );
               })}
             </div>
-          </div>
+          </details>
 
           {/* Cupom */}
           <div style={styles.card}>
-            <div style={styles.cardHeader}>
-              <div>
-                <p style={styles.cardEyebrow}>Cupom</p>
-                <h2 style={styles.cardTitle}>Aplicar desconto</h2>
-              </div>
-              {appliedCoupon && <span style={styles.pill}>-{money(discountAmount)}</span>}
+            <div style={styles.inlineHeader}>
+              <h2 style={styles.sectionTitle}>Cupom</h2>
+              {appliedCoupon && <span style={styles.inlineMeta}>-{money(discountAmount)}</span>}
             </div>
             <div style={{ ...styles.couponRow, ...(isMobile ? styles.couponRowMobile : {}) }}>
               <input
@@ -757,20 +736,14 @@ export default function CheckoutPage() {
           </div>
 
           {/* Observação */}
-          <div style={styles.card}>
-            <label htmlFor="note" style={styles.label}>Observação geral</label>
-            <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex: sem cebolinha, enviar shoyu extra..." style={styles.textarea} />
-          </div>
+          <details style={styles.compactDetails}>
+            <summary style={styles.detailsSummary}>Observação do pedido</summary>
+            <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex: sem cebolinha, enviar shoyu extra..." style={{ ...styles.textarea, ...styles.detailsContent }} />
+          </details>
 
           {/* Pagamento */}
           <div style={styles.card}>
-            <div style={styles.cardHeader}>
-              <div>
-                <p style={styles.cardEyebrow}>Pagamento</p>
-                <h2 style={styles.cardTitle}>Escolha uma forma</h2>
-              </div>
-              <span style={styles.stepBadge}>2</span>
-            </div>
+            <h2 style={styles.sectionTitle}>Pagamento</h2>
             <div style={styles.methods}>
               {(["pix", "card"] as PaymentMethod[]).map((option) => (
                 <button
@@ -879,36 +852,39 @@ export default function CheckoutPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { minHeight: "100vh", background: "#f5f1ea", color: "#171512", padding: "26px 20px 56px" },
-  pageMobile: { padding: "20px 14px 42px" },
-  header: { maxWidth: 1180, margin: "0 auto 22px", position: "relative", display: "grid", justifyItems: "center", textAlign: "center", paddingTop: 22 },
+  page: { minHeight: "100vh", background: "#f5f1ea", color: "#171512", padding: "20px 20px 48px" },
+  pageMobile: { padding: "18px 14px 38px" },
+  header: { maxWidth: 1180, margin: "0 auto 16px", position: "relative", display: "grid", justifyItems: "center", textAlign: "center", paddingTop: 18 },
   headerMobile: { paddingTop: 46 },
   headerTitle: { textAlign: "center" },
   backLink: { position: "absolute", left: 0, top: 18, color: "#8f1728", textDecoration: "none", fontSize: 14, fontWeight: 850, background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 999, padding: "9px 13px" },
   eyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
-  title: { marginTop: 8, fontSize: "clamp(38px, 5vw, 54px)", lineHeight: 0.98, fontWeight: 850 },
-  storeStatus: { marginTop: 12, borderRadius: 999, padding: "9px 12px", fontSize: 13, fontWeight: 850, lineHeight: 1.35 },
+  title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },
+  storeStatus: { marginTop: 10, borderRadius: 999, padding: "8px 11px", fontSize: 13, fontWeight: 850, lineHeight: 1.35 },
   storeStatusOpen: { background: "#ecfdf5", color: "#0f7a4a" },
   storeStatusClosed: { background: "#fee2e2", color: "#991b1b" },
   shell: { maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 378px", gap: 20, alignItems: "start" },
   shellMobile: { gridTemplateColumns: "1fr" },
-  mainColumn: { display: "grid", gap: 14 },
+  mainColumn: { display: "grid", gap: 10 },
   summaryColumn: { position: "sticky", top: 20 },
-  card: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.07)", borderRadius: 8, padding: 22, boxShadow: "0 10px 24px rgba(28, 26, 23, 0.045)" },
+  card: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.07)", borderRadius: 10, padding: 18, boxShadow: "0 8px 18px rgba(28, 26, 23, 0.035)" },
   summaryCard: { background: "#171512", color: "#fffdf8", border: "1px solid rgba(255, 253, 248, 0.08)", borderRadius: 8, padding: 22, boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)" },
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16, marginBottom: 18 },
   cardEyebrow: { color: "#9f1d2f", fontSize: 11, fontWeight: 850, textTransform: "uppercase", letterSpacing: 0 },
   cardTitle: { marginTop: 5, fontSize: 23, lineHeight: 1.12 },
+  sectionTitle: { margin: "0 0 14px", fontSize: 20, lineHeight: 1.12 },
+  inlineHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 },
+  inlineMeta: { borderRadius: 999, background: "#f0ebe2", color: "#625b53", padding: "7px 10px", fontSize: 12, fontWeight: 850, whiteSpace: "nowrap" },
   stepBadge: { display: "grid", placeItems: "center", width: 30, height: 30, borderRadius: 999, background: "#1c1a17", color: "#fffdf8", fontSize: 13, fontWeight: 850 },
   pill: { borderRadius: 999, background: "#eee8df", padding: "7px 10px", color: "#5d554c", fontSize: 13, fontWeight: 850, whiteSpace: "nowrap" },
   summaryPill: { borderRadius: 999, background: "rgba(255, 253, 248, 0.12)", padding: "7px 10px", color: "#fffdf8", fontSize: 13, fontWeight: 850, whiteSpace: "nowrap" },
   formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   formGridMobile: { gridTemplateColumns: "1fr" },
-  formHelp: { marginTop: 12, color: "#991b1b", fontSize: 13, fontWeight: 850, lineHeight: 1.4 },
+  formHelp: { marginTop: 10, color: "#991b1b", fontSize: 13, fontWeight: 850, lineHeight: 1.4 },
   formHelpOk: { color: "#0f7a4a" },
   operationalInfoGrid: { marginTop: 12, display: "flex", justifyContent: "space-between", gap: 12, borderRadius: 8, background: "#f0ebe2", color: "#514a43", padding: "12px 14px", fontWeight: 850 },
-  scheduleChoice: { marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
-  fulfillmentButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 13, color: "#1c1a17", cursor: "pointer", fontWeight: 850 },
+  scheduleChoice: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 },
+  fulfillmentButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 12, color: "#1c1a17", cursor: "pointer", fontWeight: 850 },
   fulfillmentButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
   couponRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center" },
   couponRowMobile: { gridTemplateColumns: "1fr" },
@@ -917,7 +893,10 @@ const styles: Record<string, CSSProperties> = {
   input: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
   select: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
   textarea: { width: "100%", minHeight: 96, resize: "vertical", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
-  addonGrid: { display: "grid", gap: 10 },
+  compactDetails: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.07)", borderRadius: 10, padding: 16, boxShadow: "0 8px 18px rgba(28, 26, 23, 0.03)" },
+  detailsSummary: { cursor: "pointer", fontSize: 17, fontWeight: 850, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" },
+  detailsContent: { marginTop: 12 },
+  addonGrid: { display: "grid", gap: 10, marginTop: 12 },
   addonRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 8, padding: "12px 14px", background: "#fff" },
   addonPrice: { display: "block", marginTop: 3, color: "#766e64", fontSize: 12, fontWeight: 750 },
   qtyControl: { display: "inline-flex", alignItems: "center", gap: 10 },
@@ -946,7 +925,7 @@ const styles: Record<string, CSSProperties> = {
   noticeError: { borderRadius: 8, background: "#fee2e2", color: "#991b1b", padding: 12, marginBottom: 12, fontSize: 13, fontWeight: 800, lineHeight: 1.4 },
   qrImage: { display: "grid", placeItems: "center", width: 238, height: 238, borderRadius: 8, border: "1px solid rgba(28, 26, 23, 0.08)", background: "#fff" },
   codeArea: { width: "100%", minHeight: 96, resize: "none", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: 12, color: "#514a43", background: "#fff", lineHeight: 1.45 },
-  secondaryButton: { marginTop: 10, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", padding: "12px 16px", cursor: "pointer", fontWeight: 850 },
+  secondaryButton: { border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", padding: "12px 16px", cursor: "pointer", fontWeight: 850 },
   copyPixButton: { width: "100%", marginTop: 12, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", padding: "14px 18px", cursor: "pointer", fontWeight: 850, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: "0 14px 26px rgba(28, 26, 23, 0.18)" },
   copyPixIcon: { width: 24, height: 24, borderRadius: 999, background: "rgba(255, 253, 248, 0.14)", display: "grid", placeItems: "center", fontSize: 14, lineHeight: 1 },
   successText: { marginTop: 8, color: "#0f7a4a", fontWeight: 850 },
