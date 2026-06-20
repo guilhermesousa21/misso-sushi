@@ -13,10 +13,14 @@ import {
   sortCategories,
   type MenuCategory,
 } from "../../../lib/menuCategories";
+import {
+  defaultCheckoutAddons,
+  type CheckoutAddonConfig,
+} from "../../../lib/orderFeatures";
 import { supabase } from "../../../lib/supabase";
 import { useMediaQuery } from "../../../lib/useMediaQuery";
 import { MenuItem } from "../../../types";
-import { AdminShell } from "../AdminShell";
+import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
 
 type EditableMenuItem = MenuItem & { isNew?: boolean };
 type DeletedMenuItem = MenuItem & { deleted: true };
@@ -82,9 +86,17 @@ const getOrderedCategorySlugs = (
   );
 };
 
+const isMissingColumnError = (error?: { code?: string; message?: string } | null) =>
+  error?.code === "PGRST204" ||
+  error?.code === "42703" ||
+  Boolean(error?.message?.includes("schema cache"));
+
 export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>(defaultMenuCategories);
+  const [checkoutAddons, setCheckoutAddons] = useState<CheckoutAddonConfig[]>(defaultCheckoutAddons);
+  const [storeSettingsId, setStoreSettingsId] = useState<number | undefined>();
+  const [savingAddons, setSavingAddons] = useState(false);
   const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
   const [creatingCategoryModalOpen, setCreatingCategoryModalOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width: 760px)");
@@ -111,23 +123,33 @@ export default function AdminMenuPage() {
 
   useEffect(() => {
     async function fetchMenuData() {
-      const [{ data: menuData, error: menuError }, { data: categoryData }] =
-        await Promise.all([
-          supabase
-            .from("menu")
-            .select("*")
-            .order("category", { ascending: true })
-            .order("name", { ascending: true }),
-          supabase
-            .from("menu_categories")
-            .select("*")
-            .order("sort_order", { ascending: true }),
-        ]);
+      const [
+        { data: menuData, error: menuError },
+        { data: categoryData },
+        { data: settingsData },
+      ] = await Promise.all([
+        supabase
+          .from("menu")
+          .select("*")
+          .order("category", { ascending: true })
+          .order("name", { ascending: true }),
+        supabase.from("menu_categories").select("*").order("sort_order", { ascending: true }),
+        supabase.from("store_settings").select("id,checkout_addons").limit(1).maybeSingle(),
+      ]);
 
       const nextCategories = categoryData?.length
         ? sortCategories(categoryData as MenuCategory[])
         : defaultMenuCategories;
       setCategories(nextCategories);
+
+      if (settingsData) {
+        setStoreSettingsId(settingsData.id);
+        setCheckoutAddons(
+          settingsData.checkout_addons?.length
+            ? settingsData.checkout_addons
+            : defaultCheckoutAddons
+        );
+      }
 
       if (!menuError && menuData) {
         const nextItems = uniqueById(menuData as MenuItem[]);
@@ -417,6 +439,41 @@ export default function AdminMenuPage() {
     }
 
     toast.success(nextActive ? "Item ativado." : "Item pausado.");
+  };
+
+  const saveCheckoutAddons = async () => {
+    setSavingAddons(true);
+    const payload = { checkout_addons: checkoutAddons };
+
+    const query = storeSettingsId
+      ? supabase.from("store_settings").update(payload).eq("id", storeSettingsId).select()
+      : supabase.from("store_settings").insert([payload]).select();
+
+    const result = await query;
+
+    if (isMissingColumnError(result.error)) {
+      toast.error("Coluna checkout_addons não encontrada. Rode o SQL de atualização no Supabase.");
+      setSavingAddons(false);
+      return;
+    }
+
+    if (result.error) {
+      toast.error("Não foi possível salvar os complementos.");
+      setSavingAddons(false);
+      return;
+    }
+
+    if (result.data?.[0]) {
+      setStoreSettingsId(result.data[0].id);
+      setCheckoutAddons(
+        result.data[0].checkout_addons?.length
+          ? result.data[0].checkout_addons
+          : defaultCheckoutAddons
+      );
+    }
+
+    setSavingAddons(false);
+    toast.success("Complementos salvos.");
   };
 
   const headerActions = (
@@ -764,6 +821,99 @@ export default function AdminMenuPage() {
               </article>
             );
           })}
+        </section>
+
+        <section style={{ ...baseStyles.card, ...(isMobile ? styles.addonsCardMobile : {}) }}>
+          <div style={{ ...baseStyles.cardHeader, ...(isMobile ? styles.addonsHeaderMobile : {}) }}>
+            <div>
+              <p style={baseStyles.cardEyebrow}>Checkout</p>
+              <h2 style={baseStyles.cardTitle}>Complementos</h2>
+              <p style={styles.addonsHint}>
+                Itens extras que o cliente pode adicionar no checkout (ex.: hashi, shoyu).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void saveCheckoutAddons()}
+              disabled={savingAddons}
+              style={{ ...baseStyles.primaryLink, ...(isMobile ? styles.fullWidthMobile : {}) }}
+            >
+              {savingAddons ? "Salvando..." : "Salvar complementos"}
+            </button>
+          </div>
+
+          <div style={styles.addonList}>
+            {checkoutAddons.map((addon, index) => (
+              <div key={addon.id || index} style={{ ...styles.addonRow, ...(isMobile ? styles.addonRowMobile : {}) }}>
+                <label style={styles.addonField}>
+                  <span style={styles.addonLabel}>Nome</span>
+                  <input
+                    value={addon.name}
+                    onChange={(event) => {
+                      const next = [...checkoutAddons];
+                      next[index] = { ...addon, name: event.target.value };
+                      setCheckoutAddons(next);
+                    }}
+                    style={styles.input}
+                  />
+                </label>
+                <label style={styles.addonField}>
+                  <span style={styles.addonLabel}>Preço</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={addon.unit_price}
+                    onChange={(event) => {
+                      const next = [...checkoutAddons];
+                      next[index] = { ...addon, unit_price: Number(event.target.value) };
+                      setCheckoutAddons(next);
+                    }}
+                    style={styles.input}
+                  />
+                </label>
+                <label style={styles.addonActiveField}>
+                  <input
+                    type="checkbox"
+                    checked={addon.active !== false}
+                    onChange={(event) => {
+                      const next = [...checkoutAddons];
+                      next[index] = { ...addon, active: event.target.checked };
+                      setCheckoutAddons(next);
+                    }}
+                  />
+                  Ativo
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCheckoutAddons(checkoutAddons.filter((_, itemIndex) => itemIndex !== index))
+                  }
+                  style={styles.secondaryButton}
+                >
+                  Remover
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            style={{ ...styles.secondaryButton, marginTop: 12 }}
+            onClick={() =>
+              setCheckoutAddons([
+                ...checkoutAddons,
+                {
+                  id: `addon-${Date.now()}`,
+                  name: "Novo complemento",
+                  unit_price: 2.5,
+                  active: true,
+                },
+              ])
+            }
+          >
+            + Adicionar complemento
+          </button>
         </section>
       </AdminShell>
 
@@ -2172,5 +2322,51 @@ const styles: Record<string, CSSProperties> = {
   disabledSoftButton: {
     opacity: 0.5,
     cursor: "not-allowed",
+  },
+  addonsCardMobile: {
+    marginTop: 16,
+  },
+  addonsHeaderMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
+  addonsHint: {
+    marginTop: 6,
+    color: "#766e64",
+    fontSize: 13,
+    lineHeight: 1.45,
+  },
+  addonList: {
+    display: "grid",
+    gap: 10,
+  },
+  addonRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1.4fr) minmax(120px, 0.7fr) auto auto",
+    gap: 10,
+    alignItems: "end",
+  },
+  addonRowMobile: {
+    gridTemplateColumns: "1fr",
+    alignItems: "stretch",
+  },
+  addonField: {
+    display: "grid",
+    gap: 5,
+  },
+  addonLabel: {
+    color: "#766e64",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+  },
+  addonActiveField: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    paddingBottom: 10,
+    fontWeight: 850,
+    color: "#514a43",
+    whiteSpace: "nowrap",
   },
 };
