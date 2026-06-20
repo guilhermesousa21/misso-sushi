@@ -26,7 +26,6 @@ import {
   type OperationalSettings,
   type OrderFulfillmentType,
 } from "../../lib/orderFeatures";
-import { getItemModifierOptions, formatItemModifiers } from "../../lib/itemModifiers";
 import {
   LOYALTY_DISCOUNT_VALUE,
   LOYALTY_ORDER_INTERVAL,
@@ -119,7 +118,7 @@ const formatCountdown = (seconds: number) => {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, cartLoaded, total, clear, removeById, updateModifiers } = useCart();
+  const { cart, cartLoaded, total, clear, removeById } = useCart();
   const isMobile = useMediaQuery("(max-width: 760px)");
 
   const [name, setName] = useState("");
@@ -159,7 +158,6 @@ export default function CheckoutPage() {
   const serviceFeeLabel = getServiceFeeLabel(operationalSettings);
   const pickupSlots = buildPickupSlots(operationalSettings);
   const slotLimit = getOrderSlotLimit(operationalSettings);
-  const itemModifierOptions = getItemModifierOptions(operationalSettings);
   const selectedAddonList = availableAddons
     .map((addon) => ({ ...addon, quantity: selectedAddons[addon.id] || 0 }))
     .filter((addon) => addon.quantity > 0);
@@ -514,16 +512,6 @@ export default function CheckoutPage() {
     setCouponMessage("");
   };
 
-  const toggleItemModifier = (lineKey: string, label: string) => {
-    const item = cart.find((entry) => entry.lineKey === lineKey);
-    if (!item) return;
-    const current = item.modifiers || [];
-    const next = current.includes(label)
-      ? current.filter((value) => value !== label)
-      : [...current, label];
-    updateModifiers(lineKey, next);
-  };
-
   // ── PIX aguardando / pago ────────────────────────────────────────────────────
   if (checkoutState === "awaiting_pix" || checkoutState === "paid") {
     const isPaid = checkoutState === "paid";
@@ -795,48 +783,6 @@ export default function CheckoutPage() {
             </div>
           </details>
 
-          {/* Modificadores por item */}
-          {itemModifierOptions.length > 0 && (
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>Modificadores por prato</h2>
-              <p style={styles.mutedSmall}>
-                Marque preferências por item para reduzir erro na cozinha.
-              </p>
-              <div style={styles.modifierList}>
-                {cart.map((item) => (
-                  <div key={item.lineKey} style={styles.modifierItemCard}>
-                    <strong style={styles.modifierItemTitle}>
-                      {item.quantity}x {item.name}
-                    </strong>
-                    <div style={styles.modifierChipRow}>
-                      {itemModifierOptions.map((option) => {
-                        const active = (item.modifiers || []).includes(option.label);
-                        return (
-                          <button
-                            key={`${item.lineKey}-${option.id}`}
-                            type="button"
-                            onClick={() => toggleItemModifier(item.lineKey, option.label)}
-                            style={{
-                              ...styles.modifierChip,
-                              ...(active ? styles.modifierChipActive : {}),
-                            }}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {item.modifiers?.length ? (
-                      <p style={styles.modifierSummary}>
-                        Selecionado: {formatItemModifiers(item.modifiers)}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Fidelidade */}
           {[10, 11].includes(onlyDigits(phone).length) && (
             <div style={styles.card}>
@@ -970,9 +916,6 @@ export default function CheckoutPage() {
                 <div key={item.lineKey} style={styles.summaryOrderRow}>
                   <div>
                     <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
-                    {item.modifiers?.length ? (
-                      <p style={styles.summaryMuted}>{formatItemModifiers(item.modifiers)}</p>
-                    ) : null}
                     <p style={styles.summaryMuted}>{money(Number(item.price))} cada</p>
                   </div>
                   <strong>{money(item.price * item.quantity)}</strong>
@@ -1096,33 +1039,6 @@ const styles: Record<string, CSSProperties> = {
   summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },
   addonSummary: { color: "rgba(255, 253, 248, 0.66)", fontSize: 13, lineHeight: 1.45 },
   discountText: { color: "#0f7a4a" },
-  modifierList: { display: "grid", gap: 10 },
-  modifierItemCard: {
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
-    padding: "12px 14px",
-    background: "#fff",
-    display: "grid",
-    gap: 10,
-  },
-  modifierItemTitle: { fontSize: 15, lineHeight: 1.35 },
-  modifierChipRow: { display: "flex", flexWrap: "wrap", gap: 8 },
-  modifierChip: {
-    border: "1px solid rgba(28, 26, 23, 0.12)",
-    borderRadius: 999,
-    background: "#fff",
-    color: "#1c1a17",
-    padding: "8px 12px",
-    cursor: "pointer",
-    fontWeight: 800,
-    fontSize: 13,
-  },
-  modifierChipActive: {
-    background: "#1c1a17",
-    borderColor: "#1c1a17",
-    color: "#fffdf8",
-  },
-  modifierSummary: { color: "#766e64", fontSize: 13, lineHeight: 1.4 },
   loyaltyProgressTrack: {
     marginTop: 10,
     height: 8,
