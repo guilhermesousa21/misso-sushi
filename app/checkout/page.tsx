@@ -31,7 +31,7 @@ import {
   LOYALTY_ORDER_INTERVAL,
   type LoyaltyStatus,
 } from "../../lib/loyalty";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useIsMobile } from "../../lib/useMediaQuery";
 import type { MenuItem } from "../../types";
 import { useCart } from "../context/CartContext";
 import { money, isItemOrderable } from "../../lib/orderUtils";
@@ -124,7 +124,7 @@ const formatCountdown = (seconds: number) => {
 export default function CheckoutPage() {
   const router = useRouter();
   const { cart, cartLoaded, total, clear, removeById } = useCart();
-  const isMobile = useMediaQuery("(max-width: 760px)");
+  const isMobile = useIsMobile();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -665,6 +665,77 @@ export default function CheckoutPage() {
         ? isStep2Valid
         : isFormValid;
 
+  const orderSummaryCard = (
+    <div style={styles.summaryCard}>
+      <div style={styles.cardHeader}>
+        <div>
+          <p style={styles.cardEyebrow}>Resumo</p>
+          <h2 style={styles.cardTitle}>Seu pedido</h2>
+        </div>
+        <span style={styles.summaryPill}>{itemCount} itens</span>
+      </div>
+      {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
+      <div style={styles.orderList}>
+        {cart.map((item) => (
+          <div key={item.lineKey} style={styles.summaryOrderRow}>
+            <div>
+              <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
+              <p style={styles.summaryMuted}>{money(Number(item.price))} cada</p>
+            </div>
+            <strong>{money(item.price * item.quantity)}</strong>
+          </div>
+        ))}
+      </div>
+      <div style={styles.summaryTotalBox}>
+        {(discountAmount > 0 || serviceFee > 0 || addonTotal > 0) && (
+          <div style={styles.summaryTotalLine}>
+            <span>Subtotal</span>
+            <strong>{money(total)}</strong>
+          </div>
+        )}
+        {addonTotal > 0 && (
+          <div style={styles.summaryTotalLine}>
+            <span>Complementos</span>
+            <strong>{money(addonTotal)}</strong>
+          </div>
+        )}
+        {serviceFee > 0 && (
+          <div style={styles.summaryTotalLine}>
+            <span>{serviceFeeLabel}</span>
+            <strong>{money(serviceFee)}</strong>
+          </div>
+        )}
+        {discountAmount > 0 && (
+          <div style={styles.summaryTotalLine}>
+            <span>Desconto cupom</span>
+            <strong style={styles.discountText}>-{money(discountAmount)}</strong>
+          </div>
+        )}
+        {loyaltyDiscount > 0 && (
+          <div style={styles.summaryTotalLine}>
+            <span>Fidelidade</span>
+            <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
+          </div>
+        )}
+        {selectedAddonList.length > 0 && (
+          <div style={styles.addonSummary}>
+            Complementos: {selectedAddonList.map((addon) => `${addon.quantity}x ${addon.name}`).join(", ")}
+          </div>
+        )}
+        <div style={styles.addonSummary}>
+          Retirada:{" "}
+          {wantsScheduledPickup && scheduledFor
+            ? formatPickupTime(new Date(scheduledFor).toISOString())
+            : "O quanto antes"}
+        </div>
+        <div style={styles.summaryGrandTotalLine}>
+          <span>Total</span>
+          <strong>{money(finalTotal)}</strong>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
@@ -676,6 +747,8 @@ export default function CheckoutPage() {
       </header>
 
       <div style={{ ...styles.shell, ...(isMobile ? styles.shellMobile : {}) }}>
+        {isMobile && <aside style={styles.summaryColumnMobile}>{orderSummaryCard}</aside>}
+
         <section style={styles.mainColumn}>
           <CheckoutStepper
             currentStep={checkoutStep}
@@ -935,7 +1008,7 @@ export default function CheckoutPage() {
                   ))}
                 </div>
                 {!isFormValid && <p style={styles.paymentWarning}>{stepHelp}</p>}
-                {isFormValid && (
+                {isFormValid && !isMobile && (
                   <>
                     <button
                       type="button"
@@ -961,7 +1034,7 @@ export default function CheckoutPage() {
             </>
           )}
 
-          {checkoutStep < 3 && (
+          {checkoutStep < 3 && !isMobile && (
             <div style={{ ...styles.stepNav, ...(isMobile ? styles.stepNavMobile : {}) }}>
               {checkoutStep > 1 ? (
                 <button type="button" onClick={handleBackStep} style={styles.backStepButton}>
@@ -984,7 +1057,7 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {checkoutStep === 3 && (
+          {checkoutStep === 3 && !isMobile && (
             <button type="button" onClick={handleBackStep} style={styles.backStepButtonStandalone}>
               Voltar para retirada
             </button>
@@ -993,84 +1066,73 @@ export default function CheckoutPage() {
           {error && <p style={styles.error}>{error}</p>}
         </section>
 
-        <aside style={styles.summaryColumn}>
-          <div style={styles.summaryCard}>
-            <div style={styles.cardHeader}>
-              <div>
-                <p style={styles.cardEyebrow}>Resumo</p>
-                <h2 style={styles.cardTitle}>Seu pedido</h2>
-              </div>
-              <span style={styles.summaryPill}>{itemCount} itens</span>
-            </div>
-            {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
-            <div style={styles.orderList}>
-              {cart.map((item) => (
-                <div key={item.lineKey} style={styles.summaryOrderRow}>
-                  <div>
-                    <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
-                    <p style={styles.summaryMuted}>{money(Number(item.price))} cada</p>
-                  </div>
-                  <strong>{money(item.price * item.quantity)}</strong>
-                </div>
-              ))}
-            </div>
-            <div style={styles.summaryTotalBox}>
-              {(discountAmount > 0 || serviceFee > 0 || addonTotal > 0) && (
-                <div style={styles.summaryTotalLine}>
-                  <span>Subtotal</span>
-                  <strong>{money(total)}</strong>
-                </div>
-              )}
-              {addonTotal > 0 && (
-                <div style={styles.summaryTotalLine}>
-                  <span>Complementos</span>
-                  <strong>{money(addonTotal)}</strong>
-                </div>
-              )}
-              {serviceFee > 0 && (
-                <div style={styles.summaryTotalLine}>
-                  <span>{serviceFeeLabel}</span>
-                  <strong>{money(serviceFee)}</strong>
-                </div>
-              )}
-              {discountAmount > 0 && (
-                <div style={styles.summaryTotalLine}>
-                  <span>Desconto cupom</span>
-                  <strong style={styles.discountText}>-{money(discountAmount)}</strong>
-                </div>
-              )}
-              {loyaltyDiscount > 0 && (
-                <div style={styles.summaryTotalLine}>
-                  <span>Fidelidade</span>
-                  <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
-                </div>
-              )}
-              {selectedAddonList.length > 0 && (
-                <div style={styles.addonSummary}>
-                  Complementos: {selectedAddonList.map((addon) => `${addon.quantity}x ${addon.name}`).join(", ")}
-                </div>
-              )}
-              <div style={styles.addonSummary}>
-                Retirada:{" "}
-                {wantsScheduledPickup && scheduledFor
-                  ? formatPickupTime(new Date(scheduledFor).toISOString())
-                  : "O quanto antes"}
-              </div>
-              <div style={styles.summaryGrandTotalLine}>
-                <span>Total</span>
-                <strong>{money(finalTotal)}</strong>
-              </div>
-            </div>
-          </div>
-        </aside>
+        {!isMobile && <aside style={styles.summaryColumn}>{orderSummaryCard}</aside>}
       </div>
+
+      {isMobile && checkoutStep < 3 && (
+        <div style={styles.mobileActionBar}>
+          <div style={styles.mobileActionMeta}>
+            <span>{itemCount} {itemCount === 1 ? "item" : "itens"}</span>
+            <strong>{money(finalTotal)}</strong>
+          </div>
+          <div style={styles.mobileActionButtons}>
+            {checkoutStep > 1 && (
+              <button type="button" onClick={handleBackStep} style={styles.mobileBackButton}>
+                Voltar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleContinueStep}
+              disabled={!canContinueStep}
+              style={{
+                ...styles.mobileContinueButton,
+                ...(!canContinueStep ? styles.continueButtonDisabled : {}),
+              }}
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isMobile && checkoutStep === 3 && (
+        <div style={styles.mobileActionBar}>
+          <div style={styles.mobileActionMeta}>
+            <span>Total do pedido</span>
+            <strong>{money(finalTotal)}</strong>
+          </div>
+          <div style={styles.mobileActionButtons}>
+            <button type="button" onClick={handleBackStep} style={styles.mobileBackButton}>
+              Voltar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (method === "pix") {
+                  void handlePixPayment();
+                } else {
+                  void handleCardOrder();
+                }
+              }}
+              disabled={!isFormValid}
+              style={{
+                ...styles.mobilePayButton,
+                ...(!isFormValid ? styles.continueButtonDisabled : {}),
+              }}
+            >
+              Pagar {money(finalTotal)}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
   page: { minHeight: "100vh", background: "#f5f1ea", color: "#171512", padding: "20px 20px 48px" },
-  pageMobile: { padding: "18px 14px 38px" },
+  pageMobile: { padding: "18px 14px calc(110px + env(safe-area-inset-bottom, 0px))" },
   header: { maxWidth: 1180, margin: "0 auto 16px", position: "relative", display: "grid", justifyItems: "center", textAlign: "center", paddingTop: 18 },
   headerMobile: { paddingTop: 46 },
   headerTitle: { textAlign: "center" },
@@ -1079,6 +1141,10 @@ const styles: Record<string, CSSProperties> = {
   shellMobile: { gridTemplateColumns: "1fr" },
   mainColumn: { display: "grid", gap: 10 },
   summaryColumn: { position: "sticky", top: 20 },
+  summaryColumnMobile: {
+    position: "static",
+    marginBottom: 4,
+  },
   card: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.07)", borderRadius: 10, padding: 18, boxShadow: "0 8px 18px rgba(28, 26, 23, 0.035)" },
   summaryCard: { background: "#171512", color: "#fffdf8", border: "1px solid rgba(255, 253, 248, 0.08)", borderRadius: 8, padding: 22, boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)" },
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16, marginBottom: 18 },
@@ -1260,5 +1326,60 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.45,
     cursor: "not-allowed",
     boxShadow: "none",
+  },
+  mobileActionBar: {
+    position: "fixed",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 40,
+    background: "rgba(255, 253, 248, 0.96)",
+    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
+    padding: "12px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
+    boxShadow: "0 -12px 28px rgba(28, 26, 23, 0.1)",
+    backdropFilter: "blur(12px)",
+    display: "grid",
+    gap: 10,
+  },
+  mobileActionMeta: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    color: "#514a43",
+    fontSize: 14,
+    fontWeight: 850,
+  },
+  mobileActionButtons: {
+    display: "grid",
+    gridTemplateColumns: "auto 1fr",
+    gap: 8,
+  },
+  mobileBackButton: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    background: "#fffdf8",
+    color: "#1c1a17",
+    padding: "13px 16px",
+    cursor: "pointer",
+    fontWeight: 850,
+  },
+  mobileContinueButton: {
+    border: "none",
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "13px 16px",
+    cursor: "pointer",
+    fontWeight: 850,
+  },
+  mobilePayButton: {
+    border: "none",
+    borderRadius: 999,
+    background: "#9f1d2f",
+    color: "#fffdf8",
+    padding: "13px 16px",
+    cursor: "pointer",
+    fontWeight: 850,
+    boxShadow: "0 12px 24px rgba(159, 29, 47, 0.2)",
   },
 };

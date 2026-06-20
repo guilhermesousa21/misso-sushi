@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { formatCustomerPhone, isValidCustomerPhone, onlyDigits } from "../../lib/customerPhone";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { getOrderPickupLabel, money } from "../../lib/orderFeatures";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useIsMobile } from "../../lib/useMediaQuery";
 
 type CustomerOrder = {
   id: number;
@@ -40,7 +40,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function MeusPedidosPage() {
-  const isMobile = useMediaQuery("(max-width: 760px)");
+  const isMobile = useIsMobile();
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -152,7 +152,7 @@ export default function MeusPedidosPage() {
 
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
-      <header style={styles.header}>
+      <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <BackToMenuLink variant="header" />
         <div style={styles.headerTitle}>
           <p style={styles.eyebrow}>Missô Sushi</p>
@@ -314,8 +314,9 @@ export default function MeusPedidosPage() {
 
 const styles: Record<string, CSSProperties> = {
   page: { minHeight: "100vh", background: "#f5f1ea", color: "#171512", padding: "20px 20px 48px" },
-  pageMobile: { padding: "18px 14px 38px" },
+  pageMobile: { padding: "18px 14px calc(96px + env(safe-area-inset-bottom, 0px))" },
   header: { maxWidth: 760, margin: "0 auto 20px", position: "relative", textAlign: "center", paddingTop: 18 },
+  headerMobile: { paddingTop: 52, marginBottom: 8 },
   headerTitle: { textAlign: "center" },
   eyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
   title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },

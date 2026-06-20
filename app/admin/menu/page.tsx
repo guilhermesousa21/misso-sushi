@@ -18,7 +18,7 @@ import {
   type CheckoutAddonConfig,
 } from "../../../lib/orderFeatures";
 import { supabase } from "../../../lib/supabase";
-import { useMediaQuery } from "../../../lib/useMediaQuery";
+import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import { MenuItem } from "../../../types";
 import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
 
@@ -99,8 +99,8 @@ export default function AdminMenuPage() {
   const [savingAddons, setSavingAddons] = useState(false);
   const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
   const [creatingCategoryModalOpen, setCreatingCategoryModalOpen] = useState(false);
-  const isMobile = useMediaQuery("(max-width: 760px)");
-  const isTablet = useMediaQuery("(max-width: 1040px)");
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
   const [editingItem, setEditingItem] = useState<EditableMenuItem | null>(null);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");

@@ -6,7 +6,7 @@ import { printOrder } from "../../../lib/printOrder";
 import { formatAddonSummary, getOrderPickupLabel } from "../../../lib/orderFeatures";
 import { formatOrderItemLabel } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
-import { useMediaQuery } from "../../../lib/useMediaQuery";
+import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import {
   AdminShell,
   EmptyState,
@@ -80,8 +80,8 @@ export default function AdminOrdersPage() {
   const [dateRange, setDateRange] = useState<DateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const isMobile = useMediaQuery("(max-width: 760px)");
-  const isTablet = useMediaQuery("(max-width: 1040px)");
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
 
   useEffect(() => {
     let mounted = true;

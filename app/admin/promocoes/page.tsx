@@ -3,7 +3,7 @@
 import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabase";
-import { useMediaQuery } from "../../../lib/useMediaQuery";
+import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import { AdminShell, EmptyState, adminStyles as styles } from "../AdminShell";
 
 type Promotion = {
@@ -104,8 +104,8 @@ export default function AdminPromotionsPage() {
   const [form, setForm] = useState<Promotion>(emptyPromotion);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
   const [message, setMessage] = useState("");
-  const isTablet = useMediaQuery("(max-width: 1040px)");
-  const isMobile = useMediaQuery("(max-width: 700px)");
+  const isTablet = useIsTablet();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchPromotions();

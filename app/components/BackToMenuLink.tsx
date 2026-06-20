@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { useIsMobile } from "../../lib/useMediaQuery";
 
 type BackToMenuLinkProps = {
   variant?: "inline" | "header";
@@ -12,18 +13,22 @@ export function BackToMenuLink({
   variant = "inline",
   label = "Voltar ao cardápio",
 }: BackToMenuLinkProps) {
+  const isMobile = useIsMobile();
+  const displayLabel = variant === "header" && isMobile ? "Cardápio" : label;
+
   return (
     <Link
       href="/"
       style={{
         ...styles.base,
         ...(variant === "header" ? styles.header : styles.inline),
+        ...(variant === "header" && isMobile ? styles.headerMobile : {}),
       }}
     >
       <span style={styles.icon} aria-hidden>
         ←
       </span>
-      <span>{label}</span>
+      <span style={styles.label}>{displayLabel}</span>
     </Link>
   );
 }
@@ -43,7 +48,6 @@ const styles: Record<string, CSSProperties> = {
     padding: "10px 14px",
     boxShadow: "0 8px 20px rgba(28, 26, 23, 0.06)",
     lineHeight: 1,
-    transition: "transform 0.15s ease, box-shadow 0.15s ease",
   },
   inline: {
     marginBottom: 20,
@@ -52,6 +56,16 @@ const styles: Record<string, CSSProperties> = {
     position: "absolute",
     left: 0,
     top: 18,
+    zIndex: 2,
+  },
+  headerMobile: {
+    padding: "9px 12px",
+    maxWidth: "42vw",
+  },
+  label: {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   icon: {
     width: 22,

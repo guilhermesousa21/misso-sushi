@@ -4,7 +4,7 @@ import type { CSSProperties, FormEvent } from "react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useMediaQuery } from "@/lib/useMediaQuery";
+import { useIsMobile } from "@/lib/useMediaQuery";
 
 type MenuItem = {
   id?: number;
@@ -56,7 +56,7 @@ const sanitizeFileName = (value: string) =>
     .toLowerCase();
 
 export default function AddItemForm({ onAdd }: AddItemFormProps) {
-  const isMobile = useMediaQuery("(max-width: 680px)");
+  const isMobile = useIsMobile();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");

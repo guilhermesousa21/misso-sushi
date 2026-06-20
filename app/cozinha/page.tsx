@@ -7,7 +7,7 @@ import { formatAddonSummary, getOrderPickupLabel } from "../../lib/orderFeatures
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { printOrder } from "../../lib/printOrder";
 import { supabase } from "../../lib/supabase";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useIsMobile, useIsTablet } from "../../lib/useMediaQuery";
 
 type OrderItem = {
   id: number;
@@ -115,7 +115,8 @@ const toBrasiliaDateKey = (value: string | Date) => {
 
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const isMobile = useMediaQuery("(max-width: 720px)");
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
   const [now, setNow] = useState(() => new Date());
   const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
   const [confirming, setConfirming] = useState(false);
@@ -334,7 +335,13 @@ export default function AdminPanel() {
           <h1 style={styles.title}>Cozinha</h1>
         </div>
         <div style={{ ...styles.headerSide, ...(isMobile ? styles.headerSideMobile : {}) }}>
-          <div style={{ ...styles.headerStats, ...(isMobile ? styles.headerStatsMobile : {}) }}>
+          <div
+            style={{
+              ...styles.headerStats,
+              ...(isTablet && !isMobile ? styles.headerStatsTablet : {}),
+              ...(isMobile ? styles.headerStatsMobile : {}),
+            }}
+          >
             {kitchenFilters.map((item) => {
               const isActive = filter === item.key;
 
@@ -439,7 +446,13 @@ export default function AdminPanel() {
                 <strong>{money(order.total ?? calcTotal(order.items))}</strong>
               </div>
 
-              <div style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
+              <div
+                style={{
+                  ...styles.actions,
+                  ...(isTablet && !isMobile ? styles.actionsTablet : {}),
+                  ...(isMobile ? styles.actionsMobile : {}),
+                }}
+              >
                 <Link href={`/pedido/${order.id}`} style={styles.actionDetails}>
                   Ver detalhes
                 </Link>
@@ -637,6 +650,11 @@ const styles: Record<string, CSSProperties> = {
   headerStatsMobile: {
     width: "100%",
     minWidth: 0,
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  },
+  headerStatsTablet: {
+    minWidth: 0,
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   },
   headerStatButton: {
     background: "#1c1a17",
@@ -791,6 +809,9 @@ const styles: Record<string, CSSProperties> = {
   },
   actionsMobile: {
     gridTemplateColumns: "1fr",
+  },
+  actionsTablet: {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   },
   actionSecondary: {
     border: "none",

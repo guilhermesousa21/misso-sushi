@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MQ } from "./breakpoints";
 
 export function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(false);
@@ -16,4 +17,12 @@ export function useMediaQuery(query: string) {
   }, [query]);
 
   return matches;
+}
+
+export function useIsMobile() {
+  return useMediaQuery(MQ.mobile);
+}
+
+export function useIsTablet() {
+  return useMediaQuery(MQ.tablet);
 }

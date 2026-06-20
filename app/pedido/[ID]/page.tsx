@@ -9,6 +9,7 @@ import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import { useCart } from "../../context/CartContext";
 import { BackToMenuLink } from "../../components/BackToMenuLink";
+import { useIsMobile } from "../../../lib/useMediaQuery";
 
 type Order = {
   id: number;
@@ -84,6 +85,7 @@ export default function PedidoPage({
   const { ID: orderId } = use(params);
   const router = useRouter();
   const { clear, addToCart } = useCart();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     async function loadOrder() {
@@ -241,8 +243,8 @@ export default function PedidoPage({
   };
 
   return (
-    <main style={styles.page}>
-      <section style={styles.panel}>
+    <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
+      <section style={{ ...styles.panel, ...(isMobile ? styles.panelMobile : {}) }}>
         <BackToMenuLink />
         <p style={styles.eyebrow}>Acompanhe em tempo real</p>
         <h1 style={styles.title}>Pedido #{order.id}</h1>
@@ -382,6 +384,7 @@ export default function PedidoPage({
               disabled={paymentLoading}
               style={{
                 ...styles.payButton,
+                ...(isMobile ? styles.payButtonMobileHidden : {}),
                 ...(paymentLoading ? styles.payButtonDisabled : {}),
               }}
             >
@@ -389,11 +392,13 @@ export default function PedidoPage({
                 ? "Preparando pagamento..."
                 : `Pagar pedido · ${money(orderTotal)}`}
             </button>
-            <p style={styles.payHint}>
-              {paymentMethod === "card"
-                ? "Você será redirecionado ao Mercado Pago para concluir o pagamento."
-                : "Seu pedido só entra na cozinha após a confirmação do pagamento."}
-            </p>
+            {!isMobile && (
+              <p style={styles.payHint}>
+                {paymentMethod === "card"
+                  ? "Você será redirecionado ao Mercado Pago para concluir o pagamento."
+                  : "Seu pedido só entra na cozinha após a confirmação do pagamento."}
+              </p>
+            )}
           </>
         )}
 
@@ -405,6 +410,26 @@ export default function PedidoPage({
           </button>
         )}
       </section>
+
+      {isMobile && isPaymentPending && !showPix && (
+        <div style={styles.mobilePayBar}>
+          <div style={styles.mobilePayMeta}>
+            <span>Pedido #{order.id}</span>
+            <strong>{money(orderTotal)}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={handleContinuePayment}
+            disabled={paymentLoading}
+            style={{
+              ...styles.mobilePayBarButton,
+              ...(paymentLoading ? styles.payButtonDisabled : {}),
+            }}
+          >
+            {paymentLoading ? "Preparando..." : "Pagar pedido"}
+          </button>
+        </div>
+      )}
     </main>
   );
 }
@@ -493,6 +518,10 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     placeItems: "center",
   },
+  pageMobile: {
+    padding: "20px 14px calc(100px + env(safe-area-inset-bottom, 0px))",
+    placeItems: "start stretch",
+  },
   panel: {
     width: "min(560px, 100%)",
     background: "#fffdf8",
@@ -500,6 +529,11 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 8,
     padding: 28,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.08)",
+  },
+  panelMobile: {
+    width: "100%",
+    padding: 18,
+    borderRadius: 10,
   },
   eyebrow: {
     color: "#9f1d2f",
@@ -663,6 +697,40 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.6,
     cursor: "not-allowed",
     boxShadow: "none",
+  },
+  payButtonMobileHidden: {
+    display: "none",
+  },
+  mobilePayBar: {
+    position: "fixed",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 40,
+    background: "rgba(255, 253, 248, 0.96)",
+    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
+    padding: "12px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
+    boxShadow: "0 -12px 28px rgba(28, 26, 23, 0.1)",
+    display: "grid",
+    gap: 10,
+  },
+  mobilePayMeta: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontWeight: 850,
+    color: "#514a43",
+  },
+  mobilePayBarButton: {
+    width: "100%",
+    border: "none",
+    borderRadius: 999,
+    background: "#9f1d2f",
+    color: "#fffdf8",
+    padding: "15px 18px",
+    cursor: "pointer",
+    fontWeight: 850,
+    fontSize: 16,
   },
   payHint: {
     marginTop: 10,

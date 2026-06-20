@@ -14,7 +14,7 @@ import {
   weeklyBusinessHours,
   type BusinessHours,
 } from "../lib/storeHours";
-import { useMediaQuery } from "../lib/useMediaQuery";
+import { useIsMobile } from "../lib/useMediaQuery";
 import {
   defaultMenuCategories,
   getCategoryLabel,
@@ -41,7 +41,7 @@ const sortItems = (menuItems: MenuItem[]) =>
 
 export default function Page() {
   const router = useRouter();
-  const isMobile = useMediaQuery("(max-width: 720px)");
+  const isMobile = useIsMobile();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [openCart, setOpenCart] = useState(false);
   const [activeCategory, setActiveCategory] = useState("");
@@ -58,6 +58,15 @@ export default function Page() {
   const [topItems, setTopItems] = useState<Record<number, number>>({});
   const [menuError, setMenuError] = useState("");
   const [menuLoading, setMenuLoading] = useState(true);
+
+  useEffect(() => {
+    if (!openCart) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [openCart]);
 
   useEffect(() => {
     async function fetchMenuData() {
@@ -293,7 +302,10 @@ export default function Page() {
             <button
               type="button"
               onClick={() => setOpenCart(true)}
-              style={styles.headerCartButton}
+              style={{
+                ...styles.headerCartButton,
+                ...(isMobile ? styles.headerCartButtonHidden : {}),
+              }}
               aria-label="Abrir carrinho"
             >
               <span style={styles.headerCartCount}>{itemCount}</span>
@@ -325,7 +337,7 @@ export default function Page() {
         </div>
       ) : (
         <>
-      <nav style={styles.categoryNav} aria-label="Categorias do cardápio">
+      <nav style={{ ...styles.categoryNav, ...(isMobile ? styles.categoryNavMobile : {}) }} aria-label="Categorias do cardápio">
         <div style={styles.searchRow}>
           <label style={styles.searchBox}>
             <span style={styles.searchIcon}>⌕</span>
@@ -387,7 +399,7 @@ export default function Page() {
                           src={item.image}
                           alt={item.name}
                           fill
-                          sizes="(max-width: 720px) 34vw, 160px"
+                          sizes="(max-width: 767px) 34vw, 160px"
                           style={styles.dishImage}
                         />
                       ) : (
@@ -502,7 +514,7 @@ export default function Page() {
                             src={item.image}
                             alt={item.name}
                             fill
-                            sizes="(max-width: 720px) 34vw, 160px"
+                            sizes="(max-width: 767px) 34vw, 160px"
                             style={styles.dishImage}
                           />
                         ) : (
@@ -598,7 +610,7 @@ export default function Page() {
       )}
 
       {openCart && (
-        <div style={styles.cartOverlay} role="dialog" aria-modal="true">
+        <div style={{ ...styles.cartOverlay, ...(isMobile ? styles.cartOverlayMobile : {}) }} role="dialog" aria-modal="true">
           <button
             type="button"
             aria-label="Fechar carrinho"
@@ -606,7 +618,7 @@ export default function Page() {
             style={styles.backdrop}
           />
 
-          <aside style={styles.cartPanel}>
+          <aside style={{ ...styles.cartPanel, ...(isMobile ? styles.cartPanelMobile : {}) }}>
             <div style={styles.cartHeader}>
               <div>
                 <p style={styles.cartEyebrow}>Pedido</p>
@@ -775,6 +787,9 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
     boxShadow: "0 12px 30px rgba(28, 26, 23, 0.06)",
   },
+  headerCartButtonHidden: {
+    display: "none",
+  },
   headerCartCount: {
     width: 26,
     height: 26,
@@ -852,8 +867,11 @@ const styles: Record<string, CSSProperties> = {
     top: 67,
     zIndex: 20,
     background: "rgba(247, 244, 239, 0.96)",
+    backdropFilter: "blur(12px)",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
-    backdropFilter: "blur(14px)",
+  },
+  categoryNavMobile: {
+    top: 96,
   },
   categoryBar: {
     maxWidth: 1120,
@@ -1148,7 +1166,7 @@ const styles: Record<string, CSSProperties> = {
   floatingCart: {
     position: "fixed",
     left: "50%",
-    bottom: 18,
+    bottom: "calc(18px + env(safe-area-inset-bottom, 0px))",
     transform: "translateX(-50%)",
     zIndex: 25,
     width: "min(360px, calc(100% - 32px))",
@@ -1172,6 +1190,9 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     justifyContent: "flex-end",
   },
+  cartOverlayMobile: {
+    justifyContent: "stretch",
+  },
   backdrop: {
     position: "absolute",
     inset: 0,
@@ -1187,6 +1208,11 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     boxShadow: "-18px 0 45px rgba(28, 26, 23, 0.18)",
+  },
+  cartPanelMobile: {
+    width: "100%",
+    maxWidth: "100%",
+    boxShadow: "none",
   },
   cartHeader: {
     padding: 20,

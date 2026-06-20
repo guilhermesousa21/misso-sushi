@@ -10,7 +10,7 @@ import {
   type BusinessHours,
   weeklyBusinessHours,
 } from "../../../lib/storeHours";
-import { useMediaQuery } from "../../../lib/useMediaQuery";
+import { useIsMobile } from "../../../lib/useMediaQuery";
 import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
 
 type StoreSettings = {
@@ -67,7 +67,7 @@ export default function AdminSettingsPage() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
-  const isMobile = useMediaQuery("(max-width: 760px)");
+  const isMobile = useIsMobile();
 
   const withinBusinessHours = isWithinBusinessHours(now, settings.business_hours);
   const storeOpenNow = settings.is_open;

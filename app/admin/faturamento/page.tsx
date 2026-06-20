@@ -16,7 +16,7 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { supabase } from "../../../lib/supabase";
-import { useMediaQuery } from "../../../lib/useMediaQuery";
+import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import { AdminShell } from "../AdminShell";
 
 ChartJS.register(
@@ -139,8 +139,8 @@ const getPayment = (order: Order) => order.payment_method || "";
 
 export default function FaturamentoPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const isMobile = useMediaQuery("(max-width: 760px)");
-  const isTablet = useMediaQuery("(max-width: 1040px)");
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<RangePreset>("30d");
   const [dateFrom, setDateFrom] = useState("");

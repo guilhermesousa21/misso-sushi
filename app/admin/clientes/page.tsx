@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabase";
-import { useMediaQuery } from "../../../lib/useMediaQuery";
+import { useIsMobile } from "../../../lib/useMediaQuery";
 import {
   AdminShell,
   EmptyState,
@@ -20,7 +20,7 @@ export default function AdminCustomersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const isMobile = useMediaQuery("(max-width: 760px)");
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let mounted = true;

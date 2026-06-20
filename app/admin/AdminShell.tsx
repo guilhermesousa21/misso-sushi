@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useIsMobile, useIsTablet } from "../../lib/useMediaQuery";
 
 const navItems = [
   { href: "/admin/menu", label: "Cardápio" },
@@ -90,8 +90,8 @@ export function AdminShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const isMobile = useMediaQuery("(max-width: 760px)");
-  const isTablet = useMediaQuery("(max-width: 1040px)");
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -156,7 +156,7 @@ export function AdminShell({
       </section>
       {isMobile && (
         <nav style={styles.mobileTabBar} aria-label="Navegação principal">
-          {navItems.map((item) => (
+          {[...navItems, ...extraNavItems].map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -490,20 +490,22 @@ function baseStyles(): Record<string, CSSProperties> {
       position: "fixed",
       left: 10,
       right: 10,
-      bottom: 10,
+      bottom: "calc(10px + env(safe-area-inset-bottom, 0px))",
       zIndex: 80,
-      display: "grid",
-      gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+      display: "flex",
       gap: 4,
+      overflowX: "auto",
       border: "1px solid rgba(28, 26, 23, 0.1)",
       borderRadius: 18,
       background: "rgba(255, 253, 248, 0.96)",
       padding: 6,
       boxShadow: "0 18px 45px rgba(28, 26, 23, 0.18)",
       backdropFilter: "blur(14px)",
+      WebkitOverflowScrolling: "touch",
     },
     mobileTab: {
-      minWidth: 0,
+      flex: "0 0 auto",
+      minWidth: 78,
       borderRadius: 13,
       color: "#625b53",
       padding: "9px 5px",
