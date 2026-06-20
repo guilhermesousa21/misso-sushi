@@ -903,7 +903,7 @@ export default function CheckoutPage() {
 
               <details open style={styles.compactDetails}>
                 <summary style={styles.detailsSummary}>
-                  Complementos <span>R$ 2,50 cada</span>
+                  Complementos
                 </summary>
                 <div style={styles.addonGrid}>
                   {availableAddons.map((addon) => {
