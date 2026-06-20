@@ -230,6 +230,9 @@ export default function AdminPanel() {
   const activeOrders = visibleOrders.filter(
     (order) => !["retirado"].includes(order.status)
   );
+  const receivedOrders = activeOrders.filter(
+    (order) => normalizeKitchenStatus(order.status) === "recebido"
+  );
   const readyOrders = activeOrders.filter(
     (order) => normalizeKitchenStatus(order.status) === "pronto"
   );
@@ -247,8 +250,8 @@ export default function AdminPanel() {
         <div style={{ ...styles.headerSide, ...(isMobile ? styles.headerSideMobile : {}) }}>
           <div style={{ ...styles.headerStats, ...(isMobile ? styles.headerStatsMobile : {}) }}>
             <div style={styles.headerStat}>
-              <span>Ativos</span>
-              <strong>{activeOrders.length}</strong>
+              <span>Recebidos</span>
+              <strong>{receivedOrders.length}</strong>
             </div>
             <div style={styles.headerStat}>
               <span>Prontos</span>
