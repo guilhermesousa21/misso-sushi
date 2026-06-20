@@ -171,6 +171,7 @@ export const adminStyles: Record<string, CSSProperties> = {
     gridTemplateColumns: "1fr",
   },
   input: {
+    boxSizing: "border-box",
     width: "100%",
     border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 8,
@@ -180,6 +181,7 @@ export const adminStyles: Record<string, CSSProperties> = {
     outlineColor: "#9f1d2f",
   },
   select: {
+    boxSizing: "border-box",
     width: "100%",
     border: "1px solid rgba(28, 26, 23, 0.14)",
     borderRadius: 8,

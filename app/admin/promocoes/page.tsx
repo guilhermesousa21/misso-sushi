@@ -643,7 +643,7 @@ const localStyles: Record<string, CSSProperties> = {
   },
   layout: {
     display: "grid",
-    gridTemplateColumns: "minmax(300px, 420px) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(0, 420px) minmax(0, 1fr)",
     gap: 16,
     alignItems: "start",
   },
@@ -656,6 +656,8 @@ const localStyles: Record<string, CSSProperties> = {
     borderRadius: 8,
     padding: 20,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.16)",
+    minWidth: 0,
+    overflow: "hidden",
   },
   panelMobile: {
     padding: 14,
@@ -683,11 +685,13 @@ const localStyles: Record<string, CSSProperties> = {
     fontSize: 24,
     lineHeight: 1.1,
   },
-  formStack: { display: "grid", gap: 12, marginBottom: 14 },
-  field: { display: "grid", gap: 7 },
+  formStack: { display: "grid", gap: 12, marginBottom: 14, minWidth: 0 },
+  field: { display: "grid", gap: 7, minWidth: 0 },
   label: { fontSize: 13, fontWeight: 850, color: "#d8d0c4" },
   codeInput: {
+    boxSizing: "border-box",
     width: "100%",
+    minWidth: 0,
     border: "1px solid rgba(255, 253, 248, 0.18)",
     borderRadius: 8,
     padding: 13,
@@ -699,8 +703,9 @@ const localStyles: Record<string, CSSProperties> = {
   },
   discountGrid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: 10,
+    minWidth: 0,
   },
   discountGridStack: {
     gridTemplateColumns: "1fr",
