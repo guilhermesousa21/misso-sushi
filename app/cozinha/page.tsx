@@ -1,7 +1,6 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { formatAddonSummary, getKitchenPickupBadge, getMinPickupMinutes, type OperationalSettings } from "../../lib/orderFeatures";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
@@ -457,9 +456,6 @@ export default function AdminPanel() {
               </div>
 
               <div style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
-                <Link href={`/pedido/${order.id}`} style={styles.actionDetails}>
-                  Ver detalhes
-                </Link>
                 <button
                   type="button"
                   style={styles.actionSecondary}
@@ -783,6 +779,10 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
   },
   itemRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: 14,
     padding: "4px 0",
     borderBottom: "1px dashed rgba(28, 26, 23, 0.16)",
   },
@@ -791,6 +791,12 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     lineHeight: 1.35,
     color: "#1c1a17",
+  },
+  itemPrice: {
+    fontSize: 15,
+    fontWeight: 850,
+    whiteSpace: "nowrap",
+    color: "#514a43",
   },
   muted: {
     color: "#766e64",
@@ -804,7 +810,7 @@ const styles: Record<string, CSSProperties> = {
   actions: {
     marginTop: 16,
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: 8,
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
     paddingTop: 14,
@@ -822,22 +828,6 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     minHeight: 52,
     whiteSpace: "nowrap",
-  },
-  actionDetails: {
-    border: "none",
-    borderRadius: 999,
-    background: "#fffdf8",
-    color: "#1c1a17",
-    padding: 12,
-    cursor: "pointer",
-    fontWeight: 850,
-    minHeight: 52,
-    whiteSpace: "nowrap",
-    textDecoration: "none",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "inset 0 0 0 1px rgba(28, 26, 23, 0.12)",
   },
   actionStatusButton: {
     border: "none",
