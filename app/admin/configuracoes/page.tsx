@@ -56,6 +56,11 @@ const isValidTime24 = (value: string) => {
   return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 };
 
+const isMissingColumnError = (error?: { code?: string; message?: string } | null) =>
+  error?.code === "PGRST204" ||
+  error?.code === "42703" ||
+  Boolean(error?.message?.includes("schema cache"));
+
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<StoreSettings>(defaultSettings);
   const [saving, setSaving] = useState(false);
@@ -139,12 +144,27 @@ export default function AdminSettingsPage() {
       order_slot_limit: Number(settings.order_slot_limit || 0),
       business_hours: settings.business_hours,
     };
+    const legacyPayload = {
+      is_open: settings.is_open,
+      average_time: settings.average_time,
+      business_hours: settings.business_hours,
+    };
 
     const query = settings.id
       ? supabase.from("store_settings").update(payload).eq("id", settings.id).select()
       : supabase.from("store_settings").insert([payload]).select();
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (isMissingColumnError(error)) {
+      const fallbackQuery = settings.id
+        ? supabase.from("store_settings").update(legacyPayload).eq("id", settings.id).select()
+        : supabase.from("store_settings").insert([legacyPayload]).select();
+      const fallback = await fallbackQuery;
+      data = fallback.data;
+      error = fallback.error;
+    }
+
     setSaving(false);
 
     if (error) {
@@ -154,6 +174,7 @@ export default function AdminSettingsPage() {
 
     if (data?.[0]) {
       setSettings({
+        ...defaultSettings,
         ...(data[0] as StoreSettings),
         business_hours: getBusinessHours((data[0] as StoreSettings).business_hours),
       });
@@ -181,12 +202,27 @@ export default function AdminSettingsPage() {
       order_slot_limit: Number(settings.order_slot_limit || 0),
       business_hours: settings.business_hours,
     };
+    const legacyPayload = {
+      is_open: isOpen,
+      average_time: settings.average_time,
+      business_hours: settings.business_hours,
+    };
 
     const query = settings.id
       ? supabase.from("store_settings").update(payload).eq("id", settings.id).select()
       : supabase.from("store_settings").insert([payload]).select();
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (isMissingColumnError(error)) {
+      const fallbackQuery = settings.id
+        ? supabase.from("store_settings").update(legacyPayload).eq("id", settings.id).select()
+        : supabase.from("store_settings").insert([legacyPayload]).select();
+      const fallback = await fallbackQuery;
+      data = fallback.data;
+      error = fallback.error;
+    }
+
     setSavingStatus(false);
 
     if (error) {
@@ -197,6 +233,7 @@ export default function AdminSettingsPage() {
 
     if (data?.[0]) {
       setSettings({
+        ...defaultSettings,
         ...(data[0] as StoreSettings),
         business_hours: getBusinessHours((data[0] as StoreSettings).business_hours),
       });
