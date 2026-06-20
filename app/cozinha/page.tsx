@@ -432,16 +432,27 @@ export default function AdminPanel() {
                   type="button"
                   style={{
                     ...styles.actionStatusButton,
-                    ...(kitchenStatus === "pronto" ? styles.actionPickedUp : styles.actionMarkReady),
+                    ...(kitchenStatus === "pronto"
+                      ? styles.actionMarkReadyDone
+                      : styles.actionMarkReady),
                   }}
-                  onClick={() =>
-                    setConfirmation({
-                      action: kitchenStatus === "pronto" ? "picked_up" : "ready",
-                      order,
-                    })
-                  }
+                  onClick={() => setConfirmation({ action: "ready", order })}
+                  disabled={kitchenStatus === "pronto"}
                 >
-                  {kitchenStatus === "pronto" ? "Marcar retirado" : "Pedido pronto"}
+                  {kitchenStatus === "pronto" ? "Pronto" : "Marcar pronto"}
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.actionStatusButton,
+                    ...(kitchenStatus === "pronto"
+                      ? styles.actionPickedUp
+                      : styles.actionPickedUpDisabled),
+                  }}
+                  onClick={() => setConfirmation({ action: "picked_up", order })}
+                  disabled={kitchenStatus !== "pronto"}
+                >
+                  Marcar retirado
                 </button>
               </div>
             </article>
@@ -744,7 +755,7 @@ const styles: Record<string, CSSProperties> = {
   actions: {
     marginTop: 16,
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
     gap: 8,
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
     paddingTop: 14,
@@ -792,8 +803,19 @@ const styles: Record<string, CSSProperties> = {
   actionMarkReady: {
     background: "#15803d",
   },
+  actionMarkReadyDone: {
+    background: "#dcfce7",
+    color: "#166534",
+    cursor: "not-allowed",
+  },
   actionPickedUp: {
     background: "#3730a3",
+  },
+  actionPickedUpDisabled: {
+    background: "#e0e7ff",
+    color: "#6366f1",
+    cursor: "not-allowed",
+    opacity: 0.72,
   },
   modalOverlay: {
     position: "fixed",
