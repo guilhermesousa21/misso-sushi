@@ -94,11 +94,8 @@ export default function AdminCustomersPage() {
   const summary = useMemo(() => {
     const totalRevenue = customers.reduce((sum, customer) => sum + customer.total, 0);
     const totalOrders = customers.reduce((sum, customer) => sum + customer.orders.length, 0);
-    const bestCustomer = [...customers].sort((a, b) => b.total - a.total)[0];
-
     return {
       averageTicket: totalOrders > 0 ? totalRevenue / totalOrders : 0,
-      bestCustomer,
       totalOrders,
       totalRevenue,
     };
