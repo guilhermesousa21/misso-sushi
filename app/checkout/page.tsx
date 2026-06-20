@@ -726,7 +726,7 @@ export default function CheckoutPage() {
           Retirada:{" "}
           {wantsScheduledPickup && scheduledFor
             ? formatPickupTime(new Date(scheduledFor).toISOString())
-            : "O quanto antes"}
+            : "Padrão"}
         </div>
         <div style={styles.summaryGrandTotalLine}>
           <span>Total</span>
@@ -850,7 +850,7 @@ export default function CheckoutPage() {
                   }}
                 >
                   <div style={styles.pickupOptionText}>
-                    <strong>Retirada o quanto antes</strong>
+                    <strong>Retirada padrão</strong>
                     <span>Previsão: {averageTime} após confirmação do pagamento</span>
                   </div>
                   {!wantsScheduledPickup && <span style={styles.pickupOptionMark}>✓</span>}
