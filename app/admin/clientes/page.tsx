@@ -101,6 +101,16 @@ export default function AdminCustomersPage() {
     };
   }, [customers]);
 
+  const rankedCustomers = useMemo(
+    () =>
+      [...customers].sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        if (b.orders.length !== a.orders.length) return b.orders.length - a.orders.length;
+        return a.name.localeCompare(b.name, "pt-BR");
+      }),
+    [customers]
+  );
+
   return (
     <AdminShell
       eyebrow="Relacionamento"
@@ -108,14 +118,68 @@ export default function AdminCustomersPage() {
       action={<span style={styles.pill}>{loading ? "Carregando" : `${number(filteredCustomers.length)} clientes`}</span>}
     >
       <section style={{ ...localStyles.summaryGrid, ...(isMobile ? localStyles.summaryGridMobile : {}) }}>
-        <MetricCard label="Clientes" value={number(customers.length)} detail="com pedidos" />
-        <MetricCard label="Pedidos" value={number(summary.totalOrders)} detail="no histórico" />
-        <MetricCard label="Receita" value={money(summary.totalRevenue)} detail="clientes" />
-        <MetricCard
-          label="Ticket médio"
-          value={money(summary.averageTicket)}
-          detail={summary.bestCustomer ? `Maior cliente: ${summary.bestCustomer.name}` : "Sem pedidos"}
-        />
+        <MetricCard label="Clientes" value={number(customers.length)} />
+        <MetricCard label="Pedidos" value={number(summary.totalOrders)} />
+        <MetricCard label="Receita" value={money(summary.totalRevenue)} />
+        <MetricCard label="Ticket médio" value={money(summary.averageTicket)} />
+      </section>
+
+      <section style={{ ...localStyles.rankingCard, ...(isMobile ? localStyles.rankingCardMobile : {}) }}>
+        <div style={localStyles.rankingHeader}>
+          <div>
+            <p style={localStyles.rankingEyebrow}>Ranking</p>
+            <h2 style={localStyles.rankingTitle}>Top clientes</h2>
+          </div>
+          <span style={localStyles.rankingHint}>Por total gasto</span>
+        </div>
+
+        {loading ? (
+          <p style={localStyles.rankingEmpty}>Carregando ranking...</p>
+        ) : rankedCustomers.length === 0 ? (
+          <p style={localStyles.rankingEmpty}>Nenhum cliente no ranking ainda.</p>
+        ) : (
+          <div style={localStyles.rankingList}>
+            {rankedCustomers.map((customer, index) => (
+              <article
+                key={customer.phone}
+                style={{
+                  ...localStyles.rankingRow,
+                  ...(isMobile ? localStyles.rankingRowMobile : {}),
+                  ...(index < 3 ? localStyles.rankingRowHighlight : {}),
+                }}
+              >
+                <span
+                  style={{
+                    ...localStyles.rankBadge,
+                    ...(index === 0
+                      ? localStyles.rankBadgeGold
+                      : index === 1
+                        ? localStyles.rankBadgeSilver
+                        : index === 2
+                          ? localStyles.rankBadgeBronze
+                          : {}),
+                  }}
+                >
+                  {index + 1}º
+                </span>
+                <div style={localStyles.rankingIdentity}>
+                  <strong style={localStyles.rankingName}>{customer.name}</strong>
+                  <span style={localStyles.rankingPhone}>{customer.phone}</span>
+                </div>
+                <div style={localStyles.rankingStats}>
+                  <span>{number(customer.orders.length)} pedidos</span>
+                  <strong>{money(customer.total)}</strong>
+                </div>
+                <Link
+                  href={`/admin/pedidos?cliente=${encodeURIComponent(customer.phone)}`}
+                  style={localStyles.rankingLink}
+                >
+                  Ver
+                </Link>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section style={{ ...localStyles.toolbar, ...(isMobile ? localStyles.toolbarMobile : {}) }}>
@@ -173,20 +237,11 @@ export default function AdminCustomersPage() {
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <article style={localStyles.summaryCard}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>{detail}</small>
     </article>
   );
 }
@@ -218,6 +273,127 @@ const localStyles: Record<string, CSSProperties> = {
     display: "grid",
     gap: 6,
     boxShadow: "0 10px 24px rgba(28, 26, 23, 0.04)",
+  },
+  rankingCard: {
+    background: "#fffdf8",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 14,
+    boxShadow: "0 10px 24px rgba(28, 26, 23, 0.04)",
+  },
+  rankingCardMobile: {
+    padding: 14,
+  },
+  rankingHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "start",
+    gap: 12,
+    marginBottom: 14,
+    flexWrap: "wrap",
+  },
+  rankingEyebrow: {
+    color: "#9f1d2f",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+  },
+  rankingTitle: {
+    marginTop: 4,
+    fontSize: 22,
+    lineHeight: 1.1,
+  },
+  rankingHint: {
+    borderRadius: 999,
+    background: "#f0ebe2",
+    color: "#625b53",
+    padding: "7px 10px",
+    fontSize: 12,
+    fontWeight: 850,
+    whiteSpace: "nowrap",
+  },
+  rankingEmpty: {
+    color: "#766e64",
+    fontSize: 14,
+  },
+  rankingList: {
+    display: "grid",
+    gap: 8,
+  },
+  rankingRow: {
+    display: "grid",
+    gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
+    gap: 12,
+    alignItems: "center",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    background: "#fff",
+    padding: "12px 14px",
+  },
+  rankingRowMobile: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  rankingRowHighlight: {
+    background: "#fffaf2",
+  },
+  rankBadge: {
+    minWidth: 42,
+    borderRadius: 999,
+    background: "#f0ebe2",
+    color: "#514a43",
+    padding: "8px 10px",
+    textAlign: "center",
+    fontWeight: 900,
+    fontSize: 13,
+  },
+  rankBadgeGold: {
+    background: "#fef3c7",
+    color: "#92400e",
+  },
+  rankBadgeSilver: {
+    background: "#e5e7eb",
+    color: "#374151",
+  },
+  rankBadgeBronze: {
+    background: "#ffedd5",
+    color: "#9a3412",
+  },
+  rankingIdentity: {
+    minWidth: 0,
+    display: "grid",
+    gap: 3,
+  },
+  rankingName: {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    lineHeight: 1.25,
+  },
+  rankingPhone: {
+    color: "#766e64",
+    fontSize: 12,
+  },
+  rankingStats: {
+    display: "grid",
+    justifyItems: "end",
+    gap: 3,
+    color: "#625b53",
+    fontSize: 12,
+    whiteSpace: "nowrap",
+    marginLeft: "auto",
+  },
+  rankingLink: {
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "8px 12px",
+    textDecoration: "none",
+    fontWeight: 850,
+    fontSize: 13,
+    whiteSpace: "nowrap",
   },
   toolbar: {
     display: "grid",
