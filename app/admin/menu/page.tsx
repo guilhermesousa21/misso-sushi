@@ -11,6 +11,7 @@ import {
   defaultMenuCategories,
   getCategoryLabel,
   getCategoryOrder,
+  normalizeCategorySlug,
   sortCategories,
   type MenuCategory,
 } from "../../../lib/menuCategories";
@@ -86,6 +87,7 @@ export default function AdminMenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>(defaultMenuCategories);
   const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
+  const [creatingCategoryModalOpen, setCreatingCategoryModalOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width: 760px)");
   const isTablet = useMediaQuery("(max-width: 1040px)");
   const [editingItem, setEditingItem] = useState<EditableMenuItem | null>(null);
@@ -419,6 +421,13 @@ export default function AdminMenuPage() {
               style={{ ...styles.primaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
             >
               + Novo item
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreatingCategoryModalOpen(true)}
+              style={{ ...styles.headerSecondaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
+            >
+              + Nova categoria
             </button>
           </div>
         </header>
@@ -822,6 +831,19 @@ export default function AdminMenuPage() {
         />
       )}
 
+      {creatingCategoryModalOpen && (
+        <CategoryCreateModal
+          categories={categories}
+          onClose={() => setCreatingCategoryModalOpen(false)}
+          onSave={(category) => {
+            setCategories((current) => sortCategories([...current, category]));
+            setExpandedCategories((current) => new Set(current).add(category.slug));
+            setFilterCategory(category.slug);
+            setCreatingCategoryModalOpen(false);
+          }}
+        />
+      )}
+
       {editingItem && (
         <EditModal
           item={editingItem}
@@ -866,6 +888,110 @@ function AdminLink({
     <Link href={href} style={{ ...styles.navLink, ...(compact ? styles.navLinkMobile : {}), ...(active ? styles.navLinkActive : {}) }}>
       {children}
     </Link>
+  );
+}
+
+function CategoryCreateModal({
+  categories,
+  onClose,
+  onSave,
+}: {
+  categories: MenuCategory[];
+  onClose: () => void;
+  onSave: (category: MenuCategory) => void;
+}) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const slug = normalizeCategorySlug(name);
+  const alreadyExists = categories.some((category) => category.slug === slug);
+  const canSave = Boolean(name.trim()) && Boolean(slug) && !alreadyExists && !saving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/admin/menu-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      const result = (await response.json()) as {
+        category?: MenuCategory;
+        error?: string;
+      };
+
+      if (!response.ok || !result.category) {
+        toast.error(result.error || "Não foi possível criar a categoria.");
+        return;
+      }
+
+      toast.success(`Categoria "${result.category.name}" criada.`);
+      onSave(result.category);
+    } catch {
+      toast.error("Não foi possível criar a categoria.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={{ ...styles.modal, ...styles.categoryModal }}>
+        <div style={styles.modalHeader}>
+          <div>
+            <p style={styles.cardEyebrow}>Cardápio</p>
+            <h2 style={styles.modalTitle}>Nova categoria</h2>
+          </div>
+          <button type="button" onClick={onClose} style={styles.closeButton}>
+            Fechar
+          </button>
+        </div>
+
+        <div style={styles.modalPanel}>
+          <label style={styles.field}>
+            <span style={styles.label}>Nome da categoria</span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleSave();
+                }
+              }}
+              autoFocus
+              maxLength={60}
+              placeholder="Ex: Combos especiais"
+              style={styles.input}
+            />
+          </label>
+          {name.trim() && !slug && (
+            <p style={styles.notice}>Use pelo menos uma letra ou número.</p>
+          )}
+          {alreadyExists && (
+            <p style={styles.noticeStrong}>Já existe uma categoria com esse nome.</p>
+          )}
+        </div>
+
+        <div style={styles.modalActions}>
+          <button type="button" onClick={onClose} style={styles.secondaryButton}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!canSave}
+            style={{
+              ...styles.primaryButton,
+              ...(!canSave ? styles.primaryButtonDisabled : {}),
+            }}
+          >
+            {saving ? "Criando..." : "Criar categoria"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1444,7 +1570,7 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 18,
     borderRadius: 16,
     border: "1px solid rgba(28, 26, 23, 0.08)",
-    background: "linear-gradient(135deg, #1c1a17 0%, #33251f 58%, #9f1d2f 140%)",
+    background: "#1c1a17",
     color: "#fffdf8",
     padding: 22,
     boxShadow: "0 20px 50px rgba(28, 26, 23, 0.12)",
@@ -1492,6 +1618,15 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 999,
     background: "#9f1d2f",
     color: "#fff",
+    padding: "12px 16px",
+    cursor: "pointer",
+    fontWeight: 850,
+  },
+  headerSecondaryButton: {
+    border: "1px solid rgba(255, 253, 248, 0.2)",
+    borderRadius: 999,
+    background: "rgba(255, 253, 248, 0.1)",
+    color: "#fffdf8",
     padding: "12px 16px",
     cursor: "pointer",
     fontWeight: 850,
