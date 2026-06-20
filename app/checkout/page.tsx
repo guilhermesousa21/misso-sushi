@@ -668,35 +668,29 @@ export default function CheckoutPage() {
   const orderSummaryCard = (
     <div style={styles.summaryCard}>
       <div style={styles.cardHeader}>
-        <div>
-          <p style={styles.cardEyebrow}>Resumo</p>
-          <h2 style={styles.cardTitle}>Seu pedido</h2>
-        </div>
+        <h2 style={styles.cardTitle}>Seu pedido</h2>
         <span style={styles.summaryPill}>{itemCount} itens</span>
       </div>
       {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
       <div style={styles.orderList}>
         {cart.map((item) => (
           <div key={item.lineKey} style={styles.summaryOrderRow}>
-            <div>
-              <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
-              <p style={styles.summaryMuted}>{money(Number(item.price))} cada</p>
-            </div>
-            <strong>{money(item.price * item.quantity)}</strong>
+            <span style={styles.itemName}>{item.quantity}x {item.name}</span>
+            <strong style={styles.summaryRowPrice}>{money(item.price * item.quantity)}</strong>
+          </div>
+        ))}
+        {selectedAddonList.map((addon) => (
+          <div key={addon.id} style={styles.summaryOrderRow}>
+            <span style={styles.summarySecondaryName}>{addon.quantity}x {addon.name}</span>
+            <strong style={styles.summaryRowPrice}>{money(Number(addon.unit_price || 0) * addon.quantity)}</strong>
           </div>
         ))}
       </div>
       <div style={styles.summaryTotalBox}>
-        {(discountAmount > 0 || serviceFee > 0 || addonTotal > 0) && (
+        {(discountAmount > 0 || serviceFee > 0 || loyaltyDiscount > 0) && (
           <div style={styles.summaryTotalLine}>
             <span>Subtotal</span>
-            <strong>{money(total)}</strong>
-          </div>
-        )}
-        {addonTotal > 0 && (
-          <div style={styles.summaryTotalLine}>
-            <span>Complementos</span>
-            <strong>{money(addonTotal)}</strong>
+            <strong>{money(total + addonTotal)}</strong>
           </div>
         )}
         {serviceFee > 0 && (
@@ -717,17 +711,12 @@ export default function CheckoutPage() {
             <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
           </div>
         )}
-        {selectedAddonList.length > 0 && (
-          <div style={styles.addonSummary}>
-            Complementos: {selectedAddonList.map((addon) => `${addon.quantity}x ${addon.name}`).join(", ")}
-          </div>
-        )}
-        <div style={styles.addonSummary}>
-          Retirada:{" "}
+        <p style={styles.summaryMeta}>
+          Retirada ·{" "}
           {wantsScheduledPickup && scheduledFor
             ? formatPickupTime(new Date(scheduledFor).toISOString())
             : "Padrão"}
-        </div>
+        </p>
         <div style={styles.summaryGrandTotalLine}>
           <span>Total</span>
           <strong>{money(finalTotal)}</strong>
@@ -1159,9 +1148,9 @@ const styles: Record<string, CSSProperties> = {
   },
   card: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.07)", borderRadius: 10, padding: 18, boxShadow: "0 8px 18px rgba(28, 26, 23, 0.035)" },
   summaryCard: { background: "#171512", color: "#fffdf8", border: "1px solid rgba(255, 253, 248, 0.08)", borderRadius: 8, padding: 22, boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)" },
-  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16, marginBottom: 18 },
+  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 16 },
   cardEyebrow: { color: "#9f1d2f", fontSize: 11, fontWeight: 850, textTransform: "uppercase", letterSpacing: 0 },
-  cardTitle: { marginTop: 5, fontSize: 23, lineHeight: 1.12 },
+  cardTitle: { margin: 0, fontSize: 21, lineHeight: 1.12 },
   sectionTitle: { margin: "0 0 14px", fontSize: 20, lineHeight: 1.12 },
   inlineHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 },
   inlineMeta: { borderRadius: 999, background: "#f0ebe2", color: "#625b53", padding: "7px 10px", fontSize: 12, fontWeight: 850, whiteSpace: "nowrap" },
@@ -1248,18 +1237,20 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: "0 14px 28px rgba(159, 29, 47, 0.22)",
   },
   paymentWarning: { marginTop: 12, borderRadius: 8, background: "#fff1f1", color: "#991b1b", padding: 12, fontSize: 13, fontWeight: 850, lineHeight: 1.4 },
-  orderList: { display: "grid", gap: 13 },
+  orderList: { display: "grid", gap: 10 },
   orderRow: { display: "flex", justifyContent: "space-between", gap: 18, paddingBottom: 13, borderBottom: "1px solid rgba(28, 26, 23, 0.08)" },
   itemName: { display: "block", lineHeight: 1.35 },
   totalBox: { display: "grid", gap: 10, marginTop: 18, padding: "16px 0 0", borderTop: "1px solid rgba(28, 26, 23, 0.1)" },
   totalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#625b53", fontSize: 15 },
   grandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#1c1a17", fontSize: 22, fontWeight: 850 },
   summaryMuted: { marginTop: 4, color: "rgba(255, 253, 248, 0.68)", fontSize: 13, lineHeight: 1.4 },
-  summaryOrderRow: { display: "flex", justifyContent: "space-between", gap: 18, paddingBottom: 13, borderBottom: "1px solid rgba(255, 253, 248, 0.12)" },
-  summaryTotalBox: { display: "grid", gap: 10, marginTop: 18, padding: "0" },
-  summaryTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255, 253, 248, 0.78)", fontSize: 15 },
-  summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },
-  addonSummary: { color: "rgba(255, 253, 248, 0.66)", fontSize: 13, lineHeight: 1.45 },
+  summaryOrderRow: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16 },
+  summaryRowPrice: { fontSize: 15, fontWeight: 850, whiteSpace: "nowrap" },
+  summarySecondaryName: { color: "rgba(255, 253, 248, 0.72)", fontSize: 14, lineHeight: 1.35 },
+  summaryTotalBox: { display: "grid", gap: 8, marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(255, 253, 248, 0.12)" },
+  summaryTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255, 253, 248, 0.72)", fontSize: 14 },
+  summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, color: "#fffdf8", fontSize: 20, fontWeight: 850, marginTop: 4 },
+  summaryMeta: { margin: "2px 0 0", color: "rgba(255, 253, 248, 0.52)", fontSize: 12, lineHeight: 1.4 },
   discountText: { color: "#0f7a4a" },
   loyaltyProgressTrack: {
     marginTop: 10,
