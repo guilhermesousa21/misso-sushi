@@ -868,7 +868,6 @@ export default function AdminMenuPage() {
           onSave={(category) => {
             setCategories((current) => sortCategories([...current, category]));
             setExpandedCategories((current) => new Set(current).add(category.slug));
-            setFilterCategory(category.slug);
             setCreatingCategoryModalOpen(false);
           }}
         />
