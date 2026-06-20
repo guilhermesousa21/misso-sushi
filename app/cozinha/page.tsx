@@ -830,12 +830,14 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
   actionMarkReady: {
-    background: "#15803d",
+    background: "#16a34a",
+    boxShadow: "0 8px 18px rgba(22, 163, 74, 0.24)",
   },
   actionMarkReadyDone: {
-    background: "#dcfce7",
-    color: "#166534",
+    background: "#16a34a",
+    color: "#fff",
     cursor: "not-allowed",
+    boxShadow: "inset 0 0 0 2px rgba(255, 255, 255, 0.28)",
   },
   actionPickedUp: {
     background: "#3730a3",
