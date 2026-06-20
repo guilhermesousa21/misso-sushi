@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { formatBrasiliaDateTimeShort } from "../../lib/brasiliaTime";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 
 const navItems = [
@@ -31,13 +32,7 @@ export const normalize = (value: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-export const formatDateTime = (value: string) =>
-  new Date(value).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+export const formatDateTime = (value: string) => formatBrasiliaDateTimeShort(value);
 
 export type AdminOrderItem = {
   id: number;

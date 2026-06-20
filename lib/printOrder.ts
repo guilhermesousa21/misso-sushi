@@ -1,3 +1,5 @@
+import { formatBrasiliaDateTime } from "./brasiliaTime";
+
 type PrintableItem = {
   id?: number;
   name: string;
@@ -67,15 +69,7 @@ const getSubtotal = (order: PrintableOrder) =>
   typeof order.subtotal === "number" ? order.subtotal : getTotal(order);
 
 const formatDateTime = (value?: string | null) =>
-  value
-    ? new Date(value).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : new Date().toLocaleString("pt-BR");
+  value ? formatBrasiliaDateTime(value) : formatBrasiliaDateTime(new Date());
 
 const formatPickup = (order: PrintableOrder) =>
   order.fulfillment_type === "scheduled" && order.scheduled_for

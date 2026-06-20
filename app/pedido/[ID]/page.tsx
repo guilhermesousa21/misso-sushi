@@ -7,6 +7,7 @@ import { use, useEffect, useState } from "react";
 import { formatAddonSummary, getOrderPickupLabel } from "../../../lib/orderFeatures";
 import { formatOrderItemLabel } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
+import { formatBrasiliaDateTimeShort } from "../../../lib/brasiliaTime";
 import { useCart } from "../../context/CartContext";
 
 type Order = {
@@ -152,7 +153,7 @@ export default function PedidoPage({
         <p style={styles.eyebrow}>Acompanhe em tempo real</p>
         <h1 style={styles.title}>Pedido #{order.id}</h1>
         <p style={styles.muted}>
-          Atualizado em {new Date(order.created_at).toLocaleString("pt-BR")}
+          Atualizado em {formatBrasiliaDateTimeShort(order.created_at)}
         </p>
 
         <div style={styles.statusCard}>

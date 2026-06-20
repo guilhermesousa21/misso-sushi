@@ -1,4 +1,11 @@
 import { getBusinessHours, isWithinBusinessHours, type BusinessHours } from "./storeHours";
+import {
+  addDaysInBrasilia,
+  endOfBrasiliaDay,
+  formatBrasiliaDateTimeShort,
+  roundUpToBrasiliaSlot,
+  toBrasiliaInputValue,
+} from "./brasiliaTime";
 
 export type OrderAddon = {
   id: string;
@@ -94,33 +101,15 @@ export const getOrderSlotLimit = (settings?: OperationalSettings | null) => {
 export const addMinutes = (date: Date, minutes: number) =>
   new Date(date.getTime() + minutes * 60 * 1000);
 
-export const roundUpToSlot = (date: Date, slotMinutes: number) => {
-  const next = new Date(date);
-  next.setSeconds(0, 0);
-  const minutes = next.getMinutes();
-  const roundedMinutes = Math.ceil(minutes / slotMinutes) * slotMinutes;
-  next.setMinutes(roundedMinutes);
-  return next;
-};
+export const roundUpToSlot = roundUpToBrasiliaSlot;
 
-export const toLocalInputValue = (date: Date) => {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours()
-  )}:${pad(date.getMinutes())}`;
-};
+export const toLocalInputValue = toBrasiliaInputValue;
 
 export const formatPickupTime = (value?: string | null) => {
   if (!value) return "O quanto antes";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "O quanto antes";
-  return date.toLocaleString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatBrasiliaDateTimeShort(date);
 };
 
 export const formatAddonSummary = (
@@ -157,10 +146,8 @@ export const buildPickupSlots = (
   const slotMinutes = getPickupSlotMinutes(settings);
   const minPickupMinutes = getMinPickupMinutes(settings);
   const maxAdvanceDays = getMaxAdvanceDays(settings);
-  const firstSlot = roundUpToSlot(addMinutes(now, minPickupMinutes), slotMinutes);
-  const end = new Date(now);
-  end.setDate(end.getDate() + maxAdvanceDays);
-  end.setHours(23, 59, 59, 999);
+  const firstSlot = roundUpToBrasiliaSlot(addMinutes(now, minPickupMinutes), slotMinutes);
+  const end = endOfBrasiliaDay(addDaysInBrasilia(now, maxAdvanceDays));
 
   const slots: Date[] = [];
   for (
