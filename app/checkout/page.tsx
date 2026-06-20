@@ -797,7 +797,7 @@ export default function CheckoutPage() {
               ) : loyaltyStatus ? (
                 <>
                   <p style={styles.mutedSmall}>
-                    A cada {LOYALTY_ORDER_INTERVAL} pedidos pagos, você ganha R${" "}
+                    A cada {LOYALTY_ORDER_INTERVAL} pedidos, você ganha R${" "}
                     {LOYALTY_DISCOUNT_VALUE.toFixed(0)} off.
                   </p>
                   <div style={styles.loyaltyProgressTrack}>
