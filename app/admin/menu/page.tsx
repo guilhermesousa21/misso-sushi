@@ -498,31 +498,6 @@ export default function AdminMenuPage() {
           </div>
         </section>
 
-        <div style={{ ...styles.categoryListToolbar, ...(isMobile ? styles.categoryListToolbarMobile : {}) }}>
-          <div>
-            <p style={styles.cardEyebrow}>Lista do cardápio</p>
-            <strong style={styles.categoryListToolbarTitle}>
-              {orderedCategories.length} categorias
-            </strong>
-          </div>
-          <div style={styles.categoryListToolbarActions}>
-            <button
-              type="button"
-              onClick={() => setExpandedCategories(new Set(orderedCategories))}
-              style={styles.secondaryButton}
-            >
-              Abrir todas
-            </button>
-            <button
-              type="button"
-              onClick={() => setExpandedCategories(new Set())}
-              style={styles.secondaryButton}
-            >
-              Fechar todas
-            </button>
-          </div>
-        </div>
-
         <section style={{ ...styles.categoryList, ...(isMobile ? styles.categoryListMobile : {}) }}>
           {orderedCategories.map((category) => {
             const itemsInCategory = sortItems(groupedItems[category] || []);
@@ -1734,30 +1709,6 @@ const styles: Record<string, CSSProperties> = {
     gap: 5,
     boxShadow: "0 10px 24px rgba(28, 26, 23, 0.04)",
     minHeight: 78,
-  },
-  categoryListToolbar: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
-    background: "#fffdf8",
-    padding: 12,
-    marginBottom: 12,
-  },
-  categoryListToolbarMobile: {
-    display: "grid",
-  },
-  categoryListToolbarTitle: {
-    display: "block",
-    marginTop: 3,
-    fontSize: 18,
-  },
-  categoryListToolbarActions: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
   },
   categoryList: {
     display: "grid",
