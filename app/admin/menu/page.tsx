@@ -1550,7 +1550,7 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 12,
   },
   eyebrow: {
-    color: "#f6b9c2",
+    color: "#ff304f",
     fontSize: 12,
     fontWeight: 850,
     textTransform: "uppercase",
