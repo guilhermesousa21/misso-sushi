@@ -795,17 +795,6 @@ const styles: Record<string, CSSProperties> = {
   actionPickedUp: {
     background: "#3730a3",
   },
-  actionPrimary: {
-    border: "none",
-    borderRadius: 999,
-    background: "#9f1d2f",
-    color: "#fff",
-    padding: 12,
-    cursor: "pointer",
-    fontWeight: 850,
-    minHeight: 52,
-    whiteSpace: "nowrap",
-  },
   modalOverlay: {
     position: "fixed",
     inset: 0,
