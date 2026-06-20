@@ -370,7 +370,7 @@ export default function CheckoutPage() {
       : checkoutStep === 2
         ? !selectedSlotIsAvailable
           ? "Escolha um horário de retirada disponível."
-          : "Retirada configurada. Avance para pagamento."
+          : ""
         : !storeOpen
           ? !manualOpen
             ? "A loja está fechada manualmente."
@@ -837,26 +837,38 @@ export default function CheckoutPage() {
           {checkoutStep === 2 && (
             <>
               <div style={styles.card}>
-                <div style={styles.inlineHeader}>
-                  <h2 style={styles.sectionTitle}>Retirada</h2>
-                  <span style={styles.inlineMeta}>Tempo médio: {averageTime}</span>
-                </div>
+                <h2 style={styles.sectionTitle}>Retirada</h2>
                 <p style={styles.mutedSmall}>
                   Por padrão, seu pedido entra na fila de preparo assim que o pagamento for confirmado.
                 </p>
-                <div style={styles.defaultPickupBox}>
-                  <strong>Retirada o quanto antes</strong>
-                  <span>Previsão: {averageTime} após confirmação do pagamento</span>
-                </div>
-                <label style={styles.scheduleCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={wantsScheduledPickup}
-                    onChange={(event) => setWantsScheduledPickup(event.target.checked)}
-                    style={styles.checkboxInput}
-                  />
-                  <span>Quero agendar horário</span>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setWantsScheduledPickup(false)}
+                  style={{
+                    ...styles.pickupOption,
+                    ...(!wantsScheduledPickup ? styles.pickupOptionActive : {}),
+                  }}
+                >
+                  <div style={styles.pickupOptionText}>
+                    <strong>Retirada o quanto antes</strong>
+                    <span>Previsão: {averageTime} após confirmação do pagamento</span>
+                  </div>
+                  {!wantsScheduledPickup && <span style={styles.pickupOptionMark}>✓</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWantsScheduledPickup(true)}
+                  style={{
+                    ...styles.pickupOption,
+                    ...(wantsScheduledPickup ? styles.pickupOptionActive : {}),
+                  }}
+                >
+                  <div style={styles.pickupOptionText}>
+                    <strong>Quero agendar horário</strong>
+                    <span>Escolha um horário específico para retirar</span>
+                  </div>
+                  {wantsScheduledPickup && <span style={styles.pickupOptionMark}>✓</span>}
+                </button>
                 {wantsScheduledPickup && (
                   <label style={{ ...styles.field, marginTop: 14 }}>
                     <span style={styles.label}>Horário de retirada</span>
@@ -884,9 +896,9 @@ export default function CheckoutPage() {
                     </p>
                   </label>
                 )}
-                <p style={{ ...styles.formHelp, ...(stepHelpOk ? styles.formHelpOk : {}) }}>
-                  {stepHelp}
-                </p>
+                {checkoutStep === 2 && !selectedSlotIsAvailable && (
+                  <p style={styles.formHelp}>{stepHelp}</p>
+                )}
               </div>
 
               <details open style={styles.compactDetails}>
@@ -1161,32 +1173,44 @@ const styles: Record<string, CSSProperties> = {
   formHelp: { marginTop: 10, color: "#991b1b", fontSize: 13, fontWeight: 850, lineHeight: 1.4 },
   formHelpOk: { color: "#0f7a4a" },
   operationalInfoGrid: { marginTop: 12, display: "flex", justifyContent: "space-between", gap: 12, borderRadius: 8, background: "#f0ebe2", color: "#514a43", padding: "12px 14px", fontWeight: 850 },
-  scheduleChoice: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 },
-  defaultPickupBox: {
-    marginTop: 14,
-    display: "grid",
-    gap: 4,
-    borderRadius: 8,
-    background: "#f0ebe2",
-    color: "#1c1a17",
-    padding: "12px 14px",
-    fontSize: 14,
-    lineHeight: 1.4,
-  },
-  scheduleCheckbox: {
-    marginTop: 14,
+  pickupOption: {
+    marginTop: 10,
+    width: "100%",
     display: "flex",
     alignItems: "center",
-    gap: 10,
-    cursor: "pointer",
-    fontWeight: 850,
+    justifyContent: "space-between",
+    gap: 12,
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 10,
+    background: "#fff",
     color: "#1c1a17",
-  },
-  checkboxInput: {
-    width: 18,
-    height: 18,
-    accentColor: "#9f1d2f",
+    padding: "14px 16px",
     cursor: "pointer",
+    textAlign: "left",
+    font: "inherit",
+  },
+  pickupOptionActive: {
+    background: "#f0ebe2",
+    borderColor: "#1c1a17",
+    boxShadow: "0 8px 20px rgba(28, 26, 23, 0.08)",
+  },
+  pickupOptionText: {
+    display: "grid",
+    gap: 4,
+    flex: 1,
+    minWidth: 0,
+  },
+  pickupOptionMark: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    display: "grid",
+    placeItems: "center",
+    fontSize: 13,
+    fontWeight: 900,
+    flexShrink: 0,
   },
   fulfillmentButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 12, color: "#1c1a17", cursor: "pointer", fontWeight: 850 },
   fulfillmentButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
