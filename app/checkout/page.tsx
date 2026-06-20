@@ -685,15 +685,6 @@ export default function CheckoutPage() {
             <strong>{money(item.price * item.quantity)}</strong>
           </div>
         ))}
-        {selectedAddonList.map((addon) => (
-          <div key={addon.id} style={styles.summaryOrderRow}>
-            <div>
-              <strong style={styles.itemName}>{addon.quantity}x {addon.name}</strong>
-              <p style={styles.summaryMuted}>{money(Number(addon.unit_price || 0))} cada</p>
-            </div>
-            <strong>{money(Number(addon.unit_price || 0) * addon.quantity)}</strong>
-          </div>
-        ))}
       </div>
       <div style={styles.summaryTotalBox}>
         {(discountAmount > 0 || serviceFee > 0 || addonTotal > 0) && (
