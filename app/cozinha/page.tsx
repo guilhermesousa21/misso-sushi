@@ -431,8 +431,8 @@ export default function AdminPanel() {
                 <button
                   type="button"
                   style={{
-                    ...styles.actionPrimary,
-                    ...(kitchenStatus === "pronto" ? styles.actionReady : {}),
+                    ...styles.actionStatusButton,
+                    ...(kitchenStatus === "pronto" ? styles.actionPickedUp : styles.actionMarkReady),
                   }}
                   onClick={() =>
                     setConfirmation({
@@ -779,6 +779,22 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "center",
     boxShadow: "inset 0 0 0 1px rgba(28, 26, 23, 0.12)",
   },
+  actionStatusButton: {
+    border: "none",
+    borderRadius: 999,
+    color: "#fff",
+    padding: 12,
+    cursor: "pointer",
+    fontWeight: 850,
+    minHeight: 52,
+    whiteSpace: "nowrap",
+  },
+  actionMarkReady: {
+    background: "#15803d",
+  },
+  actionPickedUp: {
+    background: "#3730a3",
+  },
   actionPrimary: {
     border: "none",
     borderRadius: 999,
@@ -789,11 +805,6 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     minHeight: 52,
     whiteSpace: "nowrap",
-  },
-  actionReady: {
-    background: "#15803d",
-    color: "#fff",
-    cursor: "not-allowed",
   },
   modalOverlay: {
     position: "fixed",
