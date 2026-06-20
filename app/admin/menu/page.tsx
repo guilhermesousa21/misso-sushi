@@ -34,6 +34,21 @@ const money = (value: number) =>
     currency: "BRL",
   });
 
+const formatBrDecimal = (value: number) =>
+  Number(value || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const parseBrDecimal = (value: string) => {
+  const normalized = value.trim().replace(/\./g, "").replace(",", ".");
+  if (!normalized) return 0;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+};
+
+const sanitizePriceDraft = (value: string) => value.replace(/[^\d,]/g, "");
+
 const normalize = (str: string) =>
   str
     .toLowerCase()
@@ -97,6 +112,7 @@ export default function AdminMenuPage() {
   const [checkoutAddons, setCheckoutAddons] = useState<CheckoutAddonConfig[]>(defaultCheckoutAddons);
   const [storeSettingsId, setStoreSettingsId] = useState<number | undefined>();
   const [savingAddons, setSavingAddons] = useState(false);
+  const [addonPriceDrafts, setAddonPriceDrafts] = useState<Record<string, string>>({});
   const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(null);
   const [creatingCategoryModalOpen, setCreatingCategoryModalOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -854,6 +870,11 @@ export default function AdminMenuPage() {
               <div style={styles.addonList}>
                 {checkoutAddons.map((addon, index) => {
                   const addonActive = addon.active !== false;
+                  const priceKey = addon.id || String(index);
+                  const priceValue =
+                    priceKey in addonPriceDrafts
+                      ? addonPriceDrafts[priceKey]
+                      : formatBrDecimal(Number(addon.unit_price || 0));
 
                   return (
                     <div key={addon.id || index} style={{ ...styles.addonRow, ...(isMobile ? styles.addonRowMobile : {}) }}>
@@ -875,14 +896,31 @@ export default function AdminMenuPage() {
                         <div style={styles.addonPriceWrap}>
                           <span style={styles.addonPricePrefix}>R$</span>
                           <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={addon.unit_price}
+                            type="text"
+                            inputMode="decimal"
+                            value={priceValue}
+                            onFocus={() => {
+                              if (priceKey in addonPriceDrafts) return;
+                              setAddonPriceDrafts((prev) => ({
+                                ...prev,
+                                [priceKey]: formatBrDecimal(Number(addon.unit_price || 0)),
+                              }));
+                            }}
                             onChange={(event) => {
+                              const draft = sanitizePriceDraft(event.target.value);
+                              setAddonPriceDrafts((prev) => ({ ...prev, [priceKey]: draft }));
+                            }}
+                            onBlur={() => {
+                              const draft = addonPriceDrafts[priceKey];
+                              if (draft === undefined) return;
                               const next = [...checkoutAddons];
-                              next[index] = { ...addon, unit_price: Number(event.target.value) };
+                              next[index] = { ...addon, unit_price: parseBrDecimal(draft) };
                               setCheckoutAddons(next);
+                              setAddonPriceDrafts((prev) => {
+                                const next = { ...prev };
+                                delete next[priceKey];
+                                return next;
+                              });
                             }}
                             style={styles.addonPriceInput}
                             aria-label={`Preço de ${addon.name || "complemento"}`}
@@ -2374,8 +2412,11 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.5,
     cursor: "not-allowed",
   },
+  addonsCard: {
+    marginTop: 32,
+  },
   addonsCardMobile: {
-    marginTop: 16,
+    marginTop: 24,
   },
   addonsHeader: {
     marginBottom: 16,
