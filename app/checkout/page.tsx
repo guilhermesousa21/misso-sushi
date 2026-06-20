@@ -24,7 +24,6 @@ import {
   getServiceFeeLabel,
   toLocalInputValue,
   type OperationalSettings,
-  type OrderFulfillmentType,
 } from "../../lib/orderFeatures";
 import {
   LOYALTY_DISCOUNT_VALUE,
@@ -125,7 +124,6 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("pix");
   const [note, setNote] = useState("");
-  const [fulfillmentType, setFulfillmentType] = useState<OrderFulfillmentType>("asap");
   const [scheduledFor, setScheduledFor] = useState("");
   const [selectedAddons, setSelectedAddons] = useState<Record<string, number>>({});
   const [couponCode, setCouponCode] = useState("");
@@ -339,10 +337,9 @@ export default function CheckoutPage() {
   }, [checkoutState, pendingOrderId]);
 
   const selectedSlotIsAvailable =
-    fulfillmentType !== "scheduled" ||
-    (Boolean(scheduledFor) &&
-      pickupSlots.some((slot) => toLocalInputValue(slot) === scheduledFor) &&
-      (slotLimit <= 0 || (scheduledOrderCounts[scheduledFor] || 0) < slotLimit));
+    Boolean(scheduledFor) &&
+    pickupSlots.some((slot) => toLocalInputValue(slot) === scheduledFor) &&
+    (slotLimit <= 0 || (scheduledOrderCounts[scheduledFor] || 0) < slotLimit);
   const isFormValid =
     cart.length > 0 &&
     hasFirstAndLastName(name) &&
@@ -383,11 +380,8 @@ export default function CheckoutPage() {
       coupon_code: appliedCoupon?.code || null,
       promotion_id: appliedCoupon?.id || null,
       fulfillment: "retirada",
-      fulfillment_type: fulfillmentType,
-      scheduled_for:
-        fulfillmentType === "scheduled" && scheduledFor
-          ? new Date(scheduledFor).toISOString()
-          : null,
+      fulfillment_type: "scheduled",
+      scheduled_for: scheduledFor ? new Date(scheduledFor).toISOString() : null,
       addons: selectedAddonList,
       service_fee: serviceFee,
       service_fee_label: serviceFeeLabel,
@@ -683,50 +677,34 @@ export default function CheckoutPage() {
           {/* Retirada */}
           <div style={styles.card}>
             <div style={styles.inlineHeader}>
-              <h2 style={styles.sectionTitle}>Retirada</h2>
+              <h2 style={styles.sectionTitle}>Agendar retirada</h2>
               <span style={styles.inlineMeta}>Tempo médio: {averageTime}</span>
             </div>
-            <div style={styles.scheduleChoice}>
-              {(["asap", "scheduled"] as OrderFulfillmentType[]).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setFulfillmentType(option)}
-                  style={{
-                    ...styles.fulfillmentButton,
-                    ...(fulfillmentType === option ? styles.fulfillmentButtonActive : {}),
-                  }}
-                >
-                  {option === "asap" ? "Retirar o quanto antes" : "Agendar retirada"}
-                </button>
-              ))}
-            </div>
-            {fulfillmentType === "scheduled" && (
-              <label style={styles.field}>
-                <span style={styles.label}>Horário de retirada</span>
-                <select
-                  value={scheduledFor}
-                  onChange={(event) => setScheduledFor(event.target.value)}
-                  style={styles.select}
-                >
-                  {pickupSlots.map((slot) => {
-                    const value = toLocalInputValue(slot);
-                    const count = scheduledOrderCounts[value] || 0;
-                    const full = slotLimit > 0 && count >= slotLimit;
-                    return (
-                      <option key={value} value={value} disabled={full}>
-                        {formatPickupTime(slot.toISOString())}
-                        {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
-                        {full ? " - lotado" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-                <p style={styles.mutedSmall}>
-                  Grade de {getPickupSlotMinutes(operationalSettings)} em {getPickupSlotMinutes(operationalSettings)} minutos.
-                </p>
-              </label>
-            )}
+            <label style={styles.field}>
+              <span style={styles.label}>Horário de retirada</span>
+              <select
+                value={scheduledFor}
+                onChange={(event) => setScheduledFor(event.target.value)}
+                style={styles.select}
+              >
+                {pickupSlots.map((slot) => {
+                  const value = toLocalInputValue(slot);
+                  const count = scheduledOrderCounts[value] || 0;
+                  const full = slotLimit > 0 && count >= slotLimit;
+                  return (
+                    <option key={value} value={value} disabled={full}>
+                      {formatPickupTime(slot.toISOString())}
+                      {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
+                      {full ? " - lotado" : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              <p style={styles.mutedSmall}>
+                Grade de {getPickupSlotMinutes(operationalSettings)} em{" "}
+                {getPickupSlotMinutes(operationalSettings)} minutos.
+              </p>
+            </label>
             {!storeOpen && (
               <p style={styles.error}>
                 {manualOpen
@@ -815,7 +793,7 @@ export default function CheckoutPage() {
                   <p style={styles.loyaltyText}>
                     {loyaltyStatus.eligibleNow
                       ? `Parabéns! Este é seu ${loyaltyStatus.nextOrderNumber}º pedido — desconto de fidelidade aplicado.`
-                      : `Você já fez ${loyaltyStatus.paidOrderCount} pedidos pagos. Faltam ${loyaltyStatus.ordersUntilReward} para o próximo desconto.`}
+                      : `Você já fez ${loyaltyStatus.paidOrderCount} pedidos. Faltam ${loyaltyStatus.ordersUntilReward} para o próximo desconto.`}
                   </p>
                 </>
               ) : (
@@ -959,7 +937,10 @@ export default function CheckoutPage() {
                 </div>
               )}
               <div style={styles.addonSummary}>
-                Retirada: {fulfillmentType === "scheduled" && scheduledFor ? formatPickupTime(new Date(scheduledFor).toISOString()) : "O quanto antes"}
+                Retirada:{" "}
+                {scheduledFor
+                  ? formatPickupTime(new Date(scheduledFor).toISOString())
+                  : "Escolha um horário"}
               </div>
               <div style={styles.summaryGrandTotalLine}>
                 <span>Total</span>
