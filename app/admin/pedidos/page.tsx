@@ -308,7 +308,7 @@ export default function AdminOrdersPage() {
                     {isMobile && (
                       <strong style={localStyles.rowTotalMobile}>{money(calcTotal(order))}</strong>
                     )}
-                    <span style={localStyles.expandIcon}>{expanded ? "−" : "+"}</span>
+                    <span style={localStyles.expandIcon}>{expanded ? "▼" : "▶"}</span>
                   </button>
                   <button
                     type="button"
@@ -581,7 +581,7 @@ const localStyles: Record<string, CSSProperties> = {
     color: "#514a43",
     display: "grid",
     placeItems: "center",
-    fontSize: 18,
+    fontSize: 11,
     fontWeight: 900,
     lineHeight: 1,
     flexShrink: 0,
