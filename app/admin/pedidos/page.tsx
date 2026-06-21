@@ -338,6 +338,11 @@ function AdminOrdersPageContent() {
           {filteredOrders.map((order) => {
             const expanded = expandedOrderId === order.id;
             const hasNote = Boolean(order.note?.trim());
+            const hasCoupon =
+              Boolean(order.coupon_code?.trim()) || Number(order.discount_amount || 0) > 0;
+            const couponTitle = order.coupon_code?.trim()
+              ? `Cupom ${order.coupon_code.trim()}`
+              : "Cupom aplicado";
             const paymentLabel = paymentLabels[order.payment_method || ""] || order.payment_method || "—";
             const totals = getOrderTotals(order);
             const activeAddons = getActiveAddons(order);
@@ -362,7 +367,31 @@ function AdminOrdersPageContent() {
                     }}
                   >
                     <div style={localStyles.rowIdentity}>
-                      <strong style={localStyles.rowTitle}>#{order.id}</strong>
+                      <div style={localStyles.rowTitleRow}>
+                        <strong style={localStyles.rowTitle}>#{order.id}</strong>
+                        {(hasNote || hasCoupon) && (
+                          <span style={localStyles.rowIndicators}>
+                            {hasNote && (
+                              <span
+                                style={localStyles.indicatorNote}
+                                title="Tem observação do cliente"
+                                aria-label="Tem observação do cliente"
+                              >
+                                Obs
+                              </span>
+                            )}
+                            {hasCoupon && (
+                              <span
+                                style={localStyles.indicatorCoupon}
+                                title={couponTitle}
+                                aria-label={couponTitle}
+                              >
+                                Cupom
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
                       <span style={localStyles.rowCustomer}>
                         {order.name || "Cliente"} · {order.phone || "Sem telefone"}
                       </span>
@@ -433,6 +462,7 @@ function AdminOrdersPageContent() {
                         quantity: item.quantity ?? 1,
                         name: item.name,
                         unitPrice: Number(item.price || 0),
+                        modifiers: item.modifiers,
                       }))}
                       addons={activeAddons.map((addon) => ({
                         key: `${order.id}-${addon.id}`,
@@ -674,6 +704,39 @@ const localStyles: Record<string, CSSProperties> = {
     minWidth: 0,
     display: "grid",
     gap: 3,
+  },
+  rowTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  rowIndicators: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+  },
+  indicatorNote: {
+    borderRadius: 999,
+    background: "#fff1f1",
+    color: "#9f1d2f",
+    padding: "2px 7px",
+    fontSize: 10,
+    fontWeight: 900,
+    letterSpacing: "0.02em",
+    textTransform: "uppercase",
+    lineHeight: 1.4,
+  },
+  indicatorCoupon: {
+    borderRadius: 999,
+    background: "#ecfdf5",
+    color: "#0f7a4a",
+    padding: "2px 7px",
+    fontSize: 10,
+    fontWeight: 900,
+    letterSpacing: "0.02em",
+    textTransform: "uppercase",
+    lineHeight: 1.4,
   },
   rowTitle: {
     fontSize: 16,

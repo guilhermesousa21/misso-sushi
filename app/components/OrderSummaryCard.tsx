@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { formatItemModifiers } from "../../lib/itemModifiers";
 import { money } from "../../lib/orderUtils";
 
 export type OrderSummaryCardItem = {
@@ -6,6 +7,7 @@ export type OrderSummaryCardItem = {
   quantity: number;
   name: string;
   unitPrice: number;
+  modifiers?: string[] | null;
 };
 
 export type OrderSummaryCardAddon = {
@@ -67,17 +69,24 @@ export function OrderSummaryCard({
 
       <div style={sharedStyles.orderList}>
         {items.length > 0 ? (
-          items.map((item) => (
-            <div key={item.key} style={palette.summaryOrderRow}>
-              <div>
-                <strong style={sharedStyles.itemName}>
-                  {item.quantity}x {item.name}
-                </strong>
-                <p style={palette.summaryMuted}>{money(item.unitPrice)} cada</p>
+          items.map((item) => {
+            const modifierText = formatItemModifiers(item.modifiers);
+
+            return (
+              <div key={item.key} style={palette.summaryOrderRow}>
+                <div>
+                  <strong style={sharedStyles.itemName}>
+                    {item.quantity}x {item.name}
+                  </strong>
+                  {modifierText ? (
+                    <p style={palette.itemModifiers}>{modifierText}</p>
+                  ) : null}
+                  <p style={palette.summaryMuted}>{money(item.unitPrice)} cada</p>
+                </div>
+                <strong>{money(item.unitPrice * item.quantity)}</strong>
               </div>
-              <strong>{money(item.unitPrice * item.quantity)}</strong>
-            </div>
-          ))
+            );
+          })
         ) : (
           <p style={palette.summaryMuted}>{emptyItemsText}</p>
         )}
@@ -221,6 +230,14 @@ const darkStyles: Record<string, CSSProperties> = {
     fontSize: 13,
     lineHeight: 1.4,
   },
+  itemModifiers: {
+    marginTop: 3,
+    marginBottom: 0,
+    color: "rgba(255, 253, 248, 0.58)",
+    fontSize: 12,
+    lineHeight: 1.35,
+    fontWeight: 700,
+  },
   summaryTotalLine: {
     display: "flex",
     justifyContent: "space-between",
@@ -279,6 +296,14 @@ const lightStyles: Record<string, CSSProperties> = {
     color: "#766e64",
     fontSize: 13,
     lineHeight: 1.4,
+  },
+  itemModifiers: {
+    marginTop: 3,
+    marginBottom: 0,
+    color: "#766e64",
+    fontSize: 12,
+    lineHeight: 1.35,
+    fontWeight: 700,
   },
   summaryTotalLine: {
     display: "flex",
