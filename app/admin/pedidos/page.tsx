@@ -3,10 +3,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Toaster, toast } from "react-hot-toast";
 import {
-  buildAdminOrderSummaryText,
-  copyTextToClipboard,
   getActiveAddons,
   getCustomerWhatsAppUrl,
   getOrderTotals,
@@ -172,24 +169,6 @@ export default function AdminOrdersPage() {
     return { average, total };
   }, [filteredOrders]);
 
-  const handleCopyPhone = async (phone?: string | null) => {
-    const value = phone?.trim();
-    if (!value) {
-      toast.error("Este pedido não tem telefone.");
-      return;
-    }
-
-    const copied = await copyTextToClipboard(value);
-    if (copied) toast.success("Telefone copiado.");
-    else toast.error("Não foi possível copiar o telefone.");
-  };
-
-  const handleCopySummary = async (order: AdminOrder) => {
-    const copied = await copyTextToClipboard(buildAdminOrderSummaryText(order));
-    if (copied) toast.success("Resumo do pedido copiado.");
-    else toast.error("Não foi possível copiar o resumo.");
-  };
-
   return (
     <AdminShell
       eyebrow="Atendimento"
@@ -200,7 +179,6 @@ export default function AdminOrdersPage() {
         </span>
       }
     >
-      <Toaster position="top-right" />
       <section style={{ ...localStyles.summaryStrip, ...(isMobile ? localStyles.summaryStripMobile : {}) }}>
         <div style={localStyles.summaryItem}>
           <span>Total no filtro</span>
@@ -376,20 +354,6 @@ export default function AdminOrdersPage() {
                           WhatsApp
                         </a>
                       ) : null}
-                      <button
-                        type="button"
-                        onClick={() => handleCopyPhone(order.phone)}
-                        style={localStyles.actionButton}
-                      >
-                        Copiar telefone
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCopySummary(order)}
-                        style={localStyles.actionButton}
-                      >
-                        Copiar resumo
-                      </button>
                       {customerOrdersHref ? (
                         <Link href={customerOrdersHref} style={localStyles.actionLink}>
                           Ver pedidos do cliente
@@ -789,17 +753,6 @@ const localStyles: Record<string, CSSProperties> = {
     display: "flex",
     flexWrap: "wrap",
     gap: 8,
-  },
-  actionButton: {
-    border: "1px solid rgba(28, 26, 23, 0.12)",
-    borderRadius: 999,
-    background: "#fff",
-    color: "#1c1a17",
-    padding: "8px 12px",
-    cursor: "pointer",
-    fontWeight: 800,
-    fontSize: 12,
-    textDecoration: "none",
   },
   actionLink: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
