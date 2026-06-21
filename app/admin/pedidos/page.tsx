@@ -1,8 +1,8 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   getActiveAddons,
   getCustomerWhatsAppUrl,
@@ -63,20 +63,77 @@ const desktopOrderGrid = "minmax(0, 1.4fr) 140px 90px 138px 96px";
 
 const isPaidOrder = (order: AdminOrder) => order.payment_status === "pago";
 
+const normalizePhoneDigits = (value: string) => value.replace(/\D/g, "");
+
+const matchesOrderSearch = (order: AdminOrder, search: string) => {
+  const trimmed = search.trim();
+  if (!trimmed) return true;
+
+  const query = normalize(trimmed);
+  const queryDigits = normalizePhoneDigits(trimmed);
+  const orderPhoneDigits = normalizePhoneDigits(order.phone || "");
+
+  return (
+    normalize(String(order.id)).includes(query) ||
+    normalize(order.name || "").includes(query) ||
+    normalize(order.phone || "").includes(query) ||
+    (queryDigits.length >= 8 && orderPhoneDigits.includes(queryDigits))
+  );
+};
+
 export default function AdminOrdersPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminShell eyebrow="Atendimento" title="Pedidos">
+          <p style={localStyles.muted}>Carregando pedidos...</p>
+        </AdminShell>
+      }
+    >
+      <AdminOrdersPageContent />
+    </Suspense>
+  );
+}
+
+function AdminOrdersPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState<string | number | null>(null);
-  const [search, setSearch] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : new URLSearchParams(window.location.search).get("cliente") || ""
-  );
+  const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
+  const activeCustomerFilter = searchParams.get("cliente")?.trim() || "";
+
+  useEffect(() => {
+    const cliente = searchParams.get("cliente");
+    if (cliente === null) return;
+
+    setSearch(cliente);
+    if (cliente.trim()) {
+      setDateRange("all");
+      setExpandedOrderId(null);
+    }
+  }, [searchParams]);
+
+  const applyCustomerFilter = (phone: string) => {
+    const value = phone.trim();
+    if (!value) return;
+
+    setSearch(value);
+    setDateRange("all");
+    setExpandedOrderId(null);
+    router.push(`/admin/pedidos?cliente=${encodeURIComponent(value)}`);
+  };
+
+  const clearCustomerFilter = () => {
+    setSearch("");
+    router.push("/admin/pedidos");
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -142,7 +199,6 @@ export default function AdminOrdersPage() {
   }, []);
 
   const filteredOrders = useMemo(() => {
-    const query = normalize(search.trim());
     const rangeStart = dateRange === "custom" ? dateFrom : getDateRangeStart(dateRange);
     const rangeEnd = dateRange === "custom" ? dateTo : "";
 
@@ -152,13 +208,8 @@ export default function AdminOrdersPage() {
       const orderDate = toBrasiliaDateKey(order.created_at);
       const byDateStart = !rangeStart || orderDate >= rangeStart;
       const byDateEnd = !rangeEnd || orderDate <= rangeEnd;
-      const bySearch =
-        !query ||
-        normalize(String(order.id)).includes(query) ||
-        normalize(order.name || "").includes(query) ||
-        normalize(order.phone || "").includes(query);
 
-      return byDateStart && byDateEnd && bySearch;
+      return byDateStart && byDateEnd && matchesOrderSearch(order, search);
     });
   }, [dateFrom, dateRange, dateTo, orders, search]);
 
@@ -262,6 +313,17 @@ export default function AdminOrdersPage() {
           </label>
         </div>
 
+        {activeCustomerFilter && (
+          <div style={localStyles.customerFilterBar}>
+            <span style={localStyles.customerFilterText}>
+              Filtrando cliente: <strong>{activeCustomerFilter}</strong>
+            </span>
+            <button type="button" onClick={clearCustomerFilter} style={localStyles.customerFilterClear}>
+              Limpar
+            </button>
+          </div>
+        )}
+
         {!isMobile && filteredOrders.length > 0 && (
           <div style={localStyles.tableHead}>
             <span>Pedido</span>
@@ -280,9 +342,7 @@ export default function AdminOrdersPage() {
             const totals = getOrderTotals(order);
             const activeAddons = getActiveAddons(order);
             const whatsappUrl = getCustomerWhatsAppUrl(order.phone);
-            const customerOrdersHref = order.phone?.trim()
-              ? `/admin/pedidos?cliente=${encodeURIComponent(order.phone.trim())}`
-              : "";
+            const customerPhone = order.phone?.trim() || "";
 
             return (
               <article key={order.id} style={localStyles.orderBlock}>
@@ -354,10 +414,14 @@ export default function AdminOrdersPage() {
                           WhatsApp
                         </a>
                       ) : null}
-                      {customerOrdersHref ? (
-                        <Link href={customerOrdersHref} style={localStyles.actionLink}>
+                      {customerPhone ? (
+                        <button
+                          type="button"
+                          onClick={() => applyCustomerFilter(customerPhone)}
+                          style={localStyles.actionLink}
+                        >
                           Ver pedidos do cliente
-                        </Link>
+                        </button>
                       ) : null}
                     </div>
 
@@ -511,6 +575,37 @@ const localStyles: Record<string, CSSProperties> = {
     color: "#1c1a17",
     outlineColor: "#9f1d2f",
     minHeight: 46,
+  },
+  customerFilterBar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+    padding: "10px 12px",
+    borderRadius: 8,
+    background: "#f0ebe2",
+    color: "#514a43",
+    fontSize: 13,
+    fontWeight: 750,
+  },
+  customerFilterText: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  customerFilterClear: {
+    border: "none",
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "7px 12px",
+    cursor: "pointer",
+    fontWeight: 850,
+    fontSize: 12,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   tableHead: {
     display: "grid",
@@ -697,6 +792,7 @@ const localStyles: Record<string, CSSProperties> = {
     textDecoration: "none",
     display: "inline-flex",
     alignItems: "center",
+    font: "inherit",
   },
   detailNote: {
     margin: 0,
