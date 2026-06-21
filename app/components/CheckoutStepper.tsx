@@ -1,13 +1,18 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { Check, CreditCard, MapPin, UserRound } from "lucide-react";
 
 export type CheckoutStep = 1 | 2 | 3;
 
-const steps: { id: CheckoutStep; label: string }[] = [
-  { id: 1, label: "Dados" },
-  { id: 2, label: "Retirada" },
-  { id: 3, label: "Pagamento" },
+const steps: {
+  id: CheckoutStep;
+  label: string;
+  Icon: typeof UserRound;
+}[] = [
+  { id: 1, label: "Dados", Icon: UserRound },
+  { id: 2, label: "Retirada", Icon: MapPin },
+  { id: 3, label: "Pagamento", Icon: CreditCard },
 ];
 
 type CheckoutStepperProps = {
@@ -28,39 +33,41 @@ export function CheckoutStepper({
       aria-label="Etapas do checkout"
       style={{ ...styles.stepper, ...(isMobile ? styles.stepperMobile : {}) }}
     >
-      {steps.map((step, index) => {
+      {steps.map((step) => {
+        const { Icon } = step;
         const isActive = currentStep === step.id;
         const isComplete = step.id < currentStep;
         const isReachable = step.id <= maxReachableStep;
-        const connectorActive = step.id < currentStep;
 
         return (
-          <div key={step.id} style={styles.stepItem}>
-            {index > 0 && (
-              <span
-                style={{
-                  ...styles.connector,
-                  ...(connectorActive ? styles.connectorActive : {}),
-                }}
-                aria-hidden
-              />
-            )}
-            <button
-              type="button"
-              disabled={!isReachable}
-              onClick={() => isReachable && onStepChange(step.id)}
+          <button
+            key={step.id}
+            type="button"
+            disabled={!isReachable}
+            onClick={() => isReachable && onStepChange(step.id)}
+            style={{
+              ...styles.stepButton,
+              ...(isActive ? styles.stepButtonActive : {}),
+              ...(isComplete ? styles.stepButtonComplete : {}),
+              ...(!isReachable ? styles.stepButtonDisabled : {}),
+            }}
+            aria-current={isActive ? "step" : undefined}
+          >
+            <span
               style={{
-                ...styles.stepButton,
-                ...(isActive ? styles.stepButtonActive : {}),
-                ...(isComplete ? styles.stepButtonComplete : {}),
-                ...(!isReachable ? styles.stepButtonDisabled : {}),
+                ...styles.stepIconWrap,
+                ...(isActive ? styles.stepIconWrapActive : {}),
+                ...(isComplete ? styles.stepIconWrapComplete : {}),
               }}
-              aria-current={isActive ? "step" : undefined}
             >
-              <span style={styles.stepIndex}>{step.id}</span>
-              <span style={styles.stepLabel}>{step.label}</span>
-            </button>
-          </div>
+              {isComplete ? (
+                <Check size={14} strokeWidth={2.5} />
+              ) : (
+                <Icon size={15} strokeWidth={2.2} />
+              )}
+            </span>
+            <span style={styles.stepLabel}>{step.label}</span>
+          </button>
         );
       })}
     </nav>
@@ -75,7 +82,7 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 14,
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 10,
     boxShadow: "0 8px 18px rgba(28, 26, 23, 0.035)",
   },
@@ -83,17 +90,9 @@ const styles: Record<string, CSSProperties> = {
     padding: 8,
     gap: 6,
   },
-  stepItem: {
-    position: "relative",
-    display: "grid",
-  },
-  connector: {
-    display: "none",
-  },
-  connectorActive: {},
   stepButton: {
     border: "1px solid rgba(28, 26, 23, 0.1)",
-    borderRadius: 8,
+    borderRadius: 10,
     background: "#fff",
     color: "#625b53",
     padding: "10px 8px",
@@ -101,8 +100,8 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     display: "grid",
     justifyItems: "center",
-    gap: 4,
-    minHeight: 58,
+    gap: 6,
+    minHeight: 62,
   },
   stepButtonActive: {
     background: "#1c1a17",
@@ -119,14 +118,21 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.45,
     cursor: "not-allowed",
   },
-  stepIndex: {
-    width: 22,
-    height: 22,
+  stepIconWrap: {
+    width: 28,
+    height: 28,
     borderRadius: 999,
     background: "rgba(28, 26, 23, 0.08)",
     display: "grid",
     placeItems: "center",
-    fontSize: 12,
+  },
+  stepIconWrapActive: {
+    background: "rgba(255, 253, 248, 0.14)",
+    color: "#fffdf8",
+  },
+  stepIconWrapComplete: {
+    background: "rgba(15, 122, 74, 0.12)",
+    color: "#0f7a4a",
   },
   stepLabel: {
     fontSize: 13,

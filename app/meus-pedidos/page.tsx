@@ -2,7 +2,14 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowRight } from "lucide-react";
 import { BackToMenuLink } from "../components/BackToMenuLink";
+import { BrandLogo } from "../components/BrandLogo";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Input } from "../components/ui/Input";
 import { useCallback, useEffect, useState } from "react";
 import { formatCustomerPhone, isValidCustomerPhone, onlyDigits } from "../../lib/customerPhone";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
@@ -41,6 +48,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function MeusPedidosPage() {
+  const router = useRouter();
   const isMobile = useIsMobile();
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
@@ -156,7 +164,9 @@ export default function MeusPedidosPage() {
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <BackToMenuLink variant="header" />
         <div style={styles.headerTitle}>
-          <p style={styles.eyebrow}>Missô Sushi</p>
+          <div style={styles.headerLogo}>
+            <BrandLogo size="sm" />
+          </div>
           <h1 style={styles.title}>Meus pedidos</h1>
           <p style={styles.muted}>
             Consulte seus últimos pedidos pelo celular, sem precisar do link do pedido.
@@ -165,33 +175,25 @@ export default function MeusPedidosPage() {
       </header>
 
       {step !== "orders" && (
-        <section style={styles.authCard}>
+        <Card style={styles.authCard}>
           {step === "phone" ? (
             <>
               <h2 style={styles.sectionTitle}>Confirme seu telefone</h2>
               <p style={styles.mutedSmall}>
                 Enviaremos um código por WhatsApp para liberar o histórico.
               </p>
-              <label style={styles.field}>
-                <span style={styles.label}>Celular</span>
-                <input
-                  value={phone}
-                  onChange={(event) => handlePhoneChange(event.target.value)}
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="(00) 00000-0000"
-                  maxLength={15}
-                  style={styles.input}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void handleSendCode()}
-                disabled={loading}
-                style={styles.primaryButton}
-              >
+              <Input
+                label="Celular"
+                value={phone}
+                onChange={(event) => handlePhoneChange(event.target.value)}
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="(00) 00000-0000"
+                maxLength={15}
+              />
+              <Button type="button" onClick={() => void handleSendCode()} disabled={loading} fullWidth>
                 {loading ? "Enviando..." : "Enviar código"}
-              </button>
+              </Button>
             </>
           ) : (
             <>
@@ -199,53 +201,50 @@ export default function MeusPedidosPage() {
               <p style={styles.mutedSmall}>
                 Enviamos um código de 6 dígitos para {phone}.
               </p>
-              {devCode && (
-                <p style={styles.devHint}>Dev: código {devCode}</p>
-              )}
-              <label style={styles.field}>
-                <span style={styles.label}>Código</span>
-                <input
-                  value={code}
-                  onChange={(event) => setCode(onlyDigits(event.target.value).slice(0, 6))}
-                  inputMode="numeric"
-                  placeholder="000000"
-                  maxLength={6}
-                  style={styles.input}
-                />
-              </label>
+              {devCode && <p style={styles.devHint}>Dev: código {devCode}</p>}
+              <Input
+                label="Código"
+                value={code}
+                onChange={(event) => setCode(onlyDigits(event.target.value).slice(0, 6))}
+                inputMode="numeric"
+                placeholder="000000"
+                maxLength={6}
+              />
               <div style={styles.actionRow}>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => {
                     setStep("phone");
                     setCode("");
                     setMessage("");
                   }}
-                  style={styles.secondaryButton}
                 >
                   Voltar
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => void handleVerifyCode()}
                   disabled={loading}
-                  style={styles.primaryButton}
+                  style={{ flex: 1 }}
                 >
                   {loading ? "Validando..." : "Ver pedidos"}
-                </button>
+                </Button>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => void handleSendCode()}
                 disabled={loading}
+                fullWidth
                 style={styles.linkButton}
               >
                 Reenviar código
-              </button>
+              </Button>
             </>
           )}
           {message && <p style={styles.message}>{message}</p>}
-        </section>
+        </Card>
       )}
 
       {step === "orders" && (
@@ -255,9 +254,9 @@ export default function MeusPedidosPage() {
               <h2 style={styles.sectionTitle}>Últimos pedidos</h2>
               <p style={styles.mutedSmall}>Telefone {phone || "confirmado"}</p>
             </div>
-            <button type="button" onClick={() => void handleLogout()} style={styles.secondaryButton}>
+            <Button type="button" variant="ghost" onClick={() => void handleLogout()}>
               Sair
-            </button>
+            </Button>
           </div>
 
           {loading ? (
@@ -265,9 +264,9 @@ export default function MeusPedidosPage() {
           ) : orders.length === 0 ? (
             <div style={styles.emptyBox}>
               <p style={styles.muted}>Nenhum pedido pago encontrado para este telefone.</p>
-              <Link href="/" style={styles.primaryLink}>
+              <Button fullWidth onClick={() => router.push("/")}>
                 Fazer um pedido
-              </Link>
+              </Button>
             </div>
           ) : (
             <div style={styles.orderList}>
@@ -282,9 +281,9 @@ export default function MeusPedidosPage() {
                           : "Data não informada"}
                       </p>
                     </div>
-                    <span style={styles.statusBadge}>
+                    <Badge variant="brand">
                       {statusLabels[order.status || ""] || order.status || "Recebido"}
-                    </span>
+                    </Badge>
                   </div>
                   <p style={styles.pickupLine}>{getOrderPickupLabel(order)}</p>
                   <div style={styles.itemList}>
@@ -300,7 +299,7 @@ export default function MeusPedidosPage() {
                   <div style={styles.orderFooter}>
                     <strong>{money(Number(order.total || 0))}</strong>
                     <Link href={`/pedido/${order.id}`} style={styles.detailLink}>
-                      Acompanhar →
+                      Acompanhar <ArrowRight size={14} strokeWidth={2.5} />
                     </Link>
                   </div>
                 </article>
@@ -314,23 +313,18 @@ export default function MeusPedidosPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { minHeight: "100vh", background: "#f5f1ea", color: "#171512", padding: "20px 20px 48px" },
+  page: { minHeight: "100vh", background: "var(--color-bg)", color: "var(--color-text)", padding: "20px 20px 48px" },
   pageMobile: { padding: "18px 14px calc(96px + env(safe-area-inset-bottom, 0px))" },
   header: { maxWidth: 760, margin: "0 auto 20px", position: "relative", textAlign: "center", paddingTop: 18 },
   headerMobile: { paddingTop: 52, marginBottom: 8 },
   headerTitle: { textAlign: "center" },
-  eyebrow: { color: "#9f1d2f", fontSize: 12, fontWeight: 850, textTransform: "uppercase" },
-  title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },
+  headerLogo: { display: "flex", justifyContent: "center", marginBottom: 10 },
+  title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850, fontFamily: "var(--font-dm-serif), Georgia, serif" },
   muted: { marginTop: 10, color: "#625b53", lineHeight: 1.55 },
   mutedSmall: { color: "#766e64", fontSize: 13, lineHeight: 1.45 },
   authCard: {
     maxWidth: 460,
     margin: "0 auto",
-    background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.07)",
-    borderRadius: 10,
-    padding: 22,
-    boxShadow: "0 8px 18px rgba(28, 26, 23, 0.035)",
     display: "grid",
     gap: 14,
   },

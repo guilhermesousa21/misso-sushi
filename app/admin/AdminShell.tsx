@@ -3,17 +3,36 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  BarChart3,
+  ChefHat,
+  LogOut,
+  Settings,
+  Tag,
+  UtensilsCrossed,
+  type LucideIcon,
+} from "lucide-react";
 import { formatBrasiliaDateTimeShort } from "../../lib/brasiliaTime";
 import { useIsMobile, useIsTablet } from "../../lib/useMediaQuery";
+import {
+  getCardStyle,
+  getInputStyle,
+  getSelectStyle,
+  eyebrowStyle,
+} from "../../lib/uiStyles";
+import { BrandLogo } from "../components/BrandLogo";
+import { Button } from "../components/ui/Button";
 
-const navItems = [
-  { href: "/admin/menu", label: "Cardápio" },
-  { href: "/admin/faturamento", label: "Faturamento" },
-  { href: "/admin/promocoes", label: "Promoções" },
-  { href: "/admin/configuracoes", label: "Configurações" },
+const navItems: { href: string; label: string; shortLabel: string; Icon: LucideIcon }[] = [
+  { href: "/admin/menu", label: "Cardápio", shortLabel: "Menu", Icon: UtensilsCrossed },
+  { href: "/admin/faturamento", label: "Faturamento", shortLabel: "Fat.", Icon: BarChart3 },
+  { href: "/admin/promocoes", label: "Promoções", shortLabel: "Promo", Icon: Tag },
+  { href: "/admin/configuracoes", label: "Configurações", shortLabel: "Config", Icon: Settings },
 ];
 
-const extraNavItems = [{ href: "/cozinha", label: "Cozinha" }];
+const extraNavItems = [
+  { href: "/cozinha", label: "Cozinha", shortLabel: "Coz.", Icon: ChefHat },
+];
 
 export const money = (value: number) =>
   value.toLocaleString("pt-BR", {
@@ -108,11 +127,13 @@ export function AdminShell({
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
       <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}), ...(isMobile ? styles.sidebarMobile : {}) }}>
         <div>
-          <h2 style={{ ...styles.sidebarTitle, ...(isMobile ? styles.sidebarTitleMobile : {}) }}>Missô Admin</h2>
+          <BrandLogo size="sm" />
           <p style={{ ...styles.sidebarMuted, ...(isMobile ? styles.sidebarMutedMobile : {}) }}>Gestão operacional</p>
         </div>
         <nav style={{ ...styles.nav, ...(isTablet ? styles.navInline : {}), ...(isMobile ? styles.navMobileHidden : {}) }}>
-          {navItems.map((item) => (
+          {navItems.map((item) => {
+            const { Icon } = item;
+            return (
             <Link
               key={item.href}
               href={item.href}
@@ -122,11 +143,15 @@ export function AdminShell({
                 ...(isNavActive(item.href) ? styles.navLinkActive : {}),
               }}
             >
+              <Icon size={16} strokeWidth={2.2} />
               {item.label}
             </Link>
-          ))}
+            );
+          })}
           <div style={styles.navDivider} />
-          {extraNavItems.map((item) => (
+          {extraNavItems.map((item) => {
+            const { Icon } = item;
+            return (
             <Link
               key={item.href}
               href={item.href}
@@ -136,24 +161,28 @@ export function AdminShell({
                 ...(isNavActive(item.href) ? styles.navLinkActive : {}),
               }}
             >
+              <Icon size={16} strokeWidth={2.2} />
               {item.label}
             </Link>
-          ))}
-          <button type="button" onClick={handleLogout} style={{ ...styles.logoutButton, ...(isMobile ? styles.logoutButtonMobile : {}) }}>
+            );
+          })}
+          <Button type="button" variant="ghost" size="sm" onClick={handleLogout} style={styles.logoutButton}>
+            <LogOut size={15} strokeWidth={2.2} />
             Sair
-          </button>
+          </Button>
         </nav>
         {isMobile && (
-          <button type="button" onClick={handleLogout} style={styles.mobileLogoutButton}>
+          <Button type="button" variant="ghost" size="sm" onClick={handleLogout} style={styles.mobileLogoutButton}>
+            <LogOut size={14} strokeWidth={2.2} />
             Sair
-          </button>
+          </Button>
         )}
       </aside>
 
       <section style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
         <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
           <div>
-            <p style={styles.eyebrow}>{eyebrow}</p>
+            <p style={eyebrowStyle}>{eyebrow}</p>
             <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>{title}</h1>
           </div>
           {action && <div style={{ ...(isMobile ? styles.headerActionMobile : {}) }}>{action}</div>}
@@ -162,7 +191,9 @@ export function AdminShell({
       </section>
       {isMobile && (
         <nav style={styles.mobileTabBar} aria-label="Navegação principal">
-          {[...navItems, ...extraNavItems].map((item) => (
+          {[...navItems, ...extraNavItems].map((item) => {
+            const { Icon } = item;
+            return (
             <Link
               key={item.href}
               href={item.href}
@@ -171,9 +202,11 @@ export function AdminShell({
                 ...(isNavActive(item.href) ? styles.mobileTabActive : {}),
               }}
             >
-              {item.label}
+              <Icon size={15} strokeWidth={2.2} />
+              <span>{item.shortLabel}</span>
             </Link>
-          ))}
+            );
+          })}
         </nav>
       )}
     </main>
@@ -195,25 +228,16 @@ export const adminStyles: Record<string, CSSProperties> = {
     gridTemplateColumns: "1fr",
   },
   input: {
+    ...getInputStyle(),
     boxSizing: "border-box",
-    width: "100%",
     minWidth: 0,
-    border: "1px solid rgba(28, 26, 23, 0.14)",
-    borderRadius: 8,
-    padding: 12,
-    background: "#fffdf8",
-    color: "#1c1a17",
-    outlineColor: "#9f1d2f",
+    background: "var(--color-surface)",
   },
   select: {
+    ...getSelectStyle(),
     boxSizing: "border-box",
-    width: "100%",
     minWidth: 0,
-    border: "1px solid rgba(28, 26, 23, 0.14)",
-    borderRadius: 8,
-    padding: 12,
-    background: "#fffdf8",
-    color: "#1c1a17",
+    background: "var(--color-surface)",
   },
   metrics: {
     display: "grid",
@@ -222,11 +246,7 @@ export const adminStyles: Record<string, CSSProperties> = {
     marginBottom: 16,
   },
   metricCard: {
-    background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
-    padding: 18,
-    boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
+    ...getCardStyle(),
     minHeight: 126,
     display: "grid",
     alignContent: "space-between",
@@ -257,11 +277,7 @@ export const adminStyles: Record<string, CSSProperties> = {
     gridTemplateColumns: "1fr",
   },
   card: {
-    background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
-    padding: 18,
-    boxShadow: "0 14px 35px rgba(28, 26, 23, 0.05)",
+    ...getCardStyle(),
     minWidth: 0,
   },
   cardHeader: {
@@ -271,12 +287,7 @@ export const adminStyles: Record<string, CSSProperties> = {
     gap: 16,
     marginBottom: 16,
   },
-  cardEyebrow: {
-    color: "#9f1d2f",
-    fontSize: 12,
-    fontWeight: 850,
-    textTransform: "uppercase",
-  },
+  cardEyebrow: eyebrowStyle,
   cardTitle: {
     marginTop: 4,
     fontSize: 24,
@@ -339,8 +350,8 @@ function baseStyles(): Record<string, CSSProperties> {
   return {
     page: {
       minHeight: "100vh",
-      background: "#f7f4ef",
-      color: "#1c1a17",
+      background: "var(--color-bg)",
+      color: "var(--color-text)",
       display: "grid",
       gridTemplateColumns: "240px minmax(0, 1fr)",
     },
@@ -349,7 +360,7 @@ function baseStyles(): Record<string, CSSProperties> {
     },
     sidebar: {
       borderRight: "1px solid rgba(28, 26, 23, 0.08)",
-      background: "#fffdf8",
+      background: "var(--color-surface)",
       padding: 22,
       display: "flex",
       flexDirection: "column",
@@ -401,9 +412,12 @@ function baseStyles(): Record<string, CSSProperties> {
     navLink: {
       color: "#514a43",
       textDecoration: "none",
-      borderRadius: 8,
+      borderRadius: 10,
       padding: "12px 14px",
       fontWeight: 850,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 10,
     },
     navLinkMobile: {
       flex: "0 0 auto",
@@ -412,8 +426,8 @@ function baseStyles(): Record<string, CSSProperties> {
       whiteSpace: "nowrap",
     },
     navLinkActive: {
-      background: "#1c1a17",
-      color: "#fffdf8",
+      background: "var(--color-dark)",
+      color: "var(--color-surface)",
     },
     navDivider: {
       height: 1,
@@ -421,30 +435,14 @@ function baseStyles(): Record<string, CSSProperties> {
       margin: "4px 0",
     },
     logoutButton: {
-      border: "1px solid rgba(28, 26, 23, 0.12)",
-      borderRadius: 8,
-      background: "#fffdf8",
-      color: "#514a43",
-      padding: "12px 14px",
-      cursor: "pointer",
-      fontWeight: 850,
-      textAlign: "left",
+      justifyContent: "flex-start",
+      width: "100%",
+      marginTop: 4,
     },
     logoutButtonMobile: {
       flex: "0 0 auto",
-      padding: "9px 11px",
-      fontSize: 13,
-      whiteSpace: "nowrap",
     },
     mobileLogoutButton: {
-      border: "1px solid rgba(28, 26, 23, 0.12)",
-      borderRadius: 999,
-      background: "#fffdf8",
-      color: "#514a43",
-      padding: "8px 12px",
-      cursor: "pointer",
-      fontSize: 13,
-      fontWeight: 850,
       whiteSpace: "nowrap",
     },
     content: {
@@ -484,6 +482,7 @@ function baseStyles(): Record<string, CSSProperties> {
       marginTop: 4,
       fontSize: "clamp(36px, 5vw, 58px)",
       lineHeight: 1,
+      fontFamily: "var(--font-dm-serif), Georgia, serif",
     },
     titleMobile: {
       fontSize: 30,
@@ -511,21 +510,22 @@ function baseStyles(): Record<string, CSSProperties> {
     },
     mobileTab: {
       flex: "0 0 auto",
-      minWidth: 78,
+      minWidth: 68,
       borderRadius: 13,
       color: "#625b53",
-      padding: "9px 5px",
+      padding: "8px 5px",
       textAlign: "center",
       textDecoration: "none",
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: 850,
       whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
+      display: "grid",
+      justifyItems: "center",
+      gap: 3,
     },
     mobileTabActive: {
-      background: "#1c1a17",
-      color: "#fffdf8",
+      background: "var(--color-dark)",
+      color: "var(--color-surface)",
     },
   };
 }

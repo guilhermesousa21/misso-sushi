@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
+import { getInputStyle } from "../../../lib/uiStyles";
 
-const cardShadow = "0 12px 28px rgba(28, 26, 23, 0.05)";
+const cardShadow = "var(--shadow-card)";
 const border = "1px solid rgba(28, 26, 23, 0.08)";
 
 export const fat = {
@@ -15,9 +16,9 @@ export const fat = {
     alignItems: "center",
     gap: 12,
     padding: 12,
-    background: "#fffdf8",
+    background: "var(--color-surface)",
     border,
-    borderRadius: 8,
+    borderRadius: 12,
     boxShadow: cardShadow,
     position: "sticky",
     top: 8,
@@ -33,8 +34,8 @@ export const fat = {
     display: "inline-flex",
     padding: 3,
     gap: 3,
-    background: "#f0ebe2",
-    borderRadius: 8,
+    background: "var(--color-warm)",
+    borderRadius: 10,
     width: "fit-content",
   } satisfies CSSProperties,
 
@@ -51,8 +52,8 @@ export const fat = {
   } satisfies CSSProperties,
 
   viewBtnActive: {
-    background: "#1c1a17",
-    color: "#fffdf8",
+    background: "var(--color-dark)",
+    color: "var(--color-surface)",
     boxShadow: "0 4px 12px rgba(28, 26, 23, 0.16)",
   } satisfies CSSProperties,
 
@@ -75,8 +76,8 @@ export const fat = {
 
   periodBtn: {
     border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
-    background: "#fffdf8",
+    borderRadius: 10,
+    background: "var(--color-surface)",
     color: "#625b53",
     padding: "8px 11px",
     cursor: "pointer",
@@ -86,9 +87,9 @@ export const fat = {
   } satisfies CSSProperties,
 
   periodBtnActive: {
-    background: "#9f1d2f",
-    color: "#fffdf8",
-    borderColor: "#9f1d2f",
+    background: "var(--color-brand)",
+    color: "var(--color-surface)",
+    borderColor: "var(--color-brand)",
   } satisfies CSSProperties,
 
   searchWrap: {
@@ -98,15 +99,11 @@ export const fat = {
   } satisfies CSSProperties,
 
   searchInput: {
-    width: "100%",
+    ...getInputStyle(),
     boxSizing: "border-box",
-    border: "1px solid rgba(28, 26, 23, 0.12)",
-    borderRadius: 8,
     padding: "11px 13px 11px 36px",
-    background: "#fff",
-    color: "#1c1a17",
     fontSize: 13,
-    outlineColor: "#9f1d2f",
+    background: "#fff",
   } satisfies CSSProperties,
 
   searchIcon: {
@@ -115,7 +112,6 @@ export const fat = {
     top: "50%",
     transform: "translateY(-50%)",
     color: "#9a9288",
-    fontSize: 14,
     pointerEvents: "none",
   } satisfies CSSProperties,
 

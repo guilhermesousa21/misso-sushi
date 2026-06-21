@@ -2,6 +2,7 @@
 
 import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { Clock3, Save } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import {
   getBusinessHours,
@@ -12,6 +13,9 @@ import {
 } from "../../../lib/storeHours";
 import { useIsMobile } from "../../../lib/useMediaQuery";
 import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
+import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 
 type StoreSettings = {
   id?: number;
@@ -291,30 +295,36 @@ export default function AdminSettingsPage() {
               role="group"
               aria-label="Status da loja"
             >
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant="ghost"
                 onClick={() => updateStoreStatus(true)}
                 disabled={savingStatus}
                 style={{
-                  ...styles.statusOption,
-                  ...(settings.is_open ? styles.statusOptionOpenActive : {}),
-                  ...(savingStatus ? styles.statusOptionDisabled : {}),
+                  ...styles.statusOptionButton,
+                  ...(settings.is_open
+                    ? styles.statusOptionOpenActive
+                    : styles.statusOptionInactive),
                 }}
               >
                 Aberta
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                size="sm"
+                variant="ghost"
                 onClick={() => updateStoreStatus(false)}
                 disabled={savingStatus}
                 style={{
-                  ...styles.statusOption,
-                  ...(!settings.is_open ? styles.statusOptionClosedActive : {}),
-                  ...(savingStatus ? styles.statusOptionDisabled : {}),
+                  ...styles.statusOptionButton,
+                  ...(!settings.is_open
+                    ? styles.statusOptionClosedActive
+                    : styles.statusOptionInactive),
                 }}
               >
                 Fechada
-              </button>
+              </Button>
             </div>
           </div>
         </section>
@@ -328,16 +338,14 @@ export default function AdminSettingsPage() {
           </div>
 
           <div style={styles.formGrid}>
-            <label style={styles.field}>
-              <input
-                value={settings.average_time}
-                onChange={(event) =>
-                  setSettings({ ...settings, average_time: event.target.value })
-                }
-                style={baseStyles.input}
-                placeholder="Ex: 35 a 50 min"
-              />
-            </label>
+            <Input
+              label="Tempo médio de preparo"
+              value={settings.average_time}
+              onChange={(event) =>
+                setSettings({ ...settings, average_time: event.target.value })
+              }
+              placeholder="Ex: 35 a 50 min"
+            />
           </div>
 
           <div style={styles.scheduleHeader}>
@@ -347,9 +355,10 @@ export default function AdminSettingsPage() {
                 Defina quando o cardápio aceita novos pedidos.
               </p>
             </div>
-            <span style={styles.todayPill}>
+            <Badge variant="neutral">
+              <Clock3 size={12} strokeWidth={2.2} />
               {getTodayBusinessHoursLabel(now, settings.business_hours)}
-            </span>
+            </Badge>
           </div>
 
           <div style={styles.scheduleGrid}>
@@ -421,13 +430,10 @@ export default function AdminSettingsPage() {
           ) : (
             <span style={styles.saveHint}>Revise os horários antes de salvar.</span>
           )}
-          <button
-            type="submit"
-            disabled={saving}
-            style={{ ...baseStyles.primaryLink, ...(isMobile ? styles.fullWidthButton : {}) }}
-          >
+          <Button type="submit" disabled={saving} fullWidth={isMobile} size="lg">
+            <Save size={16} strokeWidth={2.2} />
             {saving ? "Salvando..." : "Salvar configurações"}
-          </button>
+          </Button>
         </div>
       </form>
     </AdminShell>
@@ -464,7 +470,7 @@ const styles: Record<string, CSSProperties> = {
   statusPanel: {
     borderWidth: 1,
     borderStyle: "solid",
-    borderRadius: 8,
+    borderRadius: 14,
     padding: 22,
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) minmax(220px, 300px)",
@@ -559,14 +565,15 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     width: "100%",
   },
-  statusOption: {
-    border: "none",
+  statusOptionButton: {
     borderRadius: 999,
+    boxShadow: "none",
+    padding: "11px 16px",
+  },
+  statusOptionInactive: {
     background: "transparent",
     color: "#514a43",
-    padding: "11px 16px",
-    cursor: "pointer",
-    fontWeight: 850,
+    boxShadow: "none",
   },
   statusOptionOpenActive: {
     background: "#0f7a4a",
@@ -577,10 +584,6 @@ const styles: Record<string, CSSProperties> = {
     background: "#991b1b",
     color: "#fff",
     boxShadow: "0 8px 18px rgba(153, 27, 27, 0.16)",
-  },
-  statusOptionDisabled: {
-    opacity: 0.62,
-    cursor: "not-allowed",
   },
   scheduleHeader: {
     display: "flex",

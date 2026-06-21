@@ -3,13 +3,17 @@
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import { formatAddonSummary, getOrderPickupLabel, money } from "../../../lib/orderFeatures";
 import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import { formatBrasiliaDateTimeShort } from "../../../lib/brasiliaTime";
 import { useCart } from "../../context/CartContext";
 import { BackToMenuLink } from "../../components/BackToMenuLink";
+import { BrandLogo } from "../../components/BrandLogo";
+import { OrderTimeline } from "../../components/OrderTimeline";
+import { PixPaymentPanel } from "../../components/PixPaymentPanel";
+import { Button } from "../../components/ui/Button";
+import { Badge } from "../../components/ui/Badge";
 import { useIsMobile } from "../../../lib/useMediaQuery";
 
 type Order = {
@@ -123,7 +127,8 @@ export default function PedidoPage({
     return (
       <main style={styles.page}>
         <section style={styles.panel}>
-          <p style={styles.eyebrow}>Missô Sushi</p>
+          <BrandLogo size="sm" />
+          <p style={{ ...styles.eyebrow, marginTop: 16 }}>Acompanhe em tempo real</p>
           <h1 style={styles.title}>Abrindo seu pedido...</h1>
           <p style={styles.muted}>Estamos conferindo o pagamento e o status da retirada.</p>
         </section>
@@ -260,9 +265,9 @@ export default function PedidoPage({
                 <p style={styles.cardEyebrow}>Resumo</p>
                 <h2 style={styles.cardTitle}>Seu pedido</h2>
               </div>
-              <span style={styles.summaryPill}>
+              <Badge variant="dark">
                 {itemCount} {itemCount === 1 ? "item" : "itens"}
-              </span>
+              </Badge>
             </div>
 
             <div style={styles.orderList}>
@@ -331,68 +336,37 @@ export default function PedidoPage({
           </div>
         )}
 
-        <div style={styles.timeline}>
-          {steps.map((step, index) => {
-            const isPaymentStep = step.key === "aguardando_pagamento";
-            const active = isPaymentStep ? isPaid : index <= current;
-
-            return (
-              <StatusStep
-                key={step.key}
-                active={active}
-                current={isPaymentStep ? !isPaid : index === current}
-                text={isPaymentStep && isPaid ? "Pagamento confirmado" : step.label}
-                statusText={active ? step.doneText : "Aguardando"}
-              />
-            );
-          })}
+        <div style={styles.timelineWrap}>
+          <OrderTimeline steps={steps} currentIndex={current} isPaid={isPaid} />
         </div>
 
         {isPaymentPending && showPix && (pixCode || pixQr) && (
-          <div style={styles.pixPanel}>
-            <p style={styles.pixPanelTitle}>Pagamento PIX</p>
-            <p style={styles.pixPanelHint}>
-              Escaneie o QR Code ou copie o código. Esta página atualiza sozinha quando o pagamento for confirmado.
-            </p>
-            <div style={styles.pixQrBox}>
-              {pixCode ? (
-                <QRCodeSVG value={pixCode} size={220} level="M" includeMargin />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`data:image/png;base64,${pixQr}`} alt="QR Code PIX" width={220} height={220} />
-              )}
-              <strong style={styles.pixAmount}>{money(orderTotal)}</strong>
-            </div>
-            {pixCode && (
-              <>
-                <label htmlFor="pixCode" style={styles.pixLabel}>
-                  Código copia e cola
-                </label>
-                <textarea id="pixCode" value={pixCode} readOnly style={styles.pixCodeArea} />
-                <button type="button" onClick={handleCopyPix} style={styles.copyPixButton}>
-                  {copyFeedback ? "Código PIX copiado" : "Copiar código PIX"}
-                </button>
-              </>
-            )}
-          </div>
+          <PixPaymentPanel
+            amountLabel={money(orderTotal)}
+            pixCode={pixCode}
+            pixQr={pixQr}
+            copyFeedback={copyFeedback}
+            onCopy={() => void handleCopyPix()}
+          />
         )}
 
         {isPaymentPending && !showPix && (
           <>
-            <button
+            <Button
               type="button"
               onClick={handleContinuePayment}
               disabled={paymentLoading}
+              fullWidth
+              size="lg"
               style={{
-                ...styles.payButton,
+                marginTop: 18,
                 ...(isMobile ? styles.payButtonMobileHidden : {}),
-                ...(paymentLoading ? styles.payButtonDisabled : {}),
               }}
             >
               {paymentLoading
                 ? "Preparando pagamento..."
                 : `Pagar pedido · ${money(orderTotal)}`}
-            </button>
+            </Button>
             {!isMobile && (
               <p style={styles.payHint}>
                 {paymentMethod === "card"
@@ -406,9 +380,9 @@ export default function PedidoPage({
         {paymentError && <p style={styles.paymentError}>{paymentError}</p>}
 
         {isPaid && (order.items || []).length > 0 && (
-          <button type="button" onClick={handleRepeatOrder} style={styles.repeatButton}>
+          <Button type="button" onClick={handleRepeatOrder} variant="secondary" fullWidth style={{ marginTop: 14 }}>
             Repetir este pedido
-          </button>
+          </Button>
         )}
       </section>
 
@@ -418,95 +392,17 @@ export default function PedidoPage({
             <span>Pedido #{order.id}</span>
             <strong>{money(orderTotal)}</strong>
           </div>
-          <button
+          <Button
             type="button"
             onClick={handleContinuePayment}
             disabled={paymentLoading}
-            style={{
-              ...styles.mobilePayBarButton,
-              ...(paymentLoading ? styles.payButtonDisabled : {}),
-            }}
+            size="md"
           >
             {paymentLoading ? "Preparando..." : "Pagar pedido"}
-          </button>
+          </Button>
         </div>
       )}
     </main>
-  );
-}
-
-function StatusStep({
-  active,
-  current,
-  statusText,
-  text,
-}: {
-  active: boolean;
-  current: boolean;
-  statusText: string;
-  text: string;
-}) {
-  return (
-    <div style={styles.step}>
-      <span
-        className={
-          current && active
-            ? "current-done-dot"
-            : current && !active
-              ? "pending-payment-dot"
-              : undefined
-        }
-        style={{
-          ...styles.stepDot,
-          ...(active ? styles.stepDotActive : {}),
-          ...(current && active ? styles.stepDotCurrentDone : {}),
-          ...(current && !active ? styles.stepDotCurrentPending : {}),
-        }}
-      />
-      <div>
-        <strong style={styles.stepTitle}>{text}</strong>
-        <p style={styles.stepText}>{statusText}</p>
-      </div>
-      <style jsx global>{`
-        @keyframes pendingPaymentPulse {
-          0% {
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(153, 27, 27, 0.2);
-          }
-          50% {
-            transform: scale(1.06);
-            box-shadow: 0 0 0 7px rgba(153, 27, 27, 0.1);
-          }
-          100% {
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(153, 27, 27, 0);
-          }
-        }
-
-        .pending-payment-dot {
-          animation: pendingPaymentPulse 2.2s ease-in-out infinite;
-        }
-
-        @keyframes currentDonePulse {
-          0% {
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.22);
-          }
-          50% {
-            transform: scale(1.06);
-            box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.12);
-          }
-          100% {
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
-          }
-        }
-
-        .current-done-dot {
-          animation: currentDonePulse 2.4s ease-in-out infinite;
-        }
-      `}</style>
-    </div>
   );
 }
 
@@ -638,66 +534,8 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 22,
     fontWeight: 850,
   },
-  timeline: {
-    marginTop: 24,
-    display: "grid",
-    gap: 14,
-  },
-  step: {
-    display: "grid",
-    gridTemplateColumns: "28px 1fr",
-    gap: 12,
-    alignItems: "start",
-    padding: "14px 0",
-    borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
-  },
-  stepDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    marginTop: 2,
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: "#d8d0c4",
-    background: "#fffdf8",
-  },
-  stepDotActive: {
-    background: "#16a34a",
-    borderColor: "#16a34a",
-  },
-  stepDotCurrentDone: {
-    boxShadow: "0 0 0 5px rgba(22, 163, 74, 0.16)",
-  },
-  stepDotCurrentPending: {
-    background: "#991b1b",
-    borderColor: "#991b1b",
-  },
-  stepTitle: {
-    display: "block",
-    lineHeight: 1.25,
-  },
-  stepText: {
+  timelineWrap: {
     marginTop: 4,
-    color: "#766e64",
-    fontSize: 13,
-  },
-  payButton: {
-    marginTop: 18,
-    width: "100%",
-    border: "none",
-    borderRadius: 999,
-    background: "#9f1d2f",
-    color: "#fffdf8",
-    padding: "15px 18px",
-    cursor: "pointer",
-    fontWeight: 850,
-    fontSize: 16,
-    boxShadow: "0 14px 28px rgba(159, 29, 47, 0.22)",
-  },
-  payButtonDisabled: {
-    opacity: 0.6,
-    cursor: "not-allowed",
-    boxShadow: "none",
   },
   payButtonMobileHidden: {
     display: "none",
@@ -749,70 +587,5 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     fontSize: 13,
     lineHeight: 1.4,
-  },
-  pixPanel: {
-    marginTop: 18,
-    borderRadius: 8,
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    background: "#fffaf2",
-    padding: 18,
-    display: "grid",
-    gap: 12,
-  },
-  pixPanelTitle: {
-    fontSize: 18,
-    fontWeight: 850,
-    lineHeight: 1.2,
-  },
-  pixPanelHint: {
-    color: "#625b53",
-    fontSize: 13,
-    lineHeight: 1.45,
-  },
-  pixQrBox: {
-    display: "grid",
-    justifyItems: "center",
-    gap: 10,
-    padding: "8px 0",
-  },
-  pixAmount: {
-    fontSize: 24,
-    color: "#1c1a17",
-  },
-  pixLabel: {
-    fontSize: 14,
-    fontWeight: 850,
-  },
-  pixCodeArea: {
-    width: "100%",
-    minHeight: 96,
-    resize: "none",
-    border: "1px solid rgba(28, 26, 23, 0.12)",
-    borderRadius: 8,
-    padding: 12,
-    color: "#514a43",
-    background: "#fff",
-    lineHeight: 1.45,
-  },
-  copyPixButton: {
-    width: "100%",
-    border: "none",
-    borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
-    padding: "14px 18px",
-    cursor: "pointer",
-    fontWeight: 850,
-  },
-  repeatButton: {
-    marginTop: 18,
-    width: "100%",
-    border: "none",
-    borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
-    padding: "14px 18px",
-    cursor: "pointer",
-    fontWeight: 850,
   },
 };

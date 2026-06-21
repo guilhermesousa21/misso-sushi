@@ -2,6 +2,11 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  PackageCheck,
+  Printer,
+} from "lucide-react";
 import { formatAddonSummary, getKitchenPickupBadge, getMinPickupMinutes, type OperationalSettings } from "../../lib/orderFeatures";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { printOrder } from "../../lib/printOrder";
@@ -12,6 +17,10 @@ import {
   toBrasiliaDateKey,
 } from "../../lib/brasiliaTime";
 import { useIsMobile, useIsTablet } from "../../lib/useMediaQuery";
+import { BrandLogo } from "../components/BrandLogo";
+import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { eyebrowStyle } from "../../lib/uiStyles";
 
 type OrderItem = {
   id: number;
@@ -58,10 +67,10 @@ const statusLabels: Record<string, string> = {
   retirado: "Retirado",
 };
 
-const statusStyle: Record<string, CSSProperties> = {
-  recebido: { background: "#fee2e2", color: "#991b1b" },
-  pronto: { background: "#dcfce7", color: "#166534" },
-  retirado: { background: "#e0e7ff", color: "#3730a3" },
+const statusBadgeVariant: Record<string, "error" | "success" | "neutral"> = {
+  recebido: "error",
+  pronto: "success",
+  retirado: "neutral",
 };
 
 const normalizeKitchenStatus = (status?: string) =>
@@ -335,7 +344,8 @@ export default function AdminPanel() {
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <div>
-          <p style={styles.eyebrow}>Painel em tempo real</p>
+          <BrandLogo size="sm" />
+          <p style={{ ...eyebrowStyle, marginTop: 10 }}>Painel em tempo real</p>
           <h1 style={styles.title}>Cozinha</h1>
         </div>
         <div style={{ ...styles.headerSide, ...(isMobile ? styles.headerSideMobile : {}) }}>
@@ -420,15 +430,10 @@ export default function AdminPanel() {
                   </p>
                 </div>
                 <div style={styles.badgeStack}>
-                  <span
-                    style={{
-                      ...styles.badge,
-                      ...(statusStyle[kitchenStatus] || {}),
-                    }}
-                  >
+                  <Badge variant={statusBadgeVariant[kitchenStatus] || "neutral"}>
                     {statusLabels[kitchenStatus] || kitchenStatus}
-                  </span>
-                  <span style={styles.paymentBadge}>Pago</span>
+                  </Badge>
+                  <Badge variant="success">Pago</Badge>
                 </div>
               </div>
 
@@ -469,43 +474,30 @@ export default function AdminPanel() {
                   ...(isMobile ? styles.actionsMobile : {}),
                 }}
               >
-                <button
-                  type="button"
-                  style={styles.actionSecondary}
-                  onClick={() => printOrder(order)}
-                >
+                <Button type="button" variant="ghost" size="sm" onClick={() => printOrder(order)}>
+                  <Printer size={15} strokeWidth={2.2} />
                   Imprimir
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  style={{
-                    ...styles.actionStatusButton,
-                    ...(kitchenStatus === "retirado"
-                      ? styles.actionMarkReadyDone
-                      : kitchenStatus === "pronto"
-                        ? styles.actionMarkReadyDone
-                        : styles.actionMarkReady),
-                  }}
+                  size="sm"
+                  variant={kitchenStatus === "pronto" || kitchenStatus === "retirado" ? "ghost" : "secondary"}
                   onClick={() => setConfirmation({ action: "ready", order })}
                   disabled={kitchenStatus === "pronto" || kitchenStatus === "retirado"}
                 >
+                  <CheckCircle2 size={15} strokeWidth={2.2} />
                   {kitchenStatus === "pronto" || kitchenStatus === "retirado" ? "Pronto" : "Marcar pronto"}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  style={{
-                    ...styles.actionStatusButton,
-                    ...(kitchenStatus === "retirado"
-                      ? styles.actionPickedUpDone
-                      : kitchenStatus === "pronto"
-                        ? styles.actionPickedUp
-                        : styles.actionPickedUpDisabled),
-                  }}
+                  size="sm"
+                  variant={kitchenStatus === "retirado" ? "ghost" : kitchenStatus === "pronto" ? "primary" : "ghost"}
                   onClick={() => setConfirmation({ action: "picked_up", order })}
                   disabled={kitchenStatus !== "pronto"}
                 >
+                  <PackageCheck size={15} strokeWidth={2.2} />
                   {kitchenStatus === "retirado" ? "Retirado" : "Marcar retirado"}
-                </button>
+                </Button>
               </div>
             </article>
               );
@@ -529,7 +521,11 @@ export default function AdminPanel() {
           >
             <div style={styles.confirmHeader}>
               <span style={styles.confirmIcon}>
-                {confirmation.action === "ready" ? "✓" : "↗"}
+                {confirmation.action === "ready" ? (
+                  <CheckCircle2 size={22} strokeWidth={2.2} />
+                ) : (
+                  <PackageCheck size={22} strokeWidth={2.2} />
+                )}
               </span>
               <div>
                 <p style={styles.confirmEyebrow}>
@@ -571,26 +567,21 @@ export default function AdminPanel() {
             )}
 
             <div style={styles.confirmActions}>
-              <button
+              <Button
                 type="button"
-                style={styles.confirmCancel}
+                variant="ghost"
                 onClick={() => setConfirmation(null)}
                 disabled={confirming}
               >
                 Cancelar
-              </button>
-              <button
-                type="button"
-                style={styles.confirmPrimary}
-                onClick={handleConfirmAction}
-                disabled={confirming}
-              >
+              </Button>
+              <Button type="button" onClick={handleConfirmAction} disabled={confirming} style={{ flex: 1 }}>
                 {confirming
                   ? "Processando..."
                   : confirmation.action === "ready"
                     ? "Confirmar pronto"
                     : "Confirmar retirado"}
-              </button>
+              </Button>
             </div>
           </section>
         </div>
@@ -602,8 +593,8 @@ export default function AdminPanel() {
 const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f7f4ef",
-    color: "#1c1a17",
+    background: "var(--color-bg)",
+    color: "var(--color-text)",
     padding: "28px 20px 56px",
   },
   pageMobile: {
@@ -631,16 +622,11 @@ const styles: Record<string, CSSProperties> = {
     width: "100%",
     justifyItems: "stretch",
   },
-  eyebrow: {
-    color: "#9f1d2f",
-    fontSize: 12,
-    fontWeight: 850,
-    textTransform: "uppercase",
-  },
   title: {
     marginTop: 4,
     fontSize: "clamp(36px, 5vw, 58px)",
     lineHeight: 1,
+    fontFamily: "var(--font-dm-serif), Georgia, serif",
   },
   headerStats: {
     display: "grid",
@@ -658,9 +644,9 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   },
   headerStatButton: {
-    background: "#1c1a17",
-    color: "#fffdf8",
-    borderRadius: 8,
+    background: "var(--color-dark)",
+    color: "var(--color-surface)",
+    borderRadius: 12,
     padding: "12px 14px",
     display: "grid",
     gap: 4,
@@ -698,13 +684,13 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: "1fr",
   },
   card: {
-    background: "#fffdf8",
+    background: "var(--color-surface)",
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: "rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
+    borderRadius: 14,
     padding: 20,
-    boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
+    boxShadow: "var(--shadow-card)",
   },
   cardDelayed: {
     borderColor: "rgba(153, 27, 27, 0.28)",

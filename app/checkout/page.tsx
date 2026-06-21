@@ -2,7 +2,12 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { CreditCard, QrCode } from "lucide-react";
 import { BackToMenuLink } from "../components/BackToMenuLink";
+import { BrandLogo } from "../components/BrandLogo";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -740,7 +745,9 @@ export default function CheckoutPage() {
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <BackToMenuLink variant="header" />
         <div style={styles.headerTitle}>
-          <p style={styles.eyebrow}>Missô Sushi</p>
+          <div style={styles.headerLogo}>
+            <BrandLogo size="sm" />
+          </div>
           <h1 style={styles.title}>Finalizar pedido</h1>
         </div>
       </header>
@@ -761,30 +768,24 @@ export default function CheckoutPage() {
               <div style={styles.card}>
                 <h2 style={styles.sectionTitle}>Dados para contato</h2>
                 <div style={{ ...styles.formGrid, ...(isMobile ? styles.formGridMobile : {}) }}>
-                  <label style={styles.field}>
-                    <span style={styles.label}>Nome e sobrenome</span>
-                    <input
-                      value={name}
-                      onChange={(e) => setName(sanitizeName(e.target.value))}
-                      onBlur={() => setName(normalizeName(name))}
-                      autoComplete="name"
-                      maxLength={30}
-                      placeholder="NOME SOBRENOME"
-                      style={styles.input}
-                    />
-                  </label>
-                  <label style={styles.field}>
-                    <span style={styles.label}>Telefone</span>
-                    <input
-                      value={phone}
-                      onChange={(e) => setPhone(formatPhone(e.target.value))}
-                      inputMode="tel"
-                      autoComplete="tel"
-                      placeholder="(00) 00000-0000"
-                      maxLength={15}
-                      style={styles.input}
-                    />
-                  </label>
+                  <Input
+                    label="Nome e sobrenome"
+                    value={name}
+                    onChange={(e) => setName(sanitizeName(e.target.value))}
+                    onBlur={() => setName(normalizeName(name))}
+                    autoComplete="name"
+                    maxLength={30}
+                    placeholder="NOME SOBRENOME"
+                  />
+                  <Input
+                    label="Telefone"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="(00) 00000-0000"
+                    maxLength={15}
+                  />
                 </div>
                 <p style={{ ...styles.formHelp, ...(stepHelpOk ? styles.formHelpOk : {}) }}>
                   {stepHelp}
@@ -869,31 +870,31 @@ export default function CheckoutPage() {
                   {wantsScheduledPickup && <span style={styles.pickupOptionMark}>✓</span>}
                 </button>
                 {wantsScheduledPickup && (
-                  <label style={{ ...styles.field, marginTop: 14 }}>
-                    <span style={styles.label}>Horário de retirada</span>
-                    <select
-                      value={scheduledFor}
-                      onChange={(event) => setScheduledFor(event.target.value)}
-                      style={styles.select}
-                    >
-                      {pickupSlots.map((slot) => {
-                        const value = toLocalInputValue(slot);
-                        const count = scheduledOrderCounts[value] || 0;
-                        const full = slotLimit > 0 && count >= slotLimit;
-                        return (
-                          <option key={value} value={value} disabled={full}>
-                            {formatPickupTime(slot.toISOString())}
-                            {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
-                            {full ? " - lotado" : ""}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <p style={styles.mutedSmall}>
-                      Grade de {getPickupSlotMinutes(operationalSettings)} em{" "}
-                      {getPickupSlotMinutes(operationalSettings)} minutos.
-                    </p>
-                  </label>
+                  <Select
+                    label="Horário de retirada"
+                    containerStyle={{ marginTop: 14 }}
+                    value={scheduledFor}
+                    onChange={(event) => setScheduledFor(event.target.value)}
+                    hint={
+                      <p style={styles.mutedSmall}>
+                        Grade de {getPickupSlotMinutes(operationalSettings)} em{" "}
+                        {getPickupSlotMinutes(operationalSettings)} minutos.
+                      </p>
+                    }
+                  >
+                    {pickupSlots.map((slot) => {
+                      const value = toLocalInputValue(slot);
+                      const count = scheduledOrderCounts[value] || 0;
+                      const full = slotLimit > 0 && count >= slotLimit;
+                      return (
+                        <option key={value} value={value} disabled={full}>
+                          {formatPickupTime(slot.toISOString())}
+                          {slotLimit > 0 ? ` - ${count}/${slotLimit} pedidos` : ""}
+                          {full ? " - lotado" : ""}
+                        </option>
+                      );
+                    })}
+                  </Select>
                 )}
                 {checkoutStep === 2 && !selectedSlotIsAvailable && (
                   <p style={styles.formHelp}>{stepHelp}</p>
@@ -979,18 +980,18 @@ export default function CheckoutPage() {
                     style={styles.input}
                   />
                   {appliedCoupon ? (
-                    <button type="button" onClick={handleRemoveCoupon} style={styles.secondaryButton}>
+                    <Button type="button" variant="secondary" onClick={handleRemoveCoupon}>
                       Remover
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
                       onClick={handleApplyCoupon}
                       disabled={couponLoading}
-                      style={styles.secondaryButton}
                     >
                       {couponLoading ? "Aplicando..." : "Aplicar"}
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {couponMessage && (
@@ -1013,7 +1014,13 @@ export default function CheckoutPage() {
                         ...(!isFormValid ? styles.methodButtonDisabled : {}),
                       }}
                     >
-                      <span style={styles.methodIcon}>{option === "pix" ? "◆" : "▣"}</span>
+                      <span style={styles.methodIcon}>
+                        {option === "pix" ? (
+                          <QrCode size={16} strokeWidth={2.2} />
+                        ) : (
+                          <CreditCard size={16} strokeWidth={2.2} />
+                        )}
+                      </span>
                       <span>{option === "pix" ? "PIX" : "Cartão"}</span>
                     </button>
                   ))}
@@ -1021,8 +1028,10 @@ export default function CheckoutPage() {
                 {!isFormValid && <p style={styles.paymentWarning}>{stepHelp}</p>}
                 {isFormValid && !isMobile && (
                   <>
-                    <button
+                    <Button
                       type="button"
+                      fullWidth
+                      size="lg"
                       onClick={() => {
                         if (method === "pix") {
                           void handlePixPayment();
@@ -1030,10 +1039,10 @@ export default function CheckoutPage() {
                           void handleCardOrder();
                         }
                       }}
-                      style={styles.payButton}
+                      style={{ marginTop: 16 }}
                     >
                       Pagar {money(finalTotal)}
-                    </button>
+                    </Button>
                     <p style={{ ...styles.mutedSmall, marginTop: 14 }}>
                       {method === "pix"
                         ? "Confirme o pagamento para gerar o QR Code PIX."
@@ -1048,30 +1057,22 @@ export default function CheckoutPage() {
           {checkoutStep < 3 && !isMobile && (
             <div style={{ ...styles.stepNav, ...(isMobile ? styles.stepNavMobile : {}) }}>
               {checkoutStep > 1 ? (
-                <button type="button" onClick={handleBackStep} style={styles.backStepButton}>
+                <Button type="button" variant="ghost" onClick={handleBackStep}>
                   Voltar
-                </button>
+                </Button>
               ) : (
                 <span />
               )}
-              <button
-                type="button"
-                onClick={handleContinueStep}
-                disabled={!canContinueStep}
-                style={{
-                  ...styles.continueButton,
-                  ...(!canContinueStep ? styles.continueButtonDisabled : {}),
-                }}
-              >
+              <Button type="button" onClick={handleContinueStep} disabled={!canContinueStep}>
                 Continuar
-              </button>
+              </Button>
             </div>
           )}
 
           {checkoutStep === 3 && !isMobile && (
-            <button type="button" onClick={handleBackStep} style={styles.backStepButtonStandalone}>
+            <Button type="button" variant="ghost" onClick={handleBackStep} style={styles.backStepButtonStandalone}>
               Voltar para retirada
-            </button>
+            </Button>
           )}
 
           {error && <p style={styles.error}>{error}</p>}
@@ -1088,21 +1089,18 @@ export default function CheckoutPage() {
           </div>
           <div style={styles.mobileActionButtons}>
             {checkoutStep > 1 && (
-              <button type="button" onClick={handleBackStep} style={styles.mobileBackButton}>
+              <Button type="button" variant="ghost" onClick={handleBackStep} style={styles.mobileBackButton}>
                 Voltar
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="button"
               onClick={handleContinueStep}
               disabled={!canContinueStep}
-              style={{
-                ...styles.mobileContinueButton,
-                ...(!canContinueStep ? styles.continueButtonDisabled : {}),
-              }}
+              style={styles.mobileContinueButton}
             >
               Continuar
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -1114,10 +1112,10 @@ export default function CheckoutPage() {
             <strong>{money(finalTotal)}</strong>
           </div>
           <div style={styles.mobileActionButtons}>
-            <button type="button" onClick={handleBackStep} style={styles.mobileBackButton}>
+            <Button type="button" variant="ghost" onClick={handleBackStep} style={styles.mobileBackButton}>
               Voltar
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => {
                 if (method === "pix") {
@@ -1127,13 +1125,10 @@ export default function CheckoutPage() {
                 }
               }}
               disabled={!isFormValid}
-              style={{
-                ...styles.mobilePayButton,
-                ...(!isFormValid ? styles.continueButtonDisabled : {}),
-              }}
+              style={styles.mobilePayButton}
             >
               Pagar {money(finalTotal)}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -1147,6 +1142,7 @@ const styles: Record<string, CSSProperties> = {
   header: { maxWidth: 1180, margin: "0 auto 16px", position: "relative", display: "grid", justifyItems: "center", textAlign: "center", paddingTop: 18 },
   headerMobile: { paddingTop: 46 },
   headerTitle: { textAlign: "center" },
+  headerLogo: { display: "flex", justifyContent: "center", marginBottom: 8 },
   title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },
   shell: { maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 378px", gap: 20, alignItems: "start" },
   shellMobile: { gridTemplateColumns: "1fr" },
@@ -1232,7 +1228,7 @@ const styles: Record<string, CSSProperties> = {
   methodButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 15, color: "#1c1a17", cursor: "pointer", fontWeight: 850, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: "0 6px 16px rgba(28, 26, 23, 0.04)" },
   methodButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
   methodButtonDisabled: { opacity: 0.45, cursor: "not-allowed" },
-  methodIcon: { fontSize: 15, lineHeight: 1 },
+  methodIcon: { display: "inline-flex", alignItems: "center" },
   payButton: {
     width: "100%",
     marginTop: 16,

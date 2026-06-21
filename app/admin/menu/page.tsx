@@ -4,6 +4,7 @@ import type { CSSProperties, PointerEvent } from "react";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import Image from "next/image";
+import { FolderPlus, Pencil, Plus, Search, X } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 import {
   defaultMenuCategories,
@@ -20,7 +21,11 @@ import {
 import { supabase } from "../../../lib/supabase";
 import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import { MenuItem } from "../../../types";
+import { getButtonStyle, getInputStyle, getSelectStyle, eyebrowStyle } from "../../../lib/uiStyles";
 import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
+import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { Select } from "../../components/ui/Select";
 
 type EditableMenuItem = MenuItem & { isNew?: boolean };
 type DeletedMenuItem = MenuItem & { deleted: true };
@@ -494,20 +499,14 @@ export default function AdminMenuPage() {
 
   const headerActions = (
     <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
-      <button
-        type="button"
-        onClick={() => handleAddItem()}
-        style={{ ...styles.primaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
-      >
-        + Novo item
-      </button>
-      <button
-        type="button"
-        onClick={() => setCreatingCategoryModalOpen(true)}
-        style={{ ...styles.headerSecondaryButton, ...(isMobile ? styles.fullWidthMobile : {}) }}
-      >
-        + Nova categoria
-      </button>
+      <Button type="button" onClick={() => handleAddItem()} style={isMobile ? styles.fullWidthMobile : undefined}>
+        <Plus size={16} strokeWidth={2.5} />
+        Novo item
+      </Button>
+      <Button type="button" variant="secondary" onClick={() => setCreatingCategoryModalOpen(true)} style={isMobile ? styles.fullWidthMobile : undefined}>
+        <FolderPlus size={16} strokeWidth={2.2} />
+        Nova categoria
+      </Button>
     </div>
   );
 
@@ -517,17 +516,21 @@ export default function AdminMenuPage() {
       <AdminShell eyebrow="Operação" title="Cardápio" action={headerActions}>
 
         <section style={{ ...styles.toolbar, ...(isMobile ? styles.toolbarStack : {}) }}>
-          <input
-            type="text"
-            placeholder="Buscar prato..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            style={{ ...styles.input, ...(isMobile ? styles.controlMobile : {}) }}
-          />
-          <select
+          <label style={styles.searchWrap}>
+            <Search size={15} strokeWidth={2.2} style={styles.searchIcon} />
+            <input
+              type="text"
+              placeholder="Buscar prato..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              style={{ ...styles.input, ...(isMobile ? styles.controlMobile : {}) }}
+            />
+          </label>
+          <Select
             value={filterCategory}
             onChange={(event) => setFilterCategory(event.target.value)}
-            style={{ ...styles.select, ...(isMobile ? styles.controlMobile : {}) }}
+            containerStyle={isMobile ? styles.controlMobile : undefined}
+            style={styles.select}
           >
             <option value="">Todas as categorias</option>
             {categoryOptions.map((category) => (
@@ -535,23 +538,24 @@ export default function AdminMenuPage() {
                 {category.name}
               </option>
             ))}
-          </select>
+          </Select>
         </section>
         {(search.trim() || filterCategory) && (
           <div style={styles.activeFilterBar}>
             <span>
               Mostrando resultados filtrados
             </span>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setSearch("");
                 setFilterCategory("");
               }}
-              style={styles.clearFilterButton}
             >
               Limpar filtros
-            </button>
+            </Button>
           </div>
         )}
 
@@ -789,7 +793,7 @@ export default function AdminMenuPage() {
                           <h3 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h3>
                           <p style={styles.itemPrice}>{money(Number(item.price))}</p>
                           <div style={styles.itemStatusLine}>
-                            {!itemActive && <span style={styles.itemStatusBadgePaused}>Pausado</span>}
+                            {!itemActive && <Badge variant="error">Pausado</Badge>}
                           </div>
                           {item.description && (
                             <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>{item.description}</p>
@@ -820,13 +824,16 @@ export default function AdminMenuPage() {
                         <span style={styles.itemSwitchLabel}>
                           {itemActive ? "Ativo" : "Pausado"}
                         </span>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setEditingItem(item)}
-                          style={{ ...styles.secondaryButton, ...(isMobile ? styles.secondaryButtonMobile : {}) }}
+                          style={isMobile ? styles.secondaryButtonMobile : undefined}
                         >
+                          <Pencil size={14} strokeWidth={2.2} />
                           Editar
-                        </button>
+                        </Button>
                       </div>
                     </div>
                       );
@@ -1124,9 +1131,9 @@ function CategoryCreateModal({
             <p style={styles.cardEyebrow}>Cardápio</p>
             <h2 style={styles.modalTitle}>Nova categoria</h2>
           </div>
-          <button type="button" onClick={onClose} style={styles.closeButton}>
-            Fechar
-          </button>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
+            <X size={16} strokeWidth={2.2} />
+          </Button>
         </div>
 
         <div style={styles.modalPanel}>
@@ -1263,9 +1270,9 @@ function CategoryEditModal({
             <p style={styles.cardEyebrow}>Categoria</p>
             <h2 style={styles.modalTitle}>Editar categoria</h2>
           </div>
-          <button type="button" onClick={onClose} style={styles.closeButton}>
-            Fechar
-          </button>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
+            <X size={16} strokeWidth={2.2} />
+          </Button>
         </div>
 
         <div style={styles.modalPanel}>
@@ -1473,9 +1480,9 @@ function EditModal({
             <p style={styles.cardEyebrow}>Cardápio</p>
             <h2 style={styles.modalTitle}>{isNewItem ? "Adicionar item" : "Editar item"}</h2>
           </div>
-          <button type="button" onClick={onClose} style={styles.closeButton}>
-            Fechar
-          </button>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
+            <X size={16} strokeWidth={2.2} />
+          </Button>
         </div>
 
         <div style={{ ...styles.modalBody, ...(compact ? styles.modalBodyCompact : {}) }}>
@@ -1782,26 +1789,10 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     justifyContent: "stretch",
   },
-  primaryButton: {
-    border: "none",
-    borderRadius: 999,
-    background: "#9f1d2f",
-    color: "#fff",
-    padding: "12px 16px",
-    cursor: "pointer",
-    fontWeight: 850,
-  },
-  headerSecondaryButton: {
-    border: "none",
-    borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
-    padding: "12px 16px",
-    cursor: "pointer",
-    fontWeight: 850,
-  },
+  primaryButton: getButtonStyle("primary", "md"),
+  headerSecondaryButton: getButtonStyle("secondary", "md"),
   primaryButtonDisabled: {
-    background: "#c9c0b4",
+    opacity: 0.55,
     cursor: "not-allowed",
   },
   toolbar: {
@@ -1813,35 +1804,40 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
     marginBottom: 14,
     border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
-    background: "#fffdf8",
+    borderRadius: 12,
+    background: "var(--color-surface)",
     padding: 10,
-    boxShadow: "0 10px 24px rgba(28, 26, 23, 0.04)",
+    boxShadow: "var(--shadow-card)",
   },
   toolbarStack: {
     gridTemplateColumns: "1fr",
     gap: 8,
   },
-  input: {
-    boxSizing: "border-box",
-    width: "100%",
+  searchWrap: {
+    position: "relative",
     minWidth: 0,
-    border: "1px solid rgba(28, 26, 23, 0.14)",
-    borderRadius: 8,
-    padding: 12,
-    background: "#fffdf8",
-    color: "#1c1a17",
-    outlineColor: "#9f1d2f",
+  },
+  searchIcon: {
+    position: "absolute",
+    left: 12,
+    top: "50%",
+    transform: "translateY(-50%)",
+    color: "#9a9288",
+    pointerEvents: "none",
+    zIndex: 1,
+  },
+  input: {
+    ...getInputStyle(),
+    boxSizing: "border-box",
+    minWidth: 0,
+    paddingLeft: 36,
+    background: "var(--color-surface)",
   },
   select: {
+    ...getSelectStyle(),
     boxSizing: "border-box",
-    width: "100%",
     minWidth: 0,
-    border: "1px solid rgba(28, 26, 23, 0.14)",
-    borderRadius: 8,
-    padding: 12,
-    background: "#fffdf8",
-    color: "#1c1a17",
+    background: "var(--color-surface)",
   },
   controlMobile: {
     padding: 11,
@@ -1982,12 +1978,7 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.2,
     userSelect: "none",
   },
-  cardEyebrow: {
-    color: "#9f1d2f",
-    fontSize: 12,
-    fontWeight: 850,
-    textTransform: "uppercase",
-  },
+  cardEyebrow: eyebrowStyle,
   categoryTitle: {
     fontSize: 21,
     lineHeight: 1.15,
@@ -2182,16 +2173,7 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     minWidth: 48,
   },
-  secondaryButton: {
-    border: "1px solid rgba(28, 26, 23, 0.12)",
-    borderRadius: 999,
-    background: "#fffdf8",
-    color: "#1c1a17",
-    padding: "10px 13px",
-    cursor: "pointer",
-    fontWeight: 850,
-    whiteSpace: "nowrap",
-  },
+  secondaryButton: getButtonStyle("ghost", "sm"),
   secondaryButtonMobile: {
     padding: "9px 12px",
     marginLeft: "auto",
@@ -2213,8 +2195,8 @@ const styles: Record<string, CSSProperties> = {
     width: "min(920px, 100%)",
     maxHeight: "92vh",
     overflowY: "auto",
-    background: "#fffdf8",
-    borderRadius: 8,
+    background: "var(--color-surface)",
+    borderRadius: 14,
     padding: 22,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.22)",
   },

@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useIsMobile } from "../../lib/useMediaQuery";
 
 type BackToMenuLinkProps = {
@@ -26,7 +27,7 @@ export function BackToMenuLink({
       }}
     >
       <span style={styles.icon} aria-hidden>
-        ←
+        <ArrowLeft size={14} strokeWidth={2.5} />
       </span>
       <span style={styles.label}>{displayLabel}</span>
     </Link>
@@ -74,8 +75,7 @@ const styles: Record<string, CSSProperties> = {
     background: "rgba(159, 29, 47, 0.08)",
     display: "grid",
     placeItems: "center",
-    fontSize: 14,
-    fontWeight: 900,
     flexShrink: 0,
+    color: "#9f1d2f",
   },
 };

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { addDaysInBrasilia, toBrasiliaDateKey } from "../../../lib/brasiliaTime";
 import { useIsMobile } from "../../../lib/useMediaQuery";
@@ -166,9 +167,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
           </div>
 
           <label style={fat.searchWrap}>
-            <span style={fat.searchIcon} aria-hidden="true">
-              ⌕
-            </span>
+            <Search size={15} strokeWidth={2.2} style={fat.searchIcon} aria-hidden="true" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}

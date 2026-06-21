@@ -2,9 +2,10 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Clock3, ClipboardList, Search, ShoppingBag, X } from "lucide-react";
+import toast from "react-hot-toast";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import {
   getBusinessHours,
@@ -25,7 +26,10 @@ import {
 import { MenuItem } from "../types";
 import { useCart, type CartItem } from "./context/CartContext";
 import { money, isItemOrderable } from "../lib/orderUtils";
+import { BrandLogo } from "./components/BrandLogo";
+import { MenuItemCard } from "./components/MenuItemCard";
 import { MenuPageSkeleton } from "./components/MenuPageSkeleton";
+import { colors } from "../lib/designTokens";
 
 type CartLine = CartItem;
 
@@ -271,6 +275,7 @@ export default function Page() {
   const handleAddToCart = (item: MenuItem) => {
     addToCart(item);
     setAddedPulseId(item.id);
+    toast.success(`${item.name} adicionado`);
     window.setTimeout(() => setAddedPulseId((current) => (current === item.id ? null : current)), 280);
   };
 
@@ -285,18 +290,24 @@ export default function Page() {
       <header style={styles.header}>
         <div style={{ ...styles.headerInner, ...(isMobile ? styles.headerInnerMobile : {}) }}>
           <div>
-            <h1 style={styles.brand}>Missô Sushi</h1>
+            <BrandLogo size={isMobile ? "sm" : "md"} />
             <p style={styles.headerStatus}>
+              <span
+                className={`status-dot ${storeOpen ? "status-dot--open" : "status-dot--closed"}`}
+                aria-hidden
+              />
               {storeOpen
-                ? `Tempo médio de preparo: ${averageTime}`
+                ? `Aberto · preparo em ${averageTime}`
                 : "Pedidos pausados no momento"}
             </p>
             <p style={styles.headerHours}>
+              <Clock3 size={12} strokeWidth={2.2} style={styles.headerHoursIcon} />
               {getTodayBusinessHoursLabel(new Date(), businessHours)}
             </p>
           </div>
           <div style={styles.headerActions}>
             <Link href="/meus-pedidos" style={styles.headerLink}>
+              <ClipboardList size={14} strokeWidth={2.2} />
               Meus pedidos
             </Link>
             <button
@@ -324,16 +335,17 @@ export default function Page() {
       <nav style={{ ...styles.categoryNav, ...(isMobile ? styles.categoryNavMobile : {}) }} aria-label="Categorias do cardápio">
         <div style={styles.searchRow}>
           <label style={styles.searchBox}>
-            <span style={styles.searchIcon}>⌕</span>
+            <Search size={15} strokeWidth={2.2} style={styles.searchIcon} />
             <input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Buscar prato"
+              placeholder="O que você quer hoje?"
               style={styles.searchInput}
             />
           </label>
         </div>
         <div style={{ ...styles.categoryBar, ...(isMobile ? styles.categoryBarMobile : {}) }}>
+          <div className="category-track-wrap">
           <div style={styles.categoryTrack}>
             {orderedCategories.map((category) => (
               <button
@@ -349,6 +361,7 @@ export default function Page() {
               </button>
             ))}
           </div>
+          </div>
         </div>
       </nav>
 
@@ -362,80 +375,23 @@ export default function Page() {
               </div>
               <span style={styles.sectionCount}>{popularItems.length} itens</span>
             </div>
-            <div style={{ ...styles.menuGrid, ...(isMobile ? styles.menuGridMobile : {}) }}>
-              {popularItems.map((item) => {
-                const quantity = getQuantity(item.id);
-                const unavailable = !isItemOrderable(item);
-
-                return (
-                  <article
-                    key={`popular-${item.id}`}
-                    style={{
-                      ...styles.menuCard,
-                      ...(isMobile ? styles.menuCardMobile : {}),
-                      ...(unavailable ? styles.menuCardUnavailable : {}),
-                      ...(addedPulseId === item.id ? styles.menuCardPulse : {}),
-                    }}
-                  >
-                    <div style={{ ...styles.imageWrap, ...(isMobile ? styles.imageWrapMobile : {}) }}>
-                      {item.image ? (
-                        <Image
-                          src={item.image}
-                          alt={item.name}
-                          fill
-                          sizes="(max-width: 767px) 34vw, 160px"
-                          style={styles.dishImage}
-                        />
-                      ) : (
-                        <div style={styles.imageFallback}>
-                          <span>Missô</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={{ ...styles.cardBody, ...(isMobile ? styles.cardBodyMobile : {}) }}>
-                      <div>
-                        <h4 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h4>
-                        {unavailable && (
-                          <div style={styles.badgeLine}>
-                            <span style={styles.unavailableBadge}>Indisponível</span>
-                          </div>
-                        )}
-                        {item.description && (
-                          <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div style={{ ...styles.cardFooter, ...(isMobile ? styles.cardFooterMobile : {}) }}>
-                        <strong style={{ ...styles.price, ...(isMobile ? styles.priceMobile : {}) }}>{money(Number(item.price))}</strong>
-                        {quantity === 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => handleAddToCart(item)}
-                            disabled={unavailable || !storeOpen}
-                            style={{
-                              ...styles.addButton,
-                              ...(isMobile ? styles.addButtonMobile : {}),
-                              ...(unavailable || !storeOpen ? styles.addButtonDisabled : {}),
-                            }}
-                            aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
-                          >
-                            {unavailable ? "Indisponível" : "Adicionar"}
-                          </button>
-                        ) : (
-                          <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
-                            <button type="button" onClick={() => decreaseById(item.id)} style={{ ...styles.quantityButton, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Remover ${item.name}`}>-</button>
-                            <span style={{ ...styles.quantityValue, ...(isMobile ? styles.quantityValueMobile : {}) }}>{quantity}</span>
-                            <button type="button" onClick={() => handleIncrease(item.id)} style={{ ...styles.quantityButton, ...styles.quantityButtonDark, ...(isMobile ? styles.quantityButtonMobile : {}) }} aria-label={`Adicionar ${item.name}`}>+</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+            <div style={{ ...styles.featuredGrid, ...(isMobile ? styles.featuredGridMobile : {}) }}>
+              {popularItems.map((item) => (
+                <MenuItemCard
+                  key={`popular-${item.id}`}
+                  item={item}
+                  quantity={getQuantity(item.id)}
+                  unavailable={!isItemOrderable(item)}
+                  storeOpen={storeOpen}
+                  isMobile={isMobile}
+                  isPulsing={addedPulseId === item.id}
+                  variant="featured"
+                  showPopularBadge
+                  onAdd={() => handleAddToCart(item)}
+                  onIncrease={() => handleIncrease(item.id)}
+                  onDecrease={() => decreaseById(item.id)}
+                />
+              ))}
             </div>
           </section>
         )}
@@ -478,102 +434,20 @@ export default function Page() {
               </div>
 
               <div style={{ ...styles.menuGrid, ...(isMobile ? styles.menuGridMobile : {}) }}>
-                {itemsInCategory.map((item) => {
-                  const quantity = getQuantity(item.id);
-                  const unavailable = !isItemOrderable(item);
-
-                  return (
-                    <article
-                      key={item.id}
-                      style={{
-                        ...styles.menuCard,
-                        ...(isMobile ? styles.menuCardMobile : {}),
-                        ...(unavailable ? styles.menuCardUnavailable : {}),
-                        ...(addedPulseId === item.id ? styles.menuCardPulse : {}),
-                      }}
-                    >
-                      <div style={{ ...styles.imageWrap, ...(isMobile ? styles.imageWrapMobile : {}) }}>
-                        {item.image ? (
-                          <Image
-                            src={item.image}
-                            alt={item.name}
-                            fill
-                            sizes="(max-width: 767px) 34vw, 160px"
-                            style={styles.dishImage}
-                          />
-                        ) : (
-                          <div style={styles.imageFallback}>
-                            <span>Missô</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ ...styles.cardBody, ...(isMobile ? styles.cardBodyMobile : {}) }}>
-                        <div>
-                          <h4 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h4>
-                          {unavailable && (
-                            <div style={styles.badgeLine}>
-                              <span style={styles.unavailableBadge}>Indisponível</span>
-                            </div>
-                          )}
-                          {item.description && (
-                            <p style={{ ...styles.itemDescription, ...(isMobile ? styles.itemDescriptionMobile : {}) }}>
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-
-                        <div style={{ ...styles.cardFooter, ...(isMobile ? styles.cardFooterMobile : {}) }}>
-                          <strong style={{ ...styles.price, ...(isMobile ? styles.priceMobile : {}) }}>
-                            {money(Number(item.price))}
-                          </strong>
-
-                          {quantity === 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => handleAddToCart(item)}
-                              disabled={unavailable || !storeOpen}
-                              style={{
-                                ...styles.addButton,
-                                ...(isMobile ? styles.addButtonMobile : {}),
-                                ...(unavailable || !storeOpen ? styles.addButtonDisabled : {}),
-                              }}
-                              aria-label={unavailable ? `${item.name} indisponível` : `Adicionar ${item.name}`}
-                            >
-                              {unavailable ? "Indisponível" : "Adicionar"}
-                            </button>
-                          ) : (
-                            <div style={{ ...styles.quantityControl, ...(isMobile ? styles.quantityControlMobile : {}) }}>
-                              <button
-                                type="button"
-                                onClick={() => decreaseById(item.id)}
-                                style={{ ...styles.quantityButton, ...(isMobile ? styles.quantityButtonMobile : {}) }}
-                                aria-label={`Remover ${item.name}`}
-                              >
-                                -
-                              </button>
-                              <span style={{ ...styles.quantityValue, ...(isMobile ? styles.quantityValueMobile : {}) }}>
-                                {quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleIncrease(item.id)}
-                                style={{
-                                  ...styles.quantityButton,
-                                  ...styles.quantityButtonDark,
-                                  ...(isMobile ? styles.quantityButtonMobile : {}),
-                                }}
-                                aria-label={`Adicionar ${item.name}`}
-                              >
-                                +
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                {itemsInCategory.map((item) => (
+                  <MenuItemCard
+                    key={item.id}
+                    item={item}
+                    quantity={getQuantity(item.id)}
+                    unavailable={!isItemOrderable(item)}
+                    storeOpen={storeOpen}
+                    isMobile={isMobile}
+                    isPulsing={addedPulseId === item.id}
+                    onAdd={() => handleAddToCart(item)}
+                    onIncrease={() => handleIncrease(item.id)}
+                    onDecrease={() => decreaseById(item.id)}
+                  />
+                ))}
               </div>
             </section>
           );
@@ -588,7 +462,10 @@ export default function Page() {
           onClick={() => setOpenCart(true)}
           style={styles.floatingCart}
         >
-          <span>Ver carrinho · {itemCount === 1 ? "1 item" : `${itemCount} itens`}</span>
+          <span style={styles.floatingCartLabel}>
+            <ShoppingBag size={16} strokeWidth={2.2} />
+            Ver carrinho · {itemCount === 1 ? "1 item" : `${itemCount} itens`}
+          </span>
           <strong>{money(total)}</strong>
         </button>
       )}
@@ -600,9 +477,13 @@ export default function Page() {
             aria-label="Fechar carrinho"
             onClick={() => setOpenCart(false)}
             style={styles.backdrop}
+            className="cart-backdrop-animate"
           />
 
-          <aside style={{ ...styles.cartPanel, ...(isMobile ? styles.cartPanelMobile : {}) }}>
+          <aside
+            style={{ ...styles.cartPanel, ...(isMobile ? styles.cartPanelMobile : {}) }}
+            className={isMobile ? "cart-panel-animate-mobile" : "cart-panel-animate"}
+          >
             <div style={styles.cartHeader}>
               <div>
                 <p style={styles.cartEyebrow}>Pedido</p>
@@ -613,15 +494,22 @@ export default function Page() {
                 type="button"
                 onClick={() => setOpenCart(false)}
                 style={styles.closeButton}
+                aria-label="Fechar carrinho"
               >
-                Fechar
+                <X size={16} strokeWidth={2.2} />
               </button>
             </div>
 
             <div style={styles.cartList}>
               {cartNotice && <p style={styles.cartNotice}>{cartNotice}</p>}
               {cart.length === 0 ? (
-                <p style={styles.emptyCart}>Seu carrinho está vazio.</p>
+                <div style={styles.emptyCartWrap}>
+                  <ShoppingBag size={36} strokeWidth={1.5} color={colors.textSubtle} />
+                  <p style={styles.emptyCart}>Seu carrinho está vazio.</p>
+                  <button type="button" onClick={() => setOpenCart(false)} style={styles.emptyCartButton}>
+                    Ver cardápio
+                  </button>
+                </div>
               ) : (
                 cart.map((item: CartLine) => (
                   <div key={item.lineKey} style={styles.cartItem}>
@@ -724,15 +612,18 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "flex-end",
   },
   headerLink: {
-    color: "#8f1728",
+    color: colors.brandDark,
     textDecoration: "none",
     fontSize: 13,
     fontWeight: 850,
-    background: "#fffdf8",
+    background: colors.surface,
     border: "1px solid rgba(28, 26, 23, 0.08)",
     borderRadius: 999,
     padding: "9px 13px",
     whiteSpace: "nowrap",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
   },
   eyebrow: {
     color: "#766e64",
@@ -740,22 +631,27 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
     textTransform: "uppercase",
   },
-  brand: {
-    fontSize: 24,
-    lineHeight: 1,
-    fontWeight: 800,
-  },
   headerStatus: {
-    marginTop: 5,
-    color: "#625b53",
+    marginTop: 8,
+    color: colors.textMuted,
     fontSize: 13,
     fontWeight: 750,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
   },
   headerHours: {
-    marginTop: 3,
-    color: "#766e64",
+    marginTop: 4,
+    color: colors.textSubtle,
     fontSize: 12,
     fontWeight: 650,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  headerHoursIcon: {
+    flexShrink: 0,
+    opacity: 0.8,
   },
   headerCartButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
@@ -830,9 +726,8 @@ const styles: Record<string, CSSProperties> = {
     padding: "0 12px",
   },
   searchIcon: {
-    color: "#766e64",
-    fontSize: 15,
-    lineHeight: 1,
+    color: colors.textSubtle,
+    flexShrink: 0,
   },
   searchInput: {
     width: "100%",
@@ -921,137 +816,14 @@ const styles: Record<string, CSSProperties> = {
   menuGridMobile: {
     gap: 8,
   },
-  menuCard: {
-    minHeight: 132,
-    background: "#fffdf8",
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: "rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
+  featuredGrid: {
     display: "grid",
-    gridTemplateColumns: "116px minmax(0, 1fr)",
-    overflow: "hidden",
-    boxShadow: "0 14px 35px rgba(28, 26, 23, 0.06)",
-    transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(220px, 100%), 1fr))",
+    gap: 16,
   },
-  menuCardPulse: {
-    transform: "scale(1.015)",
-    borderColor: "rgba(159, 29, 47, 0.36)",
-    boxShadow: "0 16px 38px rgba(159, 29, 47, 0.14)",
-  },
-  menuCardUnavailable: {
-    opacity: 0.62,
-  },
-  menuCardMobile: {
-    gridTemplateColumns: "82px minmax(0, 1fr)",
-    minHeight: 104,
-  },
-  imageWrap: {
-    position: "relative",
-    minHeight: 148,
-    background: "#ebe3d6",
-  },
-  imageWrapMobile: {
-    minHeight: 104,
-  },
-  dishImage: {
-    objectFit: "cover",
-    objectPosition: "center",
-  },
-  imageFallback: {
-    width: "100%",
-    height: "100%",
-    display: "grid",
-    placeItems: "center",
-    color: "#9f1d2f",
-    fontWeight: 850,
-    background: "linear-gradient(135deg, #efe6d8, #f8f3ea)",
-  },
-  cardBody: {
-    minWidth: 0,
-    padding: 14,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    gap: 14,
-  },
-  cardBodyMobile: {
-    padding: "9px 10px",
-    gap: 8,
-  },
-  itemName: {
-    fontSize: 16,
-    lineHeight: 1.25,
-    fontWeight: 800,
-  },
-  itemNameMobile: {
-    fontSize: 14,
-    lineHeight: 1.18,
-  },
-  badgeLine: {
-    minHeight: 24,
-    marginTop: 7,
-    display: "flex",
-    gap: 6,
-    flexWrap: "wrap",
-  },
-  unavailableBadge: {
-    borderRadius: 999,
-    background: "#fee2e2",
-    color: "#991b1b",
-    padding: "4px 8px",
-    fontSize: 11,
-    fontWeight: 850,
-  },
-  itemDescription: {
-    marginTop: 5,
-    color: "#625b53",
-    fontSize: 12,
-    lineHeight: 1.4,
-  },
-  itemDescriptionMobile: {
-    marginTop: 3,
-    fontSize: 11,
-    lineHeight: 1.25,
-    display: "-webkit-box",
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: "vertical",
-    overflow: "hidden",
-  },
-  cardFooter: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  cardFooterMobile: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  price: {
-    fontSize: 16,
-  },
-  priceMobile: {
-    fontSize: 14,
-  },
-  addButton: {
-    border: "none",
-    background: "#1c1a17",
-    color: "#fffdf8",
-    borderRadius: 999,
-    padding: "9px 13px",
-    fontWeight: 800,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-  addButtonMobile: {
-    padding: "7px 10px",
-    fontSize: 12,
-  },
-  addButtonDisabled: {
-    opacity: 0.5,
-    cursor: "not-allowed",
+  featuredGridMobile: {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 10,
   },
   quantityControl: {
     height: 38,
@@ -1103,8 +875,8 @@ const styles: Record<string, CSSProperties> = {
     width: "min(360px, calc(100% - 32px))",
     border: "none",
     borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
+    background: colors.dark,
+    color: colors.surface,
     padding: "13px 16px",
     display: "flex",
     justifyContent: "space-between",
@@ -1113,6 +885,11 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 15,
     fontWeight: 800,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.24)",
+  },
+  floatingCartLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
   },
   cartOverlay: {
     position: "fixed",
@@ -1171,19 +948,41 @@ const styles: Record<string, CSSProperties> = {
   },
   closeButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
-    background: "#f7f4ef",
+    background: colors.bg,
     borderRadius: 999,
-    padding: "9px 13px",
+    width: 38,
+    height: 38,
+    display: "grid",
+    placeItems: "center",
     cursor: "pointer",
-    fontWeight: 800,
+    color: colors.text,
   },
   cartList: {
     flex: 1,
     overflowY: "auto",
     padding: "12px 20px",
   },
+  emptyCartWrap: {
+    minHeight: 220,
+    display: "grid",
+    placeItems: "center",
+    alignContent: "center",
+    gap: 12,
+    textAlign: "center",
+    padding: "24px 16px",
+  },
   emptyCart: {
-    color: "#625b53",
+    color: colors.textSubtle,
+    fontWeight: 700,
+  },
+  emptyCartButton: {
+    border: "none",
+    background: colors.dark,
+    color: colors.surface,
+    borderRadius: 999,
+    padding: "10px 16px",
+    fontWeight: 800,
+    cursor: "pointer",
   },
   cartNotice: {
     borderRadius: 8,
