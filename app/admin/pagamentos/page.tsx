@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-
-export default function AdminPaymentsPage() {
-  redirect("/admin/faturamento");
-}
+import { redirect } from "next/navigation";
+
+export default function PagamentosRedirectPage() {
+  redirect("/admin/faturamento");
+}

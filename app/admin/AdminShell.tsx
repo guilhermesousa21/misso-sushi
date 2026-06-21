@@ -9,8 +9,6 @@ import { useIsMobile, useIsTablet } from "../../lib/useMediaQuery";
 const navItems = [
   { href: "/admin/menu", label: "Cardápio" },
   { href: "/admin/faturamento", label: "Faturamento" },
-  { href: "/admin/pedidos", label: "Pedidos" },
-  { href: "/admin/clientes", label: "Clientes" },
   { href: "/admin/promocoes", label: "Promoções" },
   { href: "/admin/configuracoes", label: "Configurações" },
 ];
@@ -93,6 +91,19 @@ export function AdminShell({
     window.location.href = "/admin/login";
   };
 
+  const isNavActive = (href: string) => {
+    if (href === "/admin/faturamento") {
+      return (
+        pathname === "/admin" ||
+        pathname.startsWith("/admin/faturamento") ||
+        pathname.startsWith("/admin/pedidos") ||
+        pathname.startsWith("/admin/clientes") ||
+        pathname.startsWith("/admin/pagamentos")
+      );
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
   return (
     <main style={{ ...styles.page, ...(isTablet ? styles.pageStack : {}) }}>
       <aside style={{ ...styles.sidebar, ...(isTablet ? styles.sidebarTop : {}), ...(isMobile ? styles.sidebarMobile : {}) }}>
@@ -108,7 +119,7 @@ export function AdminShell({
               style={{
                 ...styles.navLink,
                 ...(isMobile ? styles.navLinkMobile : {}),
-                ...(pathname === item.href ? styles.navLinkActive : {}),
+                ...(isNavActive(item.href) ? styles.navLinkActive : {}),
               }}
             >
               {item.label}
@@ -122,7 +133,7 @@ export function AdminShell({
               style={{
                 ...styles.navLink,
                 ...(isMobile ? styles.navLinkMobile : {}),
-                ...(pathname === item.href ? styles.navLinkActive : {}),
+                ...(isNavActive(item.href) ? styles.navLinkActive : {}),
               }}
             >
               {item.label}
@@ -157,7 +168,7 @@ export function AdminShell({
               href={item.href}
               style={{
                 ...styles.mobileTab,
-                ...(pathname === item.href ? styles.mobileTabActive : {}),
+                ...(isNavActive(item.href) ? styles.mobileTabActive : {}),
               }}
             >
               {item.label}

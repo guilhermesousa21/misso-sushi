@@ -16,7 +16,7 @@ export default function AdminLoginPage() {
 function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/admin";
+  const next = searchParams.get("next") || "/admin/faturamento";
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

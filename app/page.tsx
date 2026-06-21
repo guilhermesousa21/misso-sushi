@@ -315,22 +315,6 @@ export default function Page() {
         </div>
       </header>
 
-      <section style={styles.intro}>
-        <div style={styles.introInner}>
-          <div style={styles.introCopy}>
-            <p style={styles.kicker}>Sushi, sashimi e pratos japoneses</p>
-            <h2 style={styles.title}>Escolha seus pratos favoritos</h2>
-          </div>
-          <div style={{ ...styles.summaryPanel, ...(isMobile ? styles.summaryPanelMobile : {}) }}>
-            <span style={styles.summaryLabel}>Seu pedido</span>
-            <strong style={styles.summaryValue}>{money(total)}</strong>
-            <span style={styles.summaryNote}>
-              {itemCount === 0 ? "Carrinho vazio" : `${itemCount} itens`}
-            </span>
-          </div>
-        </div>
-      </section>
-
       {menuLoading && !menuError ? (
         <div style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
           <MenuPageSkeleton isMobile={isMobile} />
@@ -800,33 +784,6 @@ const styles: Record<string, CSSProperties> = {
     placeItems: "center",
     fontSize: 13,
   },
-  intro: {
-  },
-  introInner: {
-    maxWidth: 1120,
-    margin: "0 auto",
-    padding: "38px 20px 30px",
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-    gap: 24,
-    alignItems: "end",
-  },
-  introCopy: {
-    maxWidth: 680,
-  },
-  kicker: {
-    color: "#9f1d2f",
-    fontSize: 13,
-    fontWeight: 800,
-    textTransform: "uppercase",
-  },
-  title: {
-    marginTop: 8,
-    fontSize: "clamp(34px, 6vw, 64px)",
-    lineHeight: 0.98,
-    fontWeight: 850,
-    maxWidth: 720,
-  },
   closedNotice: {
     marginTop: 14,
     borderRadius: 8,
@@ -835,32 +792,6 @@ const styles: Record<string, CSSProperties> = {
     padding: 12,
     fontWeight: 800,
     lineHeight: 1.45,
-  },
-  summaryPanel: {
-    background: "#1c1a17",
-    color: "#fffdf8",
-    borderRadius: 8,
-    padding: 18,
-    minHeight: 148,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-  },
-  summaryPanelMobile: {
-    minHeight: 104,
-  },
-  summaryLabel: {
-    color: "#d8d0c4",
-    fontSize: 13,
-    fontWeight: 700,
-  },
-  summaryValue: {
-    fontSize: 30,
-    lineHeight: 1,
-  },
-  summaryNote: {
-    color: "#d8d0c4",
-    fontSize: 13,
   },
   categoryNav: {
     position: "sticky",
