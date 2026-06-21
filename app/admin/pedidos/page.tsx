@@ -53,6 +53,8 @@ const getShortPickupLabel = (order: AdminOrder) => {
   return "Padrão";
 };
 
+const desktopOrderGrid = "minmax(0, 1.4fr) 140px 90px 138px 96px";
+
 const isPaidOrder = (order: AdminOrder) => order.payment_status === "pago";
 
 export default function AdminOrdersPage() {
@@ -276,7 +278,7 @@ export default function AdminOrdersPage() {
                 <div
                   style={{
                     ...localStyles.row,
-                    ...(isMobile ? localStyles.rowMobile : {}),
+                    ...(isMobile ? localStyles.rowMobile : localStyles.rowDesktop),
                     ...(expanded ? { borderColor: "rgba(28, 26, 23, 0.14)" } : {}),
                   }}
                 >
@@ -285,7 +287,7 @@ export default function AdminOrdersPage() {
                     onClick={() => setExpandedOrderId(expanded ? null : order.id)}
                     style={{
                       ...localStyles.rowMainButton,
-                      ...(isMobile ? localStyles.rowMainButtonMobile : {}),
+                      ...(isMobile ? localStyles.rowMainButtonMobile : localStyles.rowMainButtonDesktop),
                     }}
                   >
                     <div style={localStyles.rowIdentity}>
@@ -302,13 +304,18 @@ export default function AdminOrdersPage() {
                       <>
                         <span style={localStyles.pickupBadge}>{getShortPickupLabel(order)}</span>
                         <span style={localStyles.paymentBadge}>{paymentLabel}</span>
-                        <strong style={localStyles.rowTotal}>{money(calcTotal(order))}</strong>
+                        <div style={localStyles.totalCell}>
+                          <strong style={localStyles.rowTotal}>{money(calcTotal(order))}</strong>
+                          <span style={localStyles.expandIcon}>{expanded ? "▲" : "▼"}</span>
+                        </div>
                       </>
                     )}
                     {isMobile && (
-                      <strong style={localStyles.rowTotalMobile}>{money(calcTotal(order))}</strong>
+                      <>
+                        <strong style={localStyles.rowTotalMobile}>{money(calcTotal(order))}</strong>
+                        <span style={localStyles.expandIcon}>{expanded ? "▲" : "▼"}</span>
+                      </>
                     )}
-                    <span style={localStyles.expandIcon}>{expanded ? "▲" : "▼"}</span>
                   </button>
                   <button
                     type="button"
@@ -470,8 +477,8 @@ const localStyles: Record<string, CSSProperties> = {
   },
   tableHead: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1.4fr) 140px 90px 110px 92px",
-    gap: 12,
+    gridTemplateColumns: desktopOrderGrid,
+    gap: 8,
     padding: "0 14px 10px",
     color: "#766e64",
     fontSize: 11,
@@ -491,8 +498,6 @@ const localStyles: Record<string, CSSProperties> = {
   },
   row: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    gap: 8,
     alignItems: "stretch",
     background: "#fff",
     borderWidth: 1,
@@ -501,27 +506,37 @@ const localStyles: Record<string, CSSProperties> = {
     borderRadius: 8,
     overflow: "hidden",
   },
+  rowDesktop: {
+    gridTemplateColumns: desktopOrderGrid,
+    gap: 8,
+    padding: "0 14px",
+  },
   rowMobile: {
     gridTemplateColumns: "1fr",
+    gap: 0,
+    padding: 0,
   },
   rowMainButton: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1.4fr) 140px 90px 110px 28px",
-    gap: 12,
     alignItems: "center",
     border: "none",
     background: "transparent",
     color: "inherit",
-    padding: "14px",
     cursor: "pointer",
     textAlign: "left",
     font: "inherit",
     minWidth: 0,
   },
+  rowMainButtonDesktop: {
+    gridColumn: "1 / 5",
+    gridTemplateColumns: "subgrid",
+    padding: "14px 0",
+  },
   rowMainButtonMobile: {
     gridTemplateColumns: "minmax(0, 1fr) auto 24px",
     gap: 10,
     alignItems: "start",
+    padding: "14px",
   },
   rowIdentity: {
     minWidth: 0,
@@ -572,7 +587,13 @@ const localStyles: Record<string, CSSProperties> = {
     fontWeight: 850,
     whiteSpace: "nowrap",
     textAlign: "center",
-    justifySelf: "center",
+  },
+  totalCell: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    minWidth: 0,
   },
   rowTotalMobile: {
     fontSize: 16,
@@ -604,6 +625,7 @@ const localStyles: Record<string, CSSProperties> = {
     fontWeight: 850,
     fontSize: 13,
     whiteSpace: "nowrap",
+    alignSelf: "stretch",
   },
   printButtonMobile: {
     borderLeft: "none",
