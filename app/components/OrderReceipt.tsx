@@ -2,8 +2,46 @@ import type { CSSProperties } from "react";
 import { getReceiptViewModel, receiptMoney } from "../../lib/orderReceipt";
 import type { PrintableOrder } from "../../lib/printOrder";
 
-export function OrderReceipt({ order }: { order: PrintableOrder }) {
+export function OrderReceipt({
+  order,
+  variant = "full",
+}: {
+  order: PrintableOrder;
+  variant?: "full" | "items";
+}) {
   const receipt = getReceiptViewModel(order);
+
+  if (variant === "items") {
+    const addonRows = (order.addons || [])
+      .filter((addon) => Number(addon.quantity || 0) > 0)
+      .map((addon, index) => {
+        const quantity = addon.quantity ?? 1;
+        const unitPrice = Number(addon.unit_price || 0);
+        const lineTotal = unitPrice * quantity;
+
+        return {
+          key: `addon-${addon.id ?? index}`,
+          label: `${quantity}x ${addon.name}`,
+          unitPriceLabel: unitPrice > 0 ? `${receiptMoney(unitPrice)} cada` : "",
+          lineTotalLabel: lineTotal > 0 ? receiptMoney(lineTotal) : "",
+        };
+      });
+
+    return (
+      <div style={{ ...styles.receipt, ...styles.receiptItemsOnly }}>
+        <table style={{ ...styles.table, ...styles.tableCompact }}>
+          <tbody>
+            {receipt.items.map((item) => (
+              <ReceiptItemRow key={item.key} item={item} />
+            ))}
+            {addonRows.map((item) => (
+              <ReceiptItemRow key={item.key} item={item} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.receipt}>
@@ -25,15 +63,7 @@ export function OrderReceipt({ order }: { order: PrintableOrder }) {
         <table style={styles.table}>
           <tbody>
             {receipt.items.map((item) => (
-              <tr key={item.key}>
-                <td style={styles.itemCell}>
-                  <strong style={styles.itemLabel}>{item.label}</strong>
-                  {item.unitPriceLabel ? (
-                    <span style={styles.itemUnit}>{item.unitPriceLabel}</span>
-                  ) : null}
-                </td>
-                <td style={styles.itemTotal}>{item.lineTotalLabel}</td>
-              </tr>
+              <ReceiptItemRow key={item.key} item={item} />
             ))}
           </tbody>
         </table>
@@ -86,6 +116,26 @@ export function OrderReceipt({ order }: { order: PrintableOrder }) {
   );
 }
 
+function ReceiptItemRow({
+  item,
+}: {
+  item: {
+    label: string;
+    unitPriceLabel: string;
+    lineTotalLabel: string;
+  };
+}) {
+  return (
+    <tr>
+      <td style={styles.itemCell}>
+        <strong style={styles.itemLabel}>{item.label}</strong>
+        {item.unitPriceLabel ? <span style={styles.itemUnit}>{item.unitPriceLabel}</span> : null}
+      </td>
+      <td style={styles.itemTotal}>{item.lineTotalLabel}</td>
+    </tr>
+  );
+}
+
 function ReceiptLine({ label, value }: { label: string; value: string }) {
   return (
     <div style={styles.line}>
@@ -126,6 +176,9 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid rgba(28, 26, 23, 0.12)",
     borderRadius: 8,
     padding: 18,
+  },
+  receiptItemsOnly: {
+    padding: "12px 14px",
   },
   header: {
     textAlign: "center",
@@ -172,6 +225,9 @@ const styles: Record<string, CSSProperties> = {
     width: "100%",
     borderCollapse: "collapse",
     marginTop: 6,
+  },
+  tableCompact: {
+    marginTop: 0,
   },
   itemCell: {
     borderBottom: "1px dashed #bbb",

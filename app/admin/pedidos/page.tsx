@@ -462,7 +462,7 @@ function AdminOrdersPageContent() {
                     ) : null}
                   </div>
 
-                  <OrderReceipt order={order} />
+                  <OrderReceipt order={order} variant="items" />
                 </div>
               </article>
             );
