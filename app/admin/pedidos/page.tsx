@@ -257,9 +257,9 @@ export default function AdminOrdersPage() {
         {!isMobile && filteredOrders.length > 0 && (
           <div style={localStyles.tableHead}>
             <span>Pedido</span>
-            <span>Retirada</span>
-            <span>Pagamento</span>
-            <span>Total</span>
+            <span style={localStyles.tableHeadCenter}>Retirada</span>
+            <span style={localStyles.tableHeadCenter}>Pagamento</span>
+            <span style={localStyles.tableHeadCenter}>Total</span>
             <span aria-hidden="true" />
           </div>
         )}
@@ -478,6 +478,9 @@ const localStyles: Record<string, CSSProperties> = {
     fontWeight: 850,
     textTransform: "uppercase",
   },
+  tableHeadCenter: {
+    textAlign: "center",
+  },
   list: {
     display: "grid",
     gap: 8,
@@ -551,6 +554,7 @@ const localStyles: Record<string, CSSProperties> = {
     fontWeight: 850,
     whiteSpace: "nowrap",
     textAlign: "center",
+    justifySelf: "center",
   },
   paymentBadge: {
     borderRadius: 999,
@@ -561,12 +565,14 @@ const localStyles: Record<string, CSSProperties> = {
     fontWeight: 850,
     whiteSpace: "nowrap",
     textAlign: "center",
+    justifySelf: "center",
   },
   rowTotal: {
     fontSize: 15,
     fontWeight: 850,
     whiteSpace: "nowrap",
-    textAlign: "right",
+    textAlign: "center",
+    justifySelf: "center",
   },
   rowTotalMobile: {
     fontSize: 16,
