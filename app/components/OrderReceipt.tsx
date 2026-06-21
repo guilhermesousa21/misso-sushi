@@ -118,7 +118,7 @@ const styles: Record<string, CSSProperties> = {
   receipt: {
     width: "100%",
     maxWidth: 360,
-    margin: "0 auto",
+    margin: 0,
     background: "#fff",
     color: "#111",
     fontFamily: "Arial, Helvetica, sans-serif",
