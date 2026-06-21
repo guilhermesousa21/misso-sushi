@@ -308,7 +308,7 @@ export default function AdminOrdersPage() {
                     {isMobile && (
                       <strong style={localStyles.rowTotalMobile}>{money(calcTotal(order))}</strong>
                     )}
-                    <span style={localStyles.expandIcon}>{expanded ? "▼" : "▶"}</span>
+                    <span style={localStyles.expandIcon}>{expanded ? "▲" : "▼"}</span>
                   </button>
                   <button
                     type="button"
