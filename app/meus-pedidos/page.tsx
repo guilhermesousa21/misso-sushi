@@ -272,7 +272,7 @@ export default function MeusPedidosPage() {
             <div style={styles.orderList}>
               {orders.map((order) => (
                 <article key={order.id} style={styles.orderCard}>
-                  <div style={styles.orderCardHeader}>
+                  <div style={{ ...styles.orderCardHeader, ...(isMobile ? styles.orderCardHeaderMobile : {}) }}>
                     <div>
                       <strong style={styles.orderId}>Pedido #{order.id}</strong>
                       <p style={styles.mutedSmall}>
@@ -316,7 +316,7 @@ const styles: Record<string, CSSProperties> = {
   page: { minHeight: "100vh", background: "var(--color-bg)", color: "var(--color-text)", padding: "20px 20px 48px" },
   pageMobile: { padding: "18px 14px calc(96px + env(safe-area-inset-bottom, 0px))" },
   header: { maxWidth: 760, margin: "0 auto 20px", position: "relative", textAlign: "center", paddingTop: 18 },
-  headerMobile: { paddingTop: 52, marginBottom: 8 },
+  headerMobile: { paddingTop: "calc(52px + env(safe-area-inset-top, 0px))", marginBottom: 8 },
   headerTitle: { textAlign: "center" },
   headerLogo: { display: "flex", justifyContent: "center", marginBottom: 10 },
   title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850, fontFamily: "var(--font-dm-serif), Georgia, serif" },
@@ -392,6 +392,11 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
   },
   orderCardHeader: { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" },
+  orderCardHeaderMobile: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 10,
+  },
   orderId: { fontSize: 18 },
   statusBadge: {
     borderRadius: 999,

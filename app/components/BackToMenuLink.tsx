@@ -60,8 +60,9 @@ const styles: Record<string, CSSProperties> = {
     zIndex: 2,
   },
   headerMobile: {
-    padding: "9px 12px",
-    maxWidth: "42vw",
+    padding: "8px 10px",
+    top: "calc(10px + env(safe-area-inset-top, 0px))",
+    maxWidth: "none",
   },
   label: {
     overflow: "hidden",

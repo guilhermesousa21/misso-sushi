@@ -125,8 +125,8 @@ export default function PedidoPage({
 
   if (!order) {
     return (
-      <main style={styles.page}>
-        <section style={styles.panel}>
+      <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
+        <section style={{ ...styles.panel, ...(isMobile ? styles.panelMobile : {}) }}>
           <BrandLogo size="sm" />
           <p style={{ ...styles.eyebrow, marginTop: 16 }}>Acompanhe em tempo real</p>
           <h1 style={styles.title}>Abrindo seu pedido...</h1>
@@ -397,6 +397,7 @@ export default function PedidoPage({
             onClick={handleContinuePayment}
             disabled={paymentLoading}
             size="md"
+            fullWidth
           >
             {paymentLoading ? "Preparando..." : "Pagar pedido"}
           </Button>
@@ -499,6 +500,8 @@ const styles: Record<string, CSSProperties> = {
   itemName: {
     display: "block",
     lineHeight: 1.35,
+    minWidth: 0,
+    overflowWrap: "anywhere",
   },
   summaryMuted: {
     marginTop: 4,

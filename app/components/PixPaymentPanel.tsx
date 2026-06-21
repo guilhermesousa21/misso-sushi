@@ -6,6 +6,7 @@ import { Copy, Check } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
 import { Button } from "./ui/Button";
 import { colors } from "../../lib/designTokens";
+import { useIsMobile } from "../../lib/useMediaQuery";
 
 type PixPaymentPanelProps = {
   amountLabel: string;
@@ -22,9 +23,12 @@ export function PixPaymentPanel({
   copyFeedback,
   onCopy,
 }: PixPaymentPanelProps) {
+  const isMobile = useIsMobile();
+  const qrSize = isMobile ? 190 : 210;
+
   return (
     <div style={styles.panel}>
-      <div style={styles.header}>
+      <div style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <BrandLogo size="sm" />
         <div>
           <p style={styles.title}>Pagamento PIX</p>
@@ -34,18 +38,22 @@ export function PixPaymentPanel({
         </div>
       </div>
 
-      <div style={styles.body} className="pix-payment-panel-body">
+      <div
+        style={{ ...styles.body, ...(isMobile ? styles.bodyMobile : {}) }}
+        className="pix-payment-panel-body"
+      >
         <div style={styles.qrFrame}>
           <div style={styles.qrInner}>
             {pixCode ? (
-              <QRCodeSVG value={pixCode} size={210} level="M" includeMargin />
+              <QRCodeSVG value={pixCode} size={qrSize} level="M" includeMargin />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={`data:image/png;base64,${pixQr}`}
                 alt="QR Code PIX"
-                width={210}
-                height={210}
+                width={qrSize}
+                height={qrSize}
+                style={styles.qrImage}
               />
             )}
           </div>
@@ -101,6 +109,10 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
     background: "linear-gradient(180deg, #fffdf8, #f7f4ef)",
   },
+  headerMobile: {
+    padding: "14px 16px",
+    alignItems: "flex-start",
+  },
   title: {
     fontSize: 18,
     fontWeight: 850,
@@ -119,6 +131,10 @@ const styles: Record<string, CSSProperties> = {
     gap: 18,
     padding: 20,
   },
+  bodyMobile: {
+    padding: 16,
+    gap: 14,
+  },
   qrFrame: {
     border: `2px solid ${colors.brand}`,
     borderRadius: 14,
@@ -127,10 +143,18 @@ const styles: Record<string, CSSProperties> = {
     justifyItems: "center",
     gap: 10,
     background: "#fff",
+    width: "100%",
+    maxWidth: 280,
+    justifySelf: "center",
   },
   qrInner: {
     borderRadius: 10,
     overflow: "hidden",
+    maxWidth: "100%",
+  },
+  qrImage: {
+    maxWidth: "100%",
+    height: "auto",
   },
   amount: {
     fontSize: 22,

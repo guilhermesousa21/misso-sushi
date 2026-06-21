@@ -1,4 +1,5 @@
 import "./globals.css";
+import type { Viewport } from "next";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import { CartProvider } from "./context/CartContext";
@@ -15,6 +16,12 @@ const dmSerif = DM_Serif_Display({
   variable: "--font-dm-serif",
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata = {
   title: "Missô Sushi - Cardápio Online",

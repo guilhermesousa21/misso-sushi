@@ -550,7 +550,7 @@ export default function CheckoutPage() {
   if (checkoutState === "awaiting_pix" || checkoutState === "paid") {
     const isPaid = checkoutState === "paid";
     return (
-      <main style={styles.page}>
+      <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
         <section style={styles.pixState}>
           {isPaid ? (
             <div style={styles.pixConfirmedBox}>
@@ -581,10 +581,10 @@ export default function CheckoutPage() {
                 {(pixCode || pixQr) && (
                   <div style={styles.qrImage}>
                     {pixCode ? (
-                      <QRCodeSVG value={pixCode} size={220} level="M" includeMargin />
+                      <QRCodeSVG value={pixCode} size={isMobile ? 200 : 220} level="M" includeMargin />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={`data:image/png;base64,${pixQr}`} alt="QR Code PIX" width={220} height={220} />
+                      <img src={`data:image/png;base64,${pixQr}`} alt="QR Code PIX" width={isMobile ? 200 : 220} height={isMobile ? 200 : 220} style={styles.qrImageResponsive} />
                     )}
                   </div>
                 )}
@@ -626,7 +626,7 @@ export default function CheckoutPage() {
   // ── Gerando ──────────────────────────────────────────────────────────────────
   if (checkoutState === "generating") {
     return (
-      <main style={styles.page}>
+      <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
         <section style={styles.progressState}>
           <p style={styles.eyebrow}>Missô Sushi</p>
           <h1 style={styles.title}>{method === "pix" ? "Gerando PIX..." : "Enviando pedido..."}</h1>
@@ -650,7 +650,7 @@ export default function CheckoutPage() {
 
   if (cart.length === 0) {
     return (
-      <main style={styles.page}>
+      <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
         <section style={styles.emptyState}>
           <p style={styles.eyebrow}>Checkout</p>
           <h1 style={styles.title}>Seu carrinho está vazio</h1>
@@ -1092,7 +1092,12 @@ export default function CheckoutPage() {
             <span>{itemCount} {itemCount === 1 ? "item" : "itens"}</span>
             <strong>{money(finalTotal)}</strong>
           </div>
-          <div style={styles.mobileActionButtons}>
+          <div
+            style={{
+              ...styles.mobileActionButtons,
+              ...(checkoutStep === 1 ? styles.mobileActionButtonsSingle : {}),
+            }}
+          >
             {checkoutStep > 1 && (
               <Button type="button" variant="ghost" onClick={handleBackStep} style={styles.mobileBackButton}>
                 Voltar
@@ -1145,7 +1150,7 @@ const styles: Record<string, CSSProperties> = {
   page: { minHeight: "100vh", background: "#f5f1ea", color: "#171512", padding: "20px 20px 48px" },
   pageMobile: { padding: "18px 14px calc(110px + env(safe-area-inset-bottom, 0px))" },
   header: { maxWidth: 1180, margin: "0 auto 16px", position: "relative", display: "grid", justifyItems: "center", textAlign: "center", paddingTop: 18 },
-  headerMobile: { paddingTop: 46 },
+  headerMobile: { paddingTop: "calc(46px + env(safe-area-inset-top, 0px))" },
   headerTitle: { textAlign: "center" },
   headerLogo: { display: "flex", justifyContent: "center", marginBottom: 8 },
   title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },
@@ -1228,7 +1233,7 @@ const styles: Record<string, CSSProperties> = {
   addonRow: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, border: "1px solid rgba(28, 26, 23, 0.08)", borderRadius: 8, padding: "12px 14px", background: "#fff" },
   addonPrice: { display: "block", marginTop: 3, color: "#766e64", fontSize: 12, fontWeight: 750 },
   qtyControl: { display: "inline-flex", alignItems: "center", gap: 10 },
-  qtyButton: { width: 30, height: 30, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", cursor: "pointer", fontWeight: 850 },
+  qtyButton: { width: 44, height: 44, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", cursor: "pointer", fontWeight: 850 },
   methods: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 },
   methodButton: { border: "1px solid rgba(28, 26, 23, 0.1)", background: "#fff", borderRadius: 8, padding: 15, color: "#1c1a17", cursor: "pointer", fontWeight: 850, display: "flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: "0 6px 16px rgba(28, 26, 23, 0.04)" },
   methodButtonActive: { background: "#1c1a17", borderColor: "#1c1a17", color: "#fffdf8" },
@@ -1386,6 +1391,9 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: "auto 1fr",
     gap: 8,
   },
+  mobileActionButtonsSingle: {
+    gridTemplateColumns: "1fr",
+  },
   mobileBackButton: {
     border: "1px solid rgba(28, 26, 23, 0.12)",
     borderRadius: 999,
@@ -1394,6 +1402,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "13px 16px",
     cursor: "pointer",
     fontWeight: 850,
+    minHeight: 48,
   },
   mobileContinueButton: {
     border: "none",
@@ -1403,6 +1412,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "13px 16px",
     cursor: "pointer",
     fontWeight: 850,
+    minHeight: 48,
   },
   mobilePayButton: {
     border: "none",
@@ -1413,5 +1423,10 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     fontWeight: 850,
     boxShadow: "0 12px 24px rgba(159, 29, 47, 0.2)",
+    minHeight: 48,
+  },
+  qrImageResponsive: {
+    maxWidth: "100%",
+    height: "auto",
   },
 };

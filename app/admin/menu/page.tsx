@@ -1053,7 +1053,7 @@ export default function AdminMenuPage() {
         <EditModal
           item={editingItem}
           categories={categoryOptions}
-          compact={isTablet}
+          compact={isMobile || isTablet}
           onClose={() => setEditingItem(null)}
           onSave={(updated) => {
             if ("deleted" in updated) {

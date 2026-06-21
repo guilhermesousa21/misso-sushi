@@ -89,7 +89,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "20px 20px 48px",
   },
   pageMobile: {
-    padding: "18px 14px 38px",
+    padding: "18px 14px calc(110px + env(safe-area-inset-bottom, 0px))",
   },
   header: {
     maxWidth: 1180,
@@ -101,7 +101,7 @@ const styles: Record<string, CSSProperties> = {
     paddingTop: 18,
   },
   headerMobile: {
-    paddingTop: 46,
+    paddingTop: "calc(46px + env(safe-area-inset-top, 0px))",
   },
   headerTitle: {
     textAlign: "center",

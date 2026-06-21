@@ -1,22 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { MQ } from "./breakpoints";
 
+function subscribe(query: string, callback: () => void) {
+  const media = window.matchMedia(query);
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
+
+function getSnapshot(query: string) {
+  return window.matchMedia(query).matches;
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
 export function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const update = () => setMatches(media.matches);
-
-    update();
-    media.addEventListener("change", update);
-
-    return () => media.removeEventListener("change", update);
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(
+    (callback) => subscribe(query, callback),
+    () => getSnapshot(query),
+    getServerSnapshot
+  );
 }
 
 export function useIsMobile() {

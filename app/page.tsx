@@ -286,8 +286,8 @@ export default function Page() {
   };
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
+    <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
+      <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <div style={{ ...styles.headerInner, ...(isMobile ? styles.headerInnerMobile : {}) }}>
           <div>
             <BrandLogo size={isMobile ? "sm" : "md"} />
@@ -306,9 +306,9 @@ export default function Page() {
             </p>
           </div>
           <div style={styles.headerActions}>
-            <Link href="/meus-pedidos" style={styles.headerLink}>
+            <Link href="/meus-pedidos" style={{ ...styles.headerLink, ...(isMobile ? styles.headerLinkMobile : {}) }}>
               <ClipboardList size={14} strokeWidth={2.2} />
-              Meus pedidos
+              {isMobile ? "Pedidos" : "Meus pedidos"}
             </Link>
             <button
               type="button"
@@ -333,8 +333,8 @@ export default function Page() {
       ) : (
         <>
       <nav style={{ ...styles.categoryNav, ...(isMobile ? styles.categoryNavMobile : {}) }} aria-label="Categorias do cardápio">
-        <div style={styles.searchRow}>
-          <label style={styles.searchBox}>
+        <div style={{ ...styles.searchRow, ...(isMobile ? styles.searchRowMobile : {}) }}>
+          <label style={{ ...styles.searchBox, ...(isMobile ? styles.searchBoxMobile : {}) }}>
             <Search size={15} strokeWidth={2.2} style={styles.searchIcon} />
             <input
               value={searchTerm}
@@ -524,18 +524,24 @@ export default function Page() {
                       <button
                         type="button"
                         onClick={() => decrease(item.lineKey)}
-                        style={styles.quantityButton}
+                        style={{
+                          ...styles.quantityButton,
+                          ...(isMobile ? styles.quantityButtonMobile : {}),
+                        }}
                         aria-label={`Remover ${item.name}`}
                       >
                         -
                       </button>
-                      <span style={styles.quantityValue}>{item.quantity}</span>
+                      <span style={{ ...styles.quantityValue, ...(isMobile ? styles.quantityValueMobile : {}) }}>
+                        {item.quantity}
+                      </span>
                       <button
                         type="button"
                         onClick={() => increase(item.lineKey)}
                         style={{
                           ...styles.quantityButton,
                           ...styles.quantityButtonDark,
+                          ...(isMobile ? styles.quantityButtonMobile : {}),
                         }}
                         aria-label={`Adicionar ${item.name}`}
                       >
@@ -558,10 +564,11 @@ export default function Page() {
                 disabled={cart.length === 0 || !storeOpen}
                 style={{
                   ...styles.checkoutButton,
+                  ...(isMobile ? styles.checkoutButtonMobile : {}),
                   ...(cart.length === 0 || !storeOpen ? styles.checkoutButtonDisabled : {}),
                 }}
               >
-                Ir para pagamento · {money(total)}
+                {isMobile ? `Pagamento · ${money(total)}` : `Ir para pagamento · ${money(total)}`}
               </button>
               {!storeOpen && cart.length > 0 && (
                 <p style={styles.cartClosedNote}>Pedidos pausados no momento. Veja o horário no topo da página.</p>
@@ -581,6 +588,9 @@ const styles: Record<string, CSSProperties> = {
     color: "#1c1a17",
     paddingBottom: 112,
   },
+  pageMobile: {
+    paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))",
+  },
   header: {
     position: "sticky",
     top: 0,
@@ -588,6 +598,9 @@ const styles: Record<string, CSSProperties> = {
     background: "rgba(247, 244, 239, 0.92)",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
     backdropFilter: "blur(14px)",
+  },
+  headerMobile: {
+    paddingTop: "env(safe-area-inset-top, 0px)",
   },
   headerInner: {
     maxWidth: 1120,
@@ -622,6 +635,11 @@ const styles: Record<string, CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     gap: 7,
+    minHeight: 44,
+  },
+  headerLinkMobile: {
+    padding: "10px 12px",
+    fontSize: 12,
   },
   eyebrow: {
     color: "#766e64",
@@ -696,7 +714,7 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
   },
   categoryNavMobile: {
-    top: 96,
+    top: 118,
   },
   categoryBar: {
     maxWidth: 1120,
@@ -711,8 +729,11 @@ const styles: Record<string, CSSProperties> = {
     margin: "0 auto",
     padding: "10px 20px 8px",
   },
+  searchRowMobile: {
+    padding: "10px 16px 8px",
+  },
   searchBox: {
-    height: 38,
+    height: 44,
     width: "100%",
     maxWidth: 320,
     display: "flex",
@@ -722,6 +743,9 @@ const styles: Record<string, CSSProperties> = {
     background: "#fffdf8",
     borderRadius: 999,
     padding: "0 12px",
+  },
+  searchBoxMobile: {
+    maxWidth: "100%",
   },
   searchIcon: {
     color: colors.textSubtle,
@@ -748,7 +772,8 @@ const styles: Record<string, CSSProperties> = {
     background: "rgba(255, 253, 248, 0.74)",
     color: "#514a43",
     borderRadius: 999,
-    padding: "8px 12px",
+    padding: "10px 14px",
+    minHeight: 44,
     fontSize: 13,
     fontWeight: 800,
     whiteSpace: "nowrap",
@@ -765,14 +790,14 @@ const styles: Record<string, CSSProperties> = {
     padding: "28px 20px",
   },
   contentMobile: {
-    padding: "16px 12px 88px",
+    padding: "16px 12px calc(96px + env(safe-area-inset-bottom, 0px))",
   },
   categorySection: {
     scrollMarginTop: 140,
     marginBottom: 42,
   },
   categorySectionMobile: {
-    scrollMarginTop: 126,
+    scrollMarginTop: 150,
     marginBottom: 28,
   },
   sectionHeader: {
@@ -833,8 +858,8 @@ const styles: Record<string, CSSProperties> = {
     padding: 2,
   },
   quantityControlMobile: {
-    height: 32,
-    gridTemplateColumns: "32px 28px 32px",
+    height: 44,
+    gridTemplateColumns: "44px 34px 44px",
   },
   quantityButton: {
     width: 34,
@@ -848,9 +873,9 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
   quantityButtonMobile: {
-    width: 28,
-    height: 28,
-    fontSize: 15,
+    width: 44,
+    height: 44,
+    fontSize: 18,
   },
   quantityButtonDark: {
     background: "#9f1d2f",
@@ -1008,6 +1033,8 @@ const styles: Record<string, CSSProperties> = {
   cartItemName: {
     display: "block",
     lineHeight: 1.3,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   cartItemModifiers: {
     marginTop: 4,
@@ -1052,6 +1079,10 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.45,
     cursor: "not-allowed",
     boxShadow: "none",
+  },
+  checkoutButtonMobile: {
+    fontSize: 15,
+    padding: "15px 14px",
   },
   cartClosedNote: {
     marginTop: 10,

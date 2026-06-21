@@ -598,7 +598,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "28px 20px 56px",
   },
   pageMobile: {
-    padding: "18px 12px 42px",
+    padding: "18px 12px calc(24px + env(safe-area-inset-bottom, 0px))",
   },
   header: {
     maxWidth: 1180,

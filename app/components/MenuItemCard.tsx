@@ -367,8 +367,9 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
   addButtonMobile: {
-    padding: "7px 10px",
-    fontSize: 12,
+    minHeight: 44,
+    padding: "10px 14px",
+    fontSize: 13,
   },
   addButtonDisabled: {
     opacity: 0.5,
@@ -384,8 +385,8 @@ const styles: Record<string, CSSProperties> = {
     padding: 2,
   },
   quantityControlMobile: {
-    height: 32,
-    gridTemplateColumns: "32px 28px 32px",
+    height: 44,
+    gridTemplateColumns: "44px 34px 44px",
   },
   quantityButton: {
     width: 34,
@@ -399,9 +400,9 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
   quantityButtonMobile: {
-    width: 28,
-    height: 28,
-    fontSize: 15,
+    width: 44,
+    height: 44,
+    fontSize: 18,
   },
   quantityButtonDark: {
     background: colors.brand,

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { colors } from "./designTokens";
+import { colors, fonts } from "./designTokens";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "dark";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -153,4 +153,17 @@ export const eyebrowStyle: CSSProperties = {
   fontWeight: 850,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
+};
+
+export const pageTitleStyle: CSSProperties = {
+  marginTop: 8,
+  fontSize: "clamp(34px, 6vw, 64px)",
+  lineHeight: 0.98,
+  fontWeight: 850,
+  fontFamily: fonts.body,
+};
+
+export const pageTitleMobileStyle: CSSProperties = {
+  fontSize: 30,
+  lineHeight: 1,
 };

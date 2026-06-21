@@ -19,6 +19,8 @@ import {
   getInputStyle,
   getSelectStyle,
   eyebrowStyle,
+  pageTitleStyle,
+  pageTitleMobileStyle,
 } from "../../lib/uiStyles";
 import { BrandLogo } from "../components/BrandLogo";
 import { Button } from "../components/ui/Button";
@@ -375,7 +377,7 @@ function baseStyles(): Record<string, CSSProperties> {
       position: "sticky",
       top: 0,
       zIndex: 30,
-      padding: "12px 14px",
+      padding: "calc(12px + env(safe-area-inset-top, 0px)) 14px 12px",
       gap: 10,
       display: "flex",
       flexDirection: "row",
@@ -478,15 +480,8 @@ function baseStyles(): Record<string, CSSProperties> {
       fontWeight: 850,
       textTransform: "uppercase",
     },
-    title: {
-      marginTop: 4,
-      fontSize: "clamp(36px, 5vw, 58px)",
-      lineHeight: 1,
-      fontFamily: "var(--font-dm-serif), Georgia, serif",
-    },
-    titleMobile: {
-      fontSize: 30,
-    },
+    title: pageTitleStyle,
+    titleMobile: pageTitleMobileStyle,
     muted: {
       color: "#625b53",
       lineHeight: 1.5,
@@ -510,18 +505,19 @@ function baseStyles(): Record<string, CSSProperties> {
     },
     mobileTab: {
       flex: "0 0 auto",
-      minWidth: 68,
+      minWidth: 72,
+      minHeight: 52,
       borderRadius: 13,
       color: "#625b53",
-      padding: "8px 5px",
+      padding: "10px 8px",
       textAlign: "center",
       textDecoration: "none",
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: 850,
       whiteSpace: "nowrap",
       display: "grid",
       justifyItems: "center",
-      gap: 3,
+      gap: 4,
     },
     mobileTabActive: {
       background: "var(--color-dark)",

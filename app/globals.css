@@ -54,6 +54,12 @@ body {
   a[href] {
     -webkit-tap-highlight-color: transparent;
   }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 button,

@@ -8,7 +8,7 @@ import { BrandLogo } from "../../components/BrandLogo";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
-import { eyebrowStyle } from "../../../lib/uiStyles";
+import { eyebrowStyle, pageTitleStyle } from "../../../lib/uiStyles";
 
 export default function AdminLoginPage() {
   return (
@@ -86,10 +86,9 @@ const styles: Record<string, CSSProperties> = {
     gap: 4,
   },
   title: {
+    ...pageTitleStyle,
     marginTop: 6,
-    fontFamily: "var(--font-dm-serif), Georgia, serif",
     fontSize: 34,
-    lineHeight: 1,
   },
   form: {
     marginTop: 12,
