@@ -1,10 +1,12 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { printOrder } from "../../../lib/printOrder";
-import { formatAddonSummary, formatPickupTime } from "../../../lib/orderFeatures";
-import { formatOrderItemLabel } from "../../../lib/itemModifiers";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AdminOrderItemsList } from "../../components/AdminOrderItemsList";
+import { downloadOrdersCsv } from "../../../lib/exportOrdersCsv";
+import { formatPickupTime } from "../../../lib/orderFeatures";
+import { getCustomerWhatsAppUrl } from "../../../lib/adminOrderDetails";
 import { supabase } from "../../../lib/supabase";
 import {
   addDaysInBrasilia,
@@ -55,20 +57,112 @@ const getShortPickupLabel = (order: AdminOrder) => {
 
 const isPaidOrder = (order: AdminOrder) => order.payment_status === "pago";
 
+type OrderDateGroup = {
+  dateKey: string;
+  label: string;
+  orders: AdminOrder[];
+};
+
+const formatOrderDateGroupLabel = (createdAt: string) => {
+  const orderKey = toBrasiliaDateKey(createdAt);
+  const todayKey = toBrasiliaDateKey(new Date());
+  const yesterdayKey = toBrasiliaDateKey(addDaysInBrasilia(new Date(), -1));
+
+  if (orderKey === todayKey) return "Hoje";
+  if (orderKey === yesterdayKey) return "Ontem";
+
+  const [year, month, day] = orderKey.split("-");
+  const currentYear = todayKey.split("-")[0];
+  return year === currentYear ? `${day}/${month}` : `${day}/${month}/${year}`;
+};
+
+const groupOrdersByDate = (orders: AdminOrder[]): OrderDateGroup[] => {
+  const groups: OrderDateGroup[] = [];
+
+  orders.forEach((order) => {
+    const dateKey = toBrasiliaDateKey(order.created_at);
+    const label = formatOrderDateGroupLabel(order.created_at);
+    const lastGroup = groups[groups.length - 1];
+
+    if (lastGroup?.dateKey === dateKey) {
+      lastGroup.orders.push(order);
+      return;
+    }
+
+    groups.push({ dateKey, label, orders: [order] });
+  });
+
+  return groups;
+};
+
+const normalizePhoneDigits = (value: string) => value.replace(/\D/g, "");
+
+const matchesOrderSearch = (order: AdminOrder, search: string) => {
+  const trimmed = search.trim();
+  if (!trimmed) return true;
+
+  const query = normalize(trimmed);
+  const queryDigits = normalizePhoneDigits(trimmed);
+  const orderPhoneDigits = normalizePhoneDigits(order.phone || "");
+
+  return (
+    normalize(String(order.id)).includes(query) ||
+    normalize(order.name || "").includes(query) ||
+    normalize(order.phone || "").includes(query) ||
+    (queryDigits.length >= 8 && orderPhoneDigits.includes(queryDigits))
+  );
+};
+
 export default function AdminOrdersPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminShell eyebrow="Atendimento" title="Pedidos">
+          <p style={localStyles.muted}>Carregando pedidos...</p>
+        </AdminShell>
+      }
+    >
+      <AdminOrdersPageContent />
+    </Suspense>
+  );
+}
+
+function AdminOrdersPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedOrderId, setExpandedOrderId] = useState<string | number | null>(null);
-  const [search, setSearch] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : new URLSearchParams(window.location.search).get("cliente") || ""
-  );
+  const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
+  const activeCustomerFilter = searchParams.get("cliente")?.trim() || "";
+
+  useEffect(() => {
+    const cliente = searchParams.get("cliente");
+    if (cliente === null) return;
+
+    setSearch(cliente);
+    if (cliente.trim()) {
+      setDateRange("all");
+    }
+  }, [searchParams]);
+
+  const applyCustomerFilter = (phone: string) => {
+    const value = phone.trim();
+    if (!value) return;
+
+    setSearch(value);
+    setDateRange("all");
+    router.push(`/admin/pedidos?cliente=${encodeURIComponent(value)}`);
+  };
+
+  const clearCustomerFilter = () => {
+    setSearch("");
+    router.push("/admin/pedidos");
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -134,7 +228,6 @@ export default function AdminOrdersPage() {
   }, []);
 
   const filteredOrders = useMemo(() => {
-    const query = normalize(search.trim());
     const rangeStart = dateRange === "custom" ? dateFrom : getDateRangeStart(dateRange);
     const rangeEnd = dateRange === "custom" ? dateTo : "";
 
@@ -144,13 +237,8 @@ export default function AdminOrdersPage() {
       const orderDate = toBrasiliaDateKey(order.created_at);
       const byDateStart = !rangeStart || orderDate >= rangeStart;
       const byDateEnd = !rangeEnd || orderDate <= rangeEnd;
-      const bySearch =
-        !query ||
-        normalize(String(order.id)).includes(query) ||
-        normalize(order.name || "").includes(query) ||
-        normalize(order.phone || "").includes(query);
 
-      return byDateStart && byDateEnd && bySearch;
+      return byDateStart && byDateEnd && matchesOrderSearch(order, search);
     });
   }, [dateFrom, dateRange, dateTo, orders, search]);
 
@@ -160,6 +248,18 @@ export default function AdminOrdersPage() {
 
     return { average, total };
   }, [filteredOrders]);
+
+  const groupedOrders = useMemo(() => groupOrdersByDate(filteredOrders), [filteredOrders]);
+
+  const handleExportCsv = () => {
+    if (filteredOrders.length === 0) return;
+
+    downloadOrdersCsv(filteredOrders, {
+      dateRange,
+      dateFrom,
+      dateTo,
+    });
+  };
 
   return (
     <AdminShell
@@ -187,11 +287,28 @@ export default function AdminOrdersPage() {
       </section>
 
       <section style={{ ...localStyles.panel, ...(isMobile ? localStyles.panelMobile : {}) }}>
-        <div style={localStyles.panelHeader}>
+        <div
+          style={{
+            ...localStyles.panelHeader,
+            ...(isMobile ? localStyles.panelHeaderMobile : {}),
+          }}
+        >
           <div>
             <p style={styles.cardEyebrow}>Histórico</p>
             <h2 style={styles.cardTitle}>Lista de pedidos</h2>
           </div>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={loading || filteredOrders.length === 0}
+            style={{
+              ...localStyles.exportButton,
+              ...(loading || filteredOrders.length === 0 ? localStyles.exportButtonDisabled : {}),
+              ...(isMobile ? localStyles.exportButtonMobile : {}),
+            }}
+          >
+            Exportar CSV
+          </button>
         </div>
 
         <div
@@ -254,103 +371,145 @@ export default function AdminOrdersPage() {
           </label>
         </div>
 
-        {!isMobile && filteredOrders.length > 0 && (
-          <div style={localStyles.tableHead}>
-            <span>Pedido</span>
-            <span>Retirada</span>
-            <span>Pagamento</span>
-            <span>Total</span>
-            <span aria-hidden="true" />
+        {activeCustomerFilter && (
+          <div style={localStyles.customerFilterBar}>
+            <span style={localStyles.customerFilterText}>
+              Filtrando cliente: <strong>{activeCustomerFilter}</strong>
+            </span>
+            <button type="button" onClick={clearCustomerFilter} style={localStyles.customerFilterClear}>
+              Limpar
+            </button>
           </div>
         )}
 
         <div style={localStyles.list}>
-          {filteredOrders.map((order) => {
-            const expanded = expandedOrderId === order.id;
-            const addonSummary = formatAddonSummary(order.addons);
-            const hasNote = Boolean(order.note?.trim());
-            const paymentLabel = paymentLabels[order.payment_method || ""] || order.payment_method || "—";
+          {groupedOrders.map((group) => (
+            <section key={group.dateKey} style={localStyles.dateGroup}>
+              <div style={localStyles.dateGroupHeader}>{group.label}</div>
 
-            return (
-              <article key={order.id} style={localStyles.orderBlock}>
-                <div
-                  style={{
-                    ...localStyles.row,
-                    ...(isMobile ? localStyles.rowMobile : {}),
-                    ...(expanded ? { borderColor: "rgba(28, 26, 23, 0.14)" } : {}),
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setExpandedOrderId(expanded ? null : order.id)}
-                    style={{
-                      ...localStyles.rowMainButton,
-                      ...(isMobile ? localStyles.rowMainButtonMobile : {}),
-                    }}
-                  >
-                    <div style={localStyles.rowIdentity}>
-                      <strong style={localStyles.rowTitle}>#{order.id}</strong>
-                      <span style={localStyles.rowCustomer}>
-                        {order.name || "Cliente"} · {order.phone || "Sem telefone"}
-                      </span>
-                      <span style={localStyles.rowMeta}>
-                        {formatBrasiliaDateTimeShort(order.created_at)}
-                        {isMobile && ` · ${getShortPickupLabel(order)} · ${paymentLabel}`}
-                      </span>
-                    </div>
-                    {!isMobile && (
-                      <>
-                        <span style={localStyles.pickupBadge}>{getShortPickupLabel(order)}</span>
-                        <span style={localStyles.paymentBadge}>{paymentLabel}</span>
-                        <strong style={localStyles.rowTotal}>{money(calcTotal(order))}</strong>
-                      </>
-                    )}
-                    {isMobile && (
-                      <strong style={localStyles.rowTotalMobile}>{money(calcTotal(order))}</strong>
-                    )}
-                    <span style={localStyles.expandIcon}>{expanded ? "▲" : "▼"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => printOrder(order)}
-                    style={{
-                      ...localStyles.printButton,
-                      ...(isMobile ? localStyles.printButtonMobile : {}),
-                    }}
-                    aria-label={`Imprimir pedido ${order.id}`}
-                  >
-                    Imprimir
-                  </button>
-                </div>
+              {group.orders.map((order) => {
+                const hasNote = Boolean(order.note?.trim());
+                const hasCoupon =
+                  Boolean(order.coupon_code?.trim()) || Number(order.discount_amount || 0) > 0;
+                const couponTitle = order.coupon_code?.trim()
+                  ? `Cupom ${order.coupon_code.trim()}`
+                  : "Cupom aplicado";
+                const paymentLabel =
+                  paymentLabels[order.payment_method || ""] || order.payment_method || "—";
+                const whatsappUrl = getCustomerWhatsAppUrl(order.phone);
+                const customerPhone = order.phone?.trim() || "";
 
-                {expanded && (
-                  <div style={localStyles.details}>
-                    <div style={localStyles.itemList}>
-                      {(order.items || []).length > 0 ? (
-                        (order.items || []).map((item, index) => (
-                          <span key={`${order.id}-${item.id}-${index}`} style={localStyles.itemLine}>
-                            {formatOrderItemLabel(item)}
+                return (
+                  <article key={order.id} style={localStyles.orderBlock}>
+                    <div
+                      style={{
+                        ...localStyles.orderHeader,
+                        ...(isMobile ? localStyles.orderHeaderMobile : {}),
+                      }}
+                    >
+                      <div
+                        style={{
+                          ...localStyles.orderHeaderLine,
+                          ...(isMobile ? localStyles.orderHeaderLineMobile : {}),
+                        }}
+                      >
+                        <div style={localStyles.orderHeaderIdentity}>
+                          <strong style={localStyles.orderId}>#{order.id}</strong>
+                          <span style={localStyles.orderSeparator}>·</span>
+                          <span style={localStyles.orderName}>{order.name || "Cliente"}</span>
+                          <span style={localStyles.orderSeparator}>·</span>
+                          <span style={localStyles.orderPhone}>
+                            {order.phone || "Sem telefone"}
                           </span>
-                        ))
-                      ) : (
-                        <span style={localStyles.muted}>Sem itens salvos neste pedido.</span>
+                          {!isMobile && (
+                            <>
+                              <span style={localStyles.orderSeparator}>·</span>
+                              <span style={localStyles.orderTime}>
+                                {formatBrasiliaDateTimeShort(order.created_at)}
+                              </span>
+                            </>
+                          )}
+                          {(hasNote || hasCoupon) && (
+                            <span style={localStyles.rowIndicators}>
+                              {hasNote && (
+                                <span
+                                  style={localStyles.indicatorNote}
+                                  title="Tem observação do cliente"
+                                  aria-label="Tem observação do cliente"
+                                >
+                                  Obs
+                                </span>
+                              )}
+                              {hasCoupon && (
+                                <span
+                                  style={localStyles.indicatorCoupon}
+                                  title={couponTitle}
+                                  aria-label={couponTitle}
+                                >
+                                  Cupom
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+
+                        <strong style={localStyles.rowTotal}>{money(calcTotal(order))}</strong>
+                      </div>
+
+                      <div
+                        style={{
+                          ...localStyles.orderHeaderSubline,
+                          ...(isMobile ? localStyles.orderHeaderSublineMobile : {}),
+                        }}
+                      >
+                        <div style={localStyles.orderHeaderMeta}>
+                          {isMobile && (
+                            <>
+                              <span>{formatBrasiliaDateTimeShort(order.created_at)}</span>
+                              <span style={localStyles.orderSeparator}>·</span>
+                            </>
+                          )}
+                          <span>{getShortPickupLabel(order)}</span>
+                          <span style={localStyles.orderSeparator}>·</span>
+                          <span>{paymentLabel}</span>
+                        </div>
+
+                        {(whatsappUrl || customerPhone) && (
+                          <div style={localStyles.orderHeaderActions}>
+                            {whatsappUrl ? (
+                              <a
+                                href={whatsappUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={localStyles.actionLink}
+                              >
+                                WhatsApp
+                              </a>
+                            ) : null}
+                            {customerPhone ? (
+                              <button
+                                type="button"
+                                onClick={() => applyCustomerFilter(customerPhone)}
+                                style={localStyles.actionLink}
+                              >
+                                {isMobile ? "Pedidos do cliente" : "Histórico do cliente"}
+                              </button>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+
+                      {hasNote && (
+                        <p style={localStyles.orderNote}>{order.note?.trim()}</p>
                       )}
                     </div>
-                    {addonSummary && (
-                      <p style={localStyles.detailLine}>
-                        <strong>Complementos:</strong> {addonSummary}
-                      </p>
-                    )}
-                    {hasNote && (
-                      <p style={localStyles.detailNote}>
-                        <strong>Observação:</strong> {order.note?.trim()}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </article>
-            );
-          })}
+
+                    <AdminOrderItemsList items={order.items} addons={order.addons} />
+                  </article>
+                );
+              })}
+            </section>
+          ))}
 
           {loading && <p style={localStyles.muted}>Carregando pedidos...</p>}
           {!loading && filteredOrders.length === 0 && (
@@ -395,7 +554,34 @@ const localStyles: Record<string, CSSProperties> = {
     padding: "14px 12px 8px",
   },
   panelHeader: {
+    display: "flex",
+    alignItems: "end",
+    justifyContent: "space-between",
+    gap: 12,
     marginBottom: 14,
+  },
+  panelHeaderMobile: {
+    alignItems: "stretch",
+    flexDirection: "column",
+  },
+  exportButton: {
+    border: "1px solid rgba(28, 26, 23, 0.14)",
+    borderRadius: 8,
+    background: "#fff",
+    color: "#1c1a17",
+    padding: "11px 14px",
+    cursor: "pointer",
+    fontWeight: 850,
+    fontSize: 13,
+    whiteSpace: "nowrap",
+    minHeight: 46,
+  },
+  exportButtonMobile: {
+    width: "100%",
+  },
+  exportButtonDisabled: {
+    opacity: 0.45,
+    cursor: "not-allowed",
   },
   toolbar: {
     display: "grid",
@@ -468,174 +654,203 @@ const localStyles: Record<string, CSSProperties> = {
     outlineColor: "#9f1d2f",
     minHeight: 46,
   },
-  tableHead: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1.4fr) 140px 90px 110px 92px",
-    gap: 12,
-    padding: "0 14px 10px",
-    color: "#766e64",
-    fontSize: 11,
-    fontWeight: 850,
-    textTransform: "uppercase",
-  },
-  list: {
-    display: "grid",
-    gap: 8,
-  },
-  orderBlock: {
-    display: "grid",
-    gap: 0,
-  },
-  row: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    gap: 8,
-    alignItems: "stretch",
-    background: "#fff",
-    border: "1px solid rgba(28, 26, 23, 0.06)",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  rowMobile: {
-    gridTemplateColumns: "1fr",
-  },
-  rowMainButton: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1.4fr) 140px 90px 110px 28px",
-    gap: 12,
+  customerFilterBar: {
+    display: "flex",
     alignItems: "center",
-    border: "none",
-    background: "transparent",
-    color: "inherit",
-    padding: "14px",
-    cursor: "pointer",
-    textAlign: "left",
-    font: "inherit",
-    minWidth: 0,
-  },
-  rowMainButtonMobile: {
-    gridTemplateColumns: "minmax(0, 1fr) auto 24px",
-    gap: 10,
-    alignItems: "start",
-  },
-  rowIdentity: {
-    minWidth: 0,
-    display: "grid",
-    gap: 3,
-  },
-  rowTitle: {
-    fontSize: 16,
-    lineHeight: 1.2,
-  },
-  rowCustomer: {
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+    padding: "10px 12px",
+    borderRadius: 8,
+    background: "#f0ebe2",
     color: "#514a43",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 750,
+  },
+  customerFilterText: {
+    minWidth: 0,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  rowMeta: {
+  customerFilterClear: {
+    border: "none",
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "7px 12px",
+    cursor: "pointer",
+    fontWeight: 850,
+    fontSize: 12,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  },
+  list: {
+    display: "grid",
+    gap: 12,
+  },
+  dateGroup: {
+    display: "grid",
+    gap: 4,
+  },
+  dateGroupHeader: {
+    padding: "2px 2px 4px",
+    color: "#766e64",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  orderBlock: {
+    background: "#fff",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  orderHeader: {
+    display: "grid",
+    gap: 8,
+    padding: "10px 14px",
+    borderBottom: "1px solid rgba(28, 26, 23, 0.06)",
+  },
+  orderHeaderMobile: {
+    gap: 6,
+  },
+  orderHeaderLine: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    minWidth: 0,
+  },
+  orderHeaderLineMobile: {
+    alignItems: "flex-start",
+  },
+  orderHeaderSubline: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    minWidth: 0,
+  },
+  orderHeaderSublineMobile: {
+    alignItems: "flex-start",
+    flexDirection: "column",
+    gap: 4,
+  },
+  orderHeaderIdentity: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    minWidth: 0,
+    flex: "1 1 auto",
+  },
+  orderId: {
+    fontSize: 14,
+    fontWeight: 900,
+    lineHeight: 1.2,
+    color: "#1c1a17",
+  },
+  orderName: {
+    fontSize: 14,
+    fontWeight: 800,
+    color: "#1c1a17",
+    lineHeight: 1.2,
+  },
+  orderPhone: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#514a43",
+    lineHeight: 1.2,
+  },
+  orderTime: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#766e64",
+    lineHeight: 1.2,
+    whiteSpace: "nowrap",
+  },
+  orderSeparator: {
+    color: "#c7bfb3",
+    fontSize: 12,
+    lineHeight: 1,
+  },
+  orderHeaderActions: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    flexShrink: 0,
+  },
+  orderHeaderMeta: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
     color: "#766e64",
     fontSize: 12,
     lineHeight: 1.35,
+    minWidth: 0,
   },
-  pickupBadge: {
-    borderRadius: 999,
-    background: "#f0ebe2",
+  orderNote: {
+    margin: 0,
+    padding: "8px 10px",
+    borderLeft: "3px solid #9f1d2f",
+    background: "#fff7f7",
     color: "#514a43",
-    padding: "6px 10px",
     fontSize: 12,
-    fontWeight: 850,
-    whiteSpace: "nowrap",
-    textAlign: "center",
+    lineHeight: 1.45,
   },
-  paymentBadge: {
+  rowIndicators: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+  },
+  indicatorNote: {
+    borderRadius: 999,
+    background: "#fff1f1",
+    color: "#9f1d2f",
+    padding: "2px 7px",
+    fontSize: 10,
+    fontWeight: 900,
+    letterSpacing: "0.02em",
+    textTransform: "uppercase",
+    lineHeight: 1.4,
+  },
+  indicatorCoupon: {
     borderRadius: 999,
     background: "#ecfdf5",
     color: "#0f7a4a",
-    padding: "6px 10px",
-    fontSize: 12,
-    fontWeight: 850,
-    whiteSpace: "nowrap",
-    textAlign: "center",
+    padding: "2px 7px",
+    fontSize: 10,
+    fontWeight: 900,
+    letterSpacing: "0.02em",
+    textTransform: "uppercase",
+    lineHeight: 1.4,
   },
   rowTotal: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 850,
     whiteSpace: "nowrap",
-    textAlign: "right",
-  },
-  rowTotalMobile: {
-    fontSize: 16,
-    fontWeight: 850,
-    whiteSpace: "nowrap",
-    alignSelf: "start",
-    marginTop: 2,
-  },
-  expandIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    background: "#f0ebe2",
-    color: "#514a43",
-    display: "grid",
-    placeItems: "center",
-    fontSize: 11,
-    fontWeight: 900,
-    lineHeight: 1,
     flexShrink: 0,
+    color: "#1c1a17",
   },
-  printButton: {
+  actionLink: {
     border: "none",
-    borderLeft: "1px solid rgba(28, 26, 23, 0.08)",
-    background: "#f7f4ef",
-    color: "#1c1a17",
-    padding: "0 16px",
+    background: "transparent",
+    color: "#766e64",
+    padding: 0,
     cursor: "pointer",
-    fontWeight: 850,
-    fontSize: 13,
+    fontWeight: 750,
+    fontSize: 12,
+    textDecoration: "underline",
+    textDecorationColor: "rgba(118, 110, 100, 0.35)",
+    textUnderlineOffset: 2,
+    display: "inline-flex",
+    alignItems: "center",
+    font: "inherit",
     whiteSpace: "nowrap",
-  },
-  printButtonMobile: {
-    borderLeft: "none",
-    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
-    padding: "12px 14px",
-    width: "100%",
-  },
-  details: {
-    border: "1px solid rgba(28, 26, 23, 0.06)",
-    borderTop: "none",
-    borderRadius: "0 0 8px 8px",
-    background: "#faf8f4",
-    padding: "12px 14px 14px",
-    marginTop: -8,
-    display: "grid",
-    gap: 10,
-  },
-  itemList: {
-    display: "grid",
-    gap: 6,
-  },
-  itemLine: {
-    color: "#1c1a17",
-    fontSize: 15,
-    fontWeight: 800,
-    lineHeight: 1.35,
-  },
-  detailLine: {
-    margin: 0,
-    color: "#514a43",
-    fontSize: 13,
-    lineHeight: 1.45,
-  },
-  detailNote: {
-    margin: 0,
-    color: "#514a43",
-    fontSize: 13,
-    lineHeight: 1.45,
-    borderLeft: "3px solid #9f1d2f",
-    paddingLeft: 10,
   },
   muted: {
     color: "#766e64",
