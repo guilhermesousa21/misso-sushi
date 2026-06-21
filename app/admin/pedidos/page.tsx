@@ -10,6 +10,7 @@ import {
 } from "../../../lib/adminOrderDetails";
 import { OrderSummaryCard } from "../../components/OrderSummaryCard";
 import { printOrder } from "../../../lib/printOrder";
+import { downloadOrdersCsv } from "../../../lib/exportOrdersCsv";
 import { formatPickupTime } from "../../../lib/orderFeatures";
 import { supabase } from "../../../lib/supabase";
 import {
@@ -220,6 +221,16 @@ function AdminOrdersPageContent() {
     return { average, total };
   }, [filteredOrders]);
 
+  const handleExportCsv = () => {
+    if (filteredOrders.length === 0) return;
+
+    downloadOrdersCsv(filteredOrders, {
+      dateRange,
+      dateFrom,
+      dateTo,
+    });
+  };
+
   return (
     <AdminShell
       eyebrow="Atendimento"
@@ -246,11 +257,28 @@ function AdminOrdersPageContent() {
       </section>
 
       <section style={{ ...localStyles.panel, ...(isMobile ? localStyles.panelMobile : {}) }}>
-        <div style={localStyles.panelHeader}>
+        <div
+          style={{
+            ...localStyles.panelHeader,
+            ...(isMobile ? localStyles.panelHeaderMobile : {}),
+          }}
+        >
           <div>
             <p style={styles.cardEyebrow}>Histórico</p>
             <h2 style={styles.cardTitle}>Lista de pedidos</h2>
           </div>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={loading || filteredOrders.length === 0}
+            style={{
+              ...localStyles.exportButton,
+              ...(loading || filteredOrders.length === 0 ? localStyles.exportButtonDisabled : {}),
+              ...(isMobile ? localStyles.exportButtonMobile : {}),
+            }}
+          >
+            Exportar CSV
+          </button>
         </div>
 
         <div
@@ -533,7 +561,34 @@ const localStyles: Record<string, CSSProperties> = {
     padding: "14px 12px 8px",
   },
   panelHeader: {
+    display: "flex",
+    alignItems: "end",
+    justifyContent: "space-between",
+    gap: 12,
     marginBottom: 14,
+  },
+  panelHeaderMobile: {
+    alignItems: "stretch",
+    flexDirection: "column",
+  },
+  exportButton: {
+    border: "1px solid rgba(28, 26, 23, 0.14)",
+    borderRadius: 8,
+    background: "#fff",
+    color: "#1c1a17",
+    padding: "11px 14px",
+    cursor: "pointer",
+    fontWeight: 850,
+    fontSize: 13,
+    whiteSpace: "nowrap",
+    minHeight: 46,
+  },
+  exportButtonMobile: {
+    width: "100%",
+  },
+  exportButtonDisabled: {
+    opacity: 0.45,
+    cursor: "not-allowed",
   },
   toolbar: {
     display: "grid",
