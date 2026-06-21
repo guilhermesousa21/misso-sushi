@@ -1,41 +1,49 @@
 import type { CSSProperties } from "react";
 
+const cardShadow = "0 12px 28px rgba(28, 26, 23, 0.05)";
+const border = "1px solid rgba(28, 26, 23, 0.08)";
+
 export const fat = {
   page: {
     display: "grid",
-    gap: 16,
+    gap: 14,
   } satisfies CSSProperties,
 
   toolbar: {
-    display: "flex",
-    flexWrap: "wrap",
+    display: "grid",
+    gridTemplateColumns: "auto minmax(280px, 1fr)",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 12,
-    padding: "12px 14px",
-    background: "#fff",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 16,
-    boxShadow: "0 4px 24px rgba(28, 26, 23, 0.04)",
+    padding: 12,
+    background: "#fffdf8",
+    border,
+    borderRadius: 8,
+    boxShadow: cardShadow,
     position: "sticky",
     top: 8,
     zIndex: 20,
   } satisfies CSSProperties,
 
+  toolbarMobile: {
+    gridTemplateColumns: "1fr",
+    top: 0,
+  } satisfies CSSProperties,
+
   viewSwitch: {
     display: "inline-flex",
-    padding: 4,
-    gap: 4,
-    background: "#f3efe8",
-    borderRadius: 12,
+    padding: 3,
+    gap: 3,
+    background: "#f0ebe2",
+    borderRadius: 8,
+    width: "fit-content",
   } satisfies CSSProperties,
 
   viewBtn: {
     border: "none",
-    borderRadius: 9,
+    borderRadius: 6,
     background: "transparent",
     color: "#625b53",
-    padding: "9px 16px",
+    padding: "9px 14px",
     cursor: "pointer",
     fontWeight: 850,
     fontSize: 13,
@@ -43,34 +51,36 @@ export const fat = {
   } satisfies CSSProperties,
 
   viewBtnActive: {
-    background: "#fff",
-    color: "#1c1a17",
-    boxShadow: "0 2px 8px rgba(28, 26, 23, 0.08)",
+    background: "#1c1a17",
+    color: "#fffdf8",
+    boxShadow: "0 4px 12px rgba(28, 26, 23, 0.16)",
   } satisfies CSSProperties,
 
   toolbarRight: {
-    display: "flex",
-    flexWrap: "wrap",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(220px, 320px)",
     alignItems: "center",
     gap: 10,
-    flex: "1 1 280px",
-    justifyContent: "flex-end",
+  } satisfies CSSProperties,
+
+  toolbarRightStack: {
+    gridTemplateColumns: "1fr",
   } satisfies CSSProperties,
 
   periodPills: {
-    display: "inline-flex",
+    display: "flex",
     flexWrap: "wrap",
     gap: 6,
   } satisfies CSSProperties,
 
   periodBtn: {
-    border: "1px solid transparent",
-    borderRadius: 999,
-    background: "#faf8f4",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    background: "#fffdf8",
     color: "#625b53",
-    padding: "8px 13px",
+    padding: "8px 11px",
     cursor: "pointer",
-    fontWeight: 800,
+    fontWeight: 850,
     fontSize: 12,
     whiteSpace: "nowrap",
   } satisfies CSSProperties,
@@ -83,18 +93,17 @@ export const fat = {
 
   searchWrap: {
     position: "relative",
-    minWidth: "min(100%, 240px)",
-    flex: "1 1 200px",
-    maxWidth: 320,
+    minWidth: 0,
+    width: "100%",
   } satisfies CSSProperties,
 
   searchInput: {
     width: "100%",
     boxSizing: "border-box",
-    border: "1px solid rgba(28, 26, 23, 0.1)",
-    borderRadius: 999,
-    padding: "10px 14px 10px 36px",
-    background: "#faf8f4",
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 8,
+    padding: "11px 13px 11px 36px",
+    background: "#fff",
     color: "#1c1a17",
     fontSize: 13,
     outlineColor: "#9f1d2f",
@@ -114,12 +123,13 @@ export const fat = {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    borderRadius: 999,
+    borderRadius: 8,
     background: "#fce8eb",
     color: "#9f1d2f",
-    padding: "7px 12px",
+    padding: "8px 10px",
     fontSize: 12,
     fontWeight: 850,
+    width: "fit-content",
   } satisfies CSSProperties,
 
   chipBtn: {
@@ -133,85 +143,81 @@ export const fat = {
     fontSize: 16,
   } satisfies CSSProperties,
 
-  hero: {
+  summary: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1.4fr) repeat(4, minmax(0, 1fr))",
+    gridTemplateColumns: "minmax(280px, 1.35fr) repeat(4, minmax(150px, 1fr))",
     gap: 12,
-    minHeight: 148,
   } satisfies CSSProperties,
 
-  heroMobile: {
+  summaryStack: {
     gridTemplateColumns: "1fr",
   } satisfies CSSProperties,
 
-  heroMain: {
-    background: "#000000",
-    borderRadius: 20,
-    padding: "22px 24px",
-    color: "#fffdf8",
+  revenueCard: {
+    background: "#fffdf8",
+    border,
+    borderRadius: 8,
+    padding: 20,
+    color: "#1c1a17",
     display: "grid",
     alignContent: "space-between",
-    gap: 12,
+    gap: 14,
+    boxShadow: cardShadow,
     position: "relative",
     overflow: "hidden",
-    boxShadow: "0 20px 50px rgba(0, 0, 0, 0.25)",
   } satisfies CSSProperties,
 
-  heroGlow: {
+  revenueAccent: {
     position: "absolute",
-    right: -40,
-    top: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 999,
-    background: "radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%)",
+    inset: "0 auto 0 0",
+    width: 5,
+    background: "#9f1d2f",
     pointerEvents: "none",
   } satisfies CSSProperties,
 
   heroLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 850,
     textTransform: "uppercase",
-    letterSpacing: "0.08em",
-    color: "rgba(255,253,248,0.65)",
+    letterSpacing: "0.06em",
+    color: "#9f1d2f",
   } satisfies CSSProperties,
 
   heroValue: {
-    fontSize: "clamp(28px, 4vw, 40px)",
-    fontWeight: 900,
-    lineHeight: 1.05,
-    letterSpacing: "-0.02em",
+    fontSize: "clamp(30px, 4vw, 44px)",
+    fontWeight: 950,
+    lineHeight: 1,
+    color: "#1c1a17",
   } satisfies CSSProperties,
 
   heroMeta: {
     fontSize: 13,
-    color: "rgba(255,253,248,0.72)",
-    fontWeight: 650,
+    color: "#625b53",
+    fontWeight: 700,
   } satisfies CSSProperties,
 
   statCard: {
-    background: "#fff",
-    border: "1px solid rgba(28, 26, 23, 0.07)",
-    borderRadius: 16,
-    padding: "16px 18px",
+    background: "#fffdf8",
+    border,
+    borderRadius: 8,
+    padding: 16,
     display: "grid",
     alignContent: "space-between",
     gap: 8,
-    boxShadow: "0 4px 20px rgba(28, 26, 23, 0.04)",
+    boxShadow: cardShadow,
+    minHeight: 118,
   } satisfies CSSProperties,
 
   statLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 850,
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    color: "#9a9288",
+    color: "#625b53",
   } satisfies CSSProperties,
 
   statValue: {
-    fontSize: "clamp(20px, 2.5vw, 26px)",
-    fontWeight: 900,
-    lineHeight: 1.1,
+    fontSize: "clamp(21px, 2.3vw, 28px)",
+    fontWeight: 950,
+    lineHeight: 1.05,
     color: "#1c1a17",
   } satisfies CSSProperties,
 
@@ -219,11 +225,12 @@ export const fat = {
     fontSize: 12,
     color: "#766e64",
     fontWeight: 650,
+    lineHeight: 1.35,
   } satisfies CSSProperties,
 
   bento: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1.55fr) minmax(280px, 1fr)",
+    gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 0.9fr)",
     gap: 14,
     alignItems: "start",
   } satisfies CSSProperties,
@@ -233,41 +240,63 @@ export const fat = {
   } satisfies CSSProperties,
 
   panel: {
-    background: "#fff",
-    border: "1px solid rgba(28, 26, 23, 0.07)",
-    borderRadius: 18,
-    padding: "18px 20px",
-    boxShadow: "0 4px 20px rgba(28, 26, 23, 0.04)",
+    background: "#fffdf8",
+    border,
+    borderRadius: 8,
+    padding: 18,
+    boxShadow: cardShadow,
     minWidth: 0,
+  } satisfies CSSProperties,
+
+  panelTight: {
+    padding: 14,
   } satisfies CSSProperties,
 
   panelHeader: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "start",
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   } satisfies CSSProperties,
 
   panelTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 900,
     color: "#1c1a17",
-    letterSpacing: "-0.01em",
+    lineHeight: 1.15,
+  } satisfies CSSProperties,
+
+  panelSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#766e64",
+    lineHeight: 1.4,
   } satisfies CSSProperties,
 
   panelBadge: {
     borderRadius: 999,
-    background: "#f3efe8",
+    background: "#f0ebe2",
     color: "#625b53",
-    padding: "5px 10px",
+    padding: "5px 9px",
     fontSize: 11,
     fontWeight: 850,
+    whiteSpace: "nowrap",
   } satisfies CSSProperties,
 
   sideStack: {
     display: "grid",
     gap: 14,
+  } satisfies CSSProperties,
+
+  rankGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 14,
+  } satisfies CSSProperties,
+
+  rankGridStack: {
+    gridTemplateColumns: "1fr",
   } satisfies CSSProperties,
 
   rankList: {
@@ -277,19 +306,19 @@ export const fat = {
 
   rankItem: {
     display: "grid",
-    gridTemplateColumns: "28px minmax(0, 1fr) auto",
+    gridTemplateColumns: "30px minmax(0, 1fr) auto",
     gap: 10,
     alignItems: "center",
-    padding: "10px 12px",
-    borderRadius: 12,
-    background: "#faf8f4",
-    border: "1px solid rgba(28, 26, 23, 0.05)",
+    padding: "10px 11px",
+    borderRadius: 8,
+    background: "#fff",
+    border: "1px solid rgba(28, 26, 23, 0.06)",
   } satisfies CSSProperties,
 
   rankIndex: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 7,
     display: "grid",
     placeItems: "center",
     fontSize: 12,
@@ -299,6 +328,7 @@ export const fat = {
   } satisfies CSSProperties,
 
   rankName: {
+    display: "block",
     fontSize: 13,
     fontWeight: 850,
     overflow: "hidden",
@@ -324,12 +354,12 @@ export const fat = {
 
   paymentRow: {
     display: "grid",
-    gap: 10,
+    gap: 11,
   } satisfies CSSProperties,
 
   paymentItem: {
     display: "grid",
-    gap: 6,
+    gap: 7,
   } satisfies CSSProperties,
 
   paymentLine: {
@@ -343,7 +373,7 @@ export const fat = {
   } satisfies CSSProperties,
 
   paymentBar: {
-    height: 6,
+    height: 8,
     borderRadius: 999,
     background: "#f0ebe2",
     overflow: "hidden",
@@ -353,21 +383,41 @@ export const fat = {
     display: "block",
     height: "100%",
     borderRadius: 999,
-    background: "linear-gradient(90deg, #0f7a4a, #34d399)",
+    background: "#0f7a4a",
   } satisfies CSSProperties,
 
   paymentFillCard: {
     display: "block",
     height: "100%",
     borderRadius: 999,
-    background: "linear-gradient(90deg, #1d4ed8, #60a5fa)",
+    background: "#1d4ed8",
   } satisfies CSSProperties,
 
   paymentFillOther: {
     display: "block",
     height: "100%",
     borderRadius: 999,
-    background: "linear-gradient(90deg, #9f1d2f, #d45a6a)",
+    background: "#9f1d2f",
+  } satisfies CSSProperties,
+
+  customDates: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(140px, 1fr))",
+    gap: 8,
+  } satisfies CSSProperties,
+
+  customDatesStack: {
+    gridTemplateColumns: "1fr",
+  } satisfies CSSProperties,
+
+  dateInput: {
+    width: "100%",
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 8,
+    padding: "10px 12px",
+    background: "#fff",
+    fontSize: 13,
+    outlineColor: "#9f1d2f",
   } satisfies CSSProperties,
 
   empty: {
@@ -376,23 +426,5 @@ export const fat = {
     color: "#9a9288",
     fontSize: 13,
     lineHeight: 1.5,
-  } satisfies CSSProperties,
-
-  customDates: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-    width: "100%",
-    marginTop: 10,
-  } satisfies CSSProperties,
-
-  dateInput: {
-    flex: "1 1 130px",
-    border: "1px solid rgba(28, 26, 23, 0.1)",
-    borderRadius: 10,
-    padding: "9px 12px",
-    background: "#faf8f4",
-    fontSize: 13,
-    outlineColor: "#9f1d2f",
   } satisfies CSSProperties,
 };

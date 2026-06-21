@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
@@ -44,11 +43,6 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
   const hasClientFilter = Boolean(initialSearch.trim());
 
   useEffect(() => {
-    setSearch(initialSearch);
-    if (initialSearch.trim()) setView("pedidos");
-  }, [initialSearch]);
-
-  useEffect(() => {
     let mounted = true;
 
     async function fetchOrders() {
@@ -87,15 +81,15 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
         const order = normalizeOrder(payload.new as AdminOrder);
         setOrders((prev) => {
-          if (!isPaidOrder(order)) return prev.filter((c) => c.id !== order.id);
-          const exists = prev.some((c) => c.id === order.id);
+          if (!isPaidOrder(order)) return prev.filter((current) => current.id !== order.id);
+          const exists = prev.some((current) => current.id === order.id);
           return exists
-            ? prev.map((c) => (c.id === order.id ? order : c))
+            ? prev.map((current) => (current.id === order.id ? order : current))
             : [order, ...prev];
         });
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "orders" }, (payload) => {
-        setOrders((prev) => prev.filter((o) => o.id !== payload.old.id));
+        setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
       })
       .subscribe();
 
@@ -119,6 +113,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
         normalize(String(order.id)).includes(query) ||
         normalize(order.name || "").includes(query) ||
         normalize(order.phone || "").includes(query);
+
       return isPaidOrder(order) && byDateStart && byDateEnd && bySearch;
     });
   }, [dateFrom, dateRange, dateTo, orders, search]);
@@ -136,7 +131,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <header style={{ ...fat.toolbar, ...(isMobile ? { top: 0, borderRadius: 14 } : {}) }}>
+      <header style={{ ...fat.toolbar, ...(isMobile ? fat.toolbarMobile : {}) }}>
         <nav style={fat.viewSwitch} aria-label="Visualização">
           {(["painel", "pedidos"] as PageView[]).map((option) => (
             <button
@@ -153,7 +148,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
           ))}
         </nav>
 
-        <div style={fat.toolbarRight}>
+        <div style={{ ...fat.toolbarRight, ...(isMobile ? fat.toolbarRightStack : {}) }}>
           <div style={fat.periodPills} role="group" aria-label="Período">
             {(Object.keys(dateRangeLabels) as DateRange[]).map((option) => (
               <button
@@ -176,7 +171,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
             </span>
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar pedido ou cliente"
               style={fat.searchInput}
               aria-label="Buscar"
@@ -185,18 +180,18 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
         </div>
 
         {dateRange === "custom" && (
-          <div style={fat.customDates}>
+          <div style={{ ...fat.customDates, ...(isMobile ? fat.customDatesStack : {}) }}>
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={(event) => setDateFrom(event.target.value)}
               style={fat.dateInput}
               aria-label="Data inicial"
             />
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={(event) => setDateTo(event.target.value)}
               style={fat.dateInput}
               aria-label="Data final"
             />
@@ -205,7 +200,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
 
         {hasClientFilter && (
           <span style={fat.chip}>
-            {initialSearch}
+            Cliente: {initialSearch}
             <button type="button" onClick={clearClientFilter} style={fat.chipBtn} aria-label="Limpar filtro">
               ×
             </button>

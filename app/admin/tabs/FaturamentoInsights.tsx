@@ -57,18 +57,23 @@ export default function FaturamentoInsights({
   const analytics = useMemo(() => buildFaturamentoAnalytics(orders), [orders]);
 
   const dailyLabels = Object.keys(analytics.revenueByDay).sort();
+  const strongestDay = dailyLabels.reduce(
+    (best, day) => (analytics.revenueByDay[day] > best.value ? { day, value: analytics.revenueByDay[day] } : best),
+    { day: "", value: 0 }
+  );
+
   const chartData = {
     labels: dailyLabels.map(formatDateKey),
     datasets: [
       {
         label: "Faturamento",
         data: dailyLabels.map((day) => analytics.revenueByDay[day]),
-        backgroundColor: dailyLabels.map((_, i) =>
-          i === dailyLabels.length - 1 ? "#9f1d2f" : "rgba(159, 29, 47, 0.35)"
+        backgroundColor: dailyLabels.map((day) =>
+          day === strongestDay.day ? "#9f1d2f" : "rgba(159, 29, 47, 0.28)"
         ),
-        borderRadius: 8,
+        borderRadius: 6,
         borderSkipped: false,
-        maxBarThickness: 44,
+        maxBarThickness: 40,
       },
     ],
   };
@@ -79,7 +84,7 @@ export default function FaturamentoInsights({
     plugins: {
       legend: { display: false },
       datalabels: {
-        display: !isMobile,
+        display: !isMobile && dailyLabels.length <= 14,
         anchor: "end",
         align: "top",
         formatter: (value: number) => (value > 0 ? money(value) : ""),
@@ -90,7 +95,7 @@ export default function FaturamentoInsights({
       tooltip: {
         backgroundColor: "#1c1a17",
         padding: 12,
-        cornerRadius: 10,
+        cornerRadius: 8,
         callbacks: {
           label: (ctx: TooltipItem<"bar">) => money(Number(ctx.raw || 0)),
         },
@@ -99,44 +104,45 @@ export default function FaturamentoInsights({
     scales: {
       x: {
         grid: { display: false },
-        ticks: { color: "#9a9288", font: { size: 11 } },
+        ticks: { color: "#766e64", font: { size: 11 } },
         border: { display: false },
       },
       y: {
         beginAtZero: true,
         border: { display: false },
-        grid: { color: "rgba(28, 26, 23, 0.06)" },
+        grid: { color: "rgba(28, 26, 23, 0.07)" },
         ticks: {
-          color: "#9a9288",
+          color: "#766e64",
           font: { size: 11 },
           maxTicksLimit: 5,
-          callback: (v) => (typeof v === "number" ? money(v) : v),
+          callback: (value) => (typeof value === "number" ? money(value) : value),
         },
       },
     },
   };
 
   const paymentEntries = Object.entries(analytics.paymentTotals).sort((a, b) => b[1] - a[1]);
-  const paymentTotal = paymentEntries.reduce((s, [, v]) => s + v, 0);
+  const paymentTotal = paymentEntries.reduce((sum, [, value]) => sum + value, 0);
+  const customerAverage =
+    analytics.uniqueCustomers > 0 ? analytics.totalRevenue / analytics.uniqueCustomers : 0;
 
   return (
     <div style={fat.page}>
-      <section style={{ ...fat.hero, ...(isMobile || isTablet ? fat.heroMobile : {}) }}>
-        <article style={fat.heroMain}>
-          <span style={fat.heroGlow} aria-hidden="true" />
+      <section style={{ ...fat.summary, ...(isMobile || isTablet ? fat.summaryStack : {}) }}>
+        <article style={fat.revenueCard}>
+          <span style={fat.revenueAccent} aria-hidden="true" />
           <span style={fat.heroLabel}>Receita no período</span>
-          <strong style={fat.heroValue}>
-            {loading ? "—" : money(analytics.totalRevenue)}
-          </strong>
+          <strong style={fat.heroValue}>{loading ? "—" : money(analytics.totalRevenue)}</strong>
           <span style={fat.heroMeta}>
             {loading
-              ? "Calculando..."
-              : `${number(analytics.orderCount)} pedidos · ${number(analytics.uniqueCustomers)} clientes`}
+              ? "Calculando vendas confirmadas..."
+              : `${number(analytics.orderCount)} pedidos pagos · ${number(analytics.uniqueCustomers)} clientes`}
           </span>
         </article>
 
-        <StatCard label="Hoje" value={loading ? "—" : money(analytics.todayRevenue)} detail="Receita de hoje" />
-        <StatCard label="Ticket" value={loading ? "—" : money(analytics.ticketMedio)} detail="Média por pedido" />
+        <StatCard label="Hoje" value={loading ? "—" : money(analytics.todayRevenue)} detail="Entrada do dia" />
+        <StatCard label="Ticket médio" value={loading ? "—" : money(analytics.ticketMedio)} detail="Por pedido pago" />
+        <StatCard label="Por cliente" value={loading ? "—" : money(customerAverage)} detail="Média no filtro" />
         <StatCard
           label="Descontos"
           value={loading ? "—" : money(analytics.totalDiscount)}
@@ -146,16 +152,22 @@ export default function FaturamentoInsights({
               : "Sem cupons"
           }
         />
-        <StatCard label="Pedidos" value={loading ? "—" : number(analytics.orderCount)} detail="Confirmados" />
       </section>
 
       <section style={{ ...fat.bento, ...(isTablet ? fat.bentoStack : {}) }}>
         <article style={fat.panel}>
           <div style={fat.panelHeader}>
-            <h3 style={fat.panelTitle}>Evolução diária</h3>
+            <div>
+              <h3 style={fat.panelTitle}>Evolução diária</h3>
+              <p style={fat.panelSubtitle}>
+                {strongestDay.day
+                  ? `Melhor dia: ${formatDateKey(strongestDay.day)} com ${money(strongestDay.value)}`
+                  : "Acompanhe os dias com venda confirmada."}
+              </p>
+            </div>
             <span style={fat.panelBadge}>{dailyLabels.length} dia(s)</span>
           </div>
-          <div style={{ height: isMobile ? 220 : 300, minHeight: isMobile ? 220 : 300 }}>
+          <div style={{ height: isMobile ? 230 : 310, minHeight: isMobile ? 230 : 310 }}>
             {loading ? (
               <p style={fat.empty}>Carregando gráfico...</p>
             ) : orders.length === 0 ? (
@@ -167,9 +179,12 @@ export default function FaturamentoInsights({
         </article>
 
         <aside style={fat.sideStack}>
-          <article style={fat.panel}>
+          <article style={{ ...fat.panel, ...fat.panelTight }}>
             <div style={fat.panelHeader}>
-              <h3 style={fat.panelTitle}>Formas de pagamento</h3>
+              <div>
+                <h3 style={fat.panelTitle}>Formas de pagamento</h3>
+                <p style={fat.panelSubtitle}>Participação no faturamento filtrado.</p>
+              </div>
             </div>
             <div style={fat.paymentRow}>
               {paymentEntries.length === 0 ? (
@@ -195,42 +210,19 @@ export default function FaturamentoInsights({
             </div>
           </article>
 
-          {Object.keys(analytics.couponTotals).length > 0 && (
-            <article style={fat.panel}>
-              <div style={fat.panelHeader}>
-                <h3 style={fat.panelTitle}>Cupons utilizados</h3>
-              </div>
-              <div style={fat.rankList}>
-                {Object.entries(analytics.couponTotals).map(([code, value]) => (
-                  <div key={code} style={fat.rankItem}>
-                    <span style={{ ...fat.rankIndex, background: "#9f1d2f" }}>%</span>
-                    <div style={{ minWidth: 0 }}>
-                      <strong style={fat.rankName}>{code}</strong>
-                      <p style={fat.rankSub}>Desconto aplicado</p>
-                    </div>
-                    <strong style={fat.rankValue}>{money(value)}</strong>
-                  </div>
-                ))}
-              </div>
-            </article>
-          )}
+          <CouponPanel coupons={analytics.couponTotals} />
         </aside>
       </section>
 
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
-          gap: 14,
-        }}
-      >
+      <section style={{ ...fat.rankGrid, ...(isMobile ? fat.rankGridStack : {}) }}>
         <RankingPanel
           title="Mais vendidos"
+          subtitle="Itens com maior saída no período."
           loading={loading}
           empty="Nenhum item vendido."
-          items={analytics.topItems.map((item, i) => ({
+          items={analytics.topItems.map((item, index) => ({
             key: item.name,
-            index: i + 1,
+            index: index + 1,
             name: item.name,
             sub: `${number(item.quantity)} unidades`,
             value: money(item.revenue),
@@ -238,15 +230,16 @@ export default function FaturamentoInsights({
         />
         <RankingPanel
           title="Melhores clientes"
+          subtitle="Clique para ver os pedidos do cliente."
           loading={loading}
           empty="Nenhum cliente no período."
-          items={analytics.topCustomers.map((c, i) => ({
-            key: c.phone,
-            index: i + 1,
-            name: formatName(c.name),
-            sub: `${number(c.orders)} pedido(s)`,
-            value: money(c.revenue),
-            onClick: onSelectCustomer ? () => onSelectCustomer(c.phone) : undefined,
+          items={analytics.topCustomers.map((customer, index) => ({
+            key: customer.phone,
+            index: index + 1,
+            name: formatName(customer.name),
+            sub: `${number(customer.orders)} pedido(s)`,
+            value: money(customer.revenue),
+            onClick: onSelectCustomer ? () => onSelectCustomer(customer.phone) : undefined,
           }))}
         />
       </section>
@@ -264,13 +257,46 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
   );
 }
 
+function CouponPanel({ coupons }: { coupons: Record<string, number> }) {
+  const entries = Object.entries(coupons).sort((a, b) => b[1] - a[1]);
+
+  return (
+    <article style={{ ...fat.panel, ...fat.panelTight }}>
+      <div style={fat.panelHeader}>
+        <div>
+          <h3 style={fat.panelTitle}>Cupons utilizados</h3>
+          <p style={fat.panelSubtitle}>Total de desconto por código.</p>
+        </div>
+      </div>
+      <div style={fat.rankList}>
+        {entries.length === 0 ? (
+          <p style={fat.empty}>Nenhum cupom aplicado.</p>
+        ) : (
+          entries.map(([code, value]) => (
+            <div key={code} style={fat.rankItem}>
+              <span style={{ ...fat.rankIndex, background: "#9f1d2f" }}>%</span>
+              <div style={{ minWidth: 0 }}>
+                <strong style={fat.rankName}>{code}</strong>
+                <p style={fat.rankSub}>Desconto aplicado</p>
+              </div>
+              <strong style={fat.rankValue}>{money(value)}</strong>
+            </div>
+          ))
+        )}
+      </div>
+    </article>
+  );
+}
+
 function RankingPanel({
   title,
+  subtitle,
   items,
   loading,
   empty,
 }: {
   title: string;
+  subtitle: string;
   items: {
     key: string;
     index: number;
@@ -285,7 +311,10 @@ function RankingPanel({
   return (
     <article style={fat.panel}>
       <div style={fat.panelHeader}>
-        <h3 style={fat.panelTitle}>{title}</h3>
+        <div>
+          <h3 style={fat.panelTitle}>{title}</h3>
+          <p style={fat.panelSubtitle}>{subtitle}</p>
+        </div>
       </div>
       <div style={fat.rankList}>
         {loading ? (
@@ -314,7 +343,6 @@ function RankingPanel({
                   style={{
                     ...fat.rankItem,
                     width: "100%",
-                    border: "1px solid rgba(28, 26, 23, 0.05)",
                     cursor: "pointer",
                     font: "inherit",
                     textAlign: "left",

@@ -92,8 +92,8 @@ function OrderCard({ order, isMobile }: { order: AdminOrder; isMobile: boolean }
         <div style={s.details}>
           <div style={s.items}>
             {(order.items || []).length > 0 ? (
-              (order.items || []).map((item, i) => (
-                <div key={`${order.id}-${item.id}-${i}`} style={s.item}>
+              (order.items || []).map((item, index) => (
+                <div key={`${order.id}-${item.id}-${index}`} style={s.item}>
                   {formatOrderItemLabel(item)}
                 </div>
               ))
@@ -127,14 +127,14 @@ export default function PedidosSection({
   embedded?: boolean;
 }) {
   const isMobile = useIsMobile();
-  const revenue = orders.reduce((sum, o) => sum + calcTotal(o), 0);
+  const revenue = orders.reduce((sum, order) => sum + calcTotal(order), 0);
 
   return (
     <section style={{ ...fat.panel, ...(embedded ? { marginTop: 0 } : {}) }}>
       <div style={fat.panelHeader}>
         <div>
           <h2 style={{ ...fat.panelTitle, fontSize: 17 }}>Histórico de pedidos</h2>
-          <p style={{ marginTop: 4, fontSize: 13, color: "#766e64" }}>
+          <p style={fat.panelSubtitle}>
             {loading ? "Carregando..." : `${number(orders.length)} pedidos · ${money(revenue)}`}
           </p>
         </div>
@@ -157,9 +157,9 @@ export default function PedidosSection({
 const s: Record<string, CSSProperties> = {
   list: { display: "grid", gap: 10 },
   card: {
-    background: "#faf8f4",
+    background: "#fff",
     border: "1px solid rgba(28, 26, 23, 0.07)",
-    borderRadius: 14,
+    borderRadius: 8,
     overflow: "hidden",
     transition: "border-color 0.15s ease, box-shadow 0.15s ease",
   },
@@ -199,7 +199,7 @@ const s: Record<string, CSSProperties> = {
   idBadge: {
     background: "#1c1a17",
     color: "#fffdf8",
-    borderRadius: 8,
+    borderRadius: 7,
     padding: "5px 9px",
     fontSize: 12,
     fontWeight: 900,
@@ -239,7 +239,7 @@ const s: Record<string, CSSProperties> = {
   printBtn: {
     border: "none",
     borderLeft: "1px solid rgba(28, 26, 23, 0.08)",
-    background: "#fff",
+    background: "#fffdf8",
     color: "#514a43",
     padding: "0 18px",
     cursor: "pointer",
@@ -256,15 +256,15 @@ const s: Record<string, CSSProperties> = {
   details: {
     borderTop: "1px dashed rgba(28, 26, 23, 0.1)",
     padding: "14px 16px 16px",
-    background: "#fff",
+    background: "#fffdf8",
     display: "grid",
     gap: 10,
   },
   items: { display: "grid", gap: 6 },
   item: {
     padding: "10px 12px",
-    borderRadius: 10,
-    background: "#faf8f4",
+    borderRadius: 8,
+    background: "#fff",
     border: "1px solid rgba(28, 26, 23, 0.05)",
     fontSize: 13,
     fontWeight: 800,
