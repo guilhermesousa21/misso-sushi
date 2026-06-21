@@ -8,9 +8,9 @@ import {
   getCustomerWhatsAppUrl,
   getOrderTotals,
 } from "../../../lib/adminOrderDetails";
+import { OrderSummaryCard } from "../../components/OrderSummaryCard";
 import { printOrder } from "../../../lib/printOrder";
 import { formatPickupTime } from "../../../lib/orderFeatures";
-import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import {
   addDaysInBrasilia,
@@ -361,98 +361,28 @@ export default function AdminOrdersPage() {
                       ) : null}
                     </div>
 
-                    <div style={localStyles.detailBlock}>
-                      <p style={localStyles.detailEyebrow}>Itens</p>
-                      <div style={localStyles.detailRows}>
-                        {(order.items || []).length > 0 ? (
-                          (order.items || []).map((item, index) => {
-                            const quantity = item.quantity ?? 1;
-                            const unitPrice = Number(item.price || 0);
-                            const lineTotal = unitPrice * quantity;
-                            const modifierText = formatItemModifiers(item.modifiers);
-
-                            return (
-                              <div
-                                key={`${order.id}-${item.id}-${index}`}
-                                style={localStyles.detailRow}
-                              >
-                                <div style={localStyles.detailRowMain}>
-                                  <strong style={localStyles.itemLine}>
-                                    {quantity}x {item.name}
-                                  </strong>
-                                  {modifierText ? (
-                                    <span style={localStyles.detailMuted}>{modifierText}</span>
-                                  ) : null}
-                                  <span style={localStyles.detailMuted}>{money(unitPrice)} cada</span>
-                                </div>
-                                <strong style={localStyles.detailRowValue}>{money(lineTotal)}</strong>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <span style={localStyles.mutedInline}>Sem itens salvos neste pedido.</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div style={localStyles.totalsBox}>
-                      {totals.hasBreakdown && (
-                        <div style={localStyles.totalLine}>
-                          <span>Subtotal</span>
-                          <strong>{money(totals.itemsSubtotal)}</strong>
-                        </div>
-                      )}
-                      {activeAddons.length > 0 && (
-                        <>
-                          <div style={localStyles.totalLine}>
-                            <span>Complementos</span>
-                            <strong>{money(totals.addonTotal)}</strong>
-                          </div>
-                          <div style={localStyles.addonList}>
-                            {activeAddons.map((addon) => {
-                              const quantity = addon.quantity ?? 1;
-                              const lineTotal = Number(addon.unit_price || 0) * quantity;
-
-                              return (
-                                <div key={`${order.id}-${addon.id}`} style={localStyles.addonLine}>
-                                  {quantity}x {addon.name}
-                                  {lineTotal > 0 ? ` · ${money(lineTotal)}` : ""}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-                      {totals.serviceFee > 0 && (
-                        <div style={localStyles.totalLine}>
-                          <span>{totals.serviceFeeLabel}</span>
-                          <strong>{money(totals.serviceFee)}</strong>
-                        </div>
-                      )}
-                      {totals.discountAmount > 0 && (
-                        <div style={localStyles.totalLine}>
-                          <span>
-                            Desconto cupom
-                            {order.coupon_code ? ` (${order.coupon_code})` : ""}
-                          </span>
-                          <strong style={localStyles.discountValue}>
-                            -{money(totals.discountAmount)}
-                          </strong>
-                        </div>
-                      )}
-                      {totals.loyaltyDiscount > 0 && (
-                        <div style={localStyles.totalLine}>
-                          <span>Fidelidade</span>
-                          <strong style={localStyles.discountValue}>
-                            -{money(totals.loyaltyDiscount)}
-                          </strong>
-                        </div>
-                      )}
-                      <div style={localStyles.grandTotalLine}>
-                        <span>Total</span>
-                        <strong>{money(totals.grandTotal)}</strong>
-                      </div>
-                    </div>
+                    <OrderSummaryCard
+                      title={`Pedido #${order.id}`}
+                      items={(order.items || []).map((item, index) => ({
+                        key: `${order.id}-${item.id}-${index}`,
+                        quantity: item.quantity ?? 1,
+                        name: item.name,
+                        unitPrice: Number(item.price || 0),
+                      }))}
+                      addons={activeAddons.map((addon) => ({
+                        key: `${order.id}-${addon.id}`,
+                        quantity: addon.quantity ?? 1,
+                        name: addon.name,
+                      }))}
+                      itemsSubtotal={totals.itemsSubtotal}
+                      addonTotal={totals.addonTotal}
+                      serviceFee={totals.serviceFee}
+                      serviceFeeLabel={totals.serviceFeeLabel}
+                      discountAmount={totals.discountAmount}
+                      loyaltyDiscount={totals.loyaltyDiscount}
+                      grandTotal={totals.grandTotal}
+                      emptyItemsText="Sem itens salvos neste pedido."
+                    />
 
                     {hasNote && (
                       <p style={localStyles.detailNote}>
@@ -766,102 +696,6 @@ const localStyles: Record<string, CSSProperties> = {
     textDecoration: "none",
     display: "inline-flex",
     alignItems: "center",
-  },
-  detailBlock: {
-    display: "grid",
-    gap: 8,
-  },
-  detailEyebrow: {
-    margin: 0,
-    color: "#766e64",
-    fontSize: 11,
-    fontWeight: 850,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-  },
-  detailRows: {
-    display: "grid",
-    gap: 10,
-  },
-  detailRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  detailRowMain: {
-    display: "grid",
-    gap: 2,
-    minWidth: 0,
-  },
-  detailRowValue: {
-    fontSize: 14,
-    fontWeight: 850,
-    whiteSpace: "nowrap",
-  },
-  detailMuted: {
-    color: "#766e64",
-    fontSize: 12,
-    lineHeight: 1.35,
-  },
-  totalsBox: {
-    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
-    paddingTop: 12,
-    display: "grid",
-    gap: 8,
-  },
-  totalLine: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    color: "#514a43",
-    fontSize: 13,
-    fontWeight: 750,
-  },
-  grandTotalLine: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    paddingTop: 4,
-    fontSize: 15,
-    fontWeight: 900,
-    color: "#1c1a17",
-  },
-  discountValue: {
-    color: "#0f7a4a",
-  },
-  addonList: {
-    display: "grid",
-    gap: 4,
-    paddingLeft: 2,
-  },
-  addonLine: {
-    color: "#514a43",
-    fontSize: 12,
-    lineHeight: 1.4,
-    fontWeight: 700,
-  },
-  itemList: {
-    display: "grid",
-    gap: 6,
-  },
-  itemLine: {
-    color: "#1c1a17",
-    fontSize: 15,
-    fontWeight: 800,
-    lineHeight: 1.35,
-  },
-  mutedInline: {
-    color: "#766e64",
-    fontSize: 14,
-  },
-  detailLine: {
-    margin: 0,
-    color: "#514a43",
-    fontSize: 13,
-    lineHeight: 1.45,
   },
   detailNote: {
     margin: 0,

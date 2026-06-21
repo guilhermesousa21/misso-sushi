@@ -41,6 +41,7 @@ import {
   type CheckoutStep,
 } from "../components/CheckoutStepper";
 import { CheckoutFormSkeleton } from "../components/CheckoutFormSkeleton";
+import { OrderSummaryCard } from "../components/OrderSummaryCard";
 
 type PaymentMethod = "pix" | "card";
 
@@ -667,72 +668,27 @@ export default function CheckoutPage() {
         : isFormValid;
 
   const orderSummaryCard = (
-    <div style={styles.summaryCard}>
-      <div style={styles.cardHeader}>
-        <div>
-          <p style={styles.cardEyebrow}>Resumo</p>
-          <h2 style={styles.cardTitle}>Seu pedido</h2>
-        </div>
-        <span style={styles.summaryPill}>{itemCount} itens</span>
-      </div>
-      {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
-      <div style={styles.orderList}>
-        {cart.map((item) => (
-          <div key={item.lineKey} style={styles.summaryOrderRow}>
-            <div>
-              <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
-              <p style={styles.summaryMuted}>{money(Number(item.price))} cada</p>
-            </div>
-            <strong>{money(item.price * item.quantity)}</strong>
-          </div>
-        ))}
-      </div>
-      <div style={styles.summaryTotalBox}>
-        {(discountAmount > 0 || serviceFee > 0 || addonTotal > 0) && (
-          <div style={styles.summaryTotalLine}>
-            <span>Subtotal</span>
-            <strong>{money(total)}</strong>
-          </div>
-        )}
-        {addonTotal > 0 && (
-          <>
-            <div style={styles.summaryTotalLine}>
-              <span>Complementos</span>
-              <strong>{money(addonTotal)}</strong>
-            </div>
-            <div style={styles.addonSummaryList}>
-              {selectedAddonList.map((addon) => (
-                <div key={addon.id} style={styles.addonSummary}>
-                  {addon.quantity}x {addon.name}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-        {serviceFee > 0 && (
-          <div style={styles.summaryTotalLine}>
-            <span>{serviceFeeLabel}</span>
-            <strong>{money(serviceFee)}</strong>
-          </div>
-        )}
-        {discountAmount > 0 && (
-          <div style={styles.summaryTotalLine}>
-            <span>Desconto cupom</span>
-            <strong style={styles.discountText}>-{money(discountAmount)}</strong>
-          </div>
-        )}
-        {loyaltyDiscount > 0 && (
-          <div style={styles.summaryTotalLine}>
-            <span>Fidelidade</span>
-            <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
-          </div>
-        )}
-        <div style={styles.summaryGrandTotalLine}>
-          <span>Total</span>
-          <strong>{money(finalTotal)}</strong>
-        </div>
-      </div>
-    </div>
+    <OrderSummaryCard
+      items={cart.map((item) => ({
+        key: item.lineKey,
+        quantity: item.quantity,
+        name: item.name,
+        unitPrice: Number(item.price),
+      }))}
+      addons={selectedAddonList.map((addon) => ({
+        key: addon.id,
+        quantity: addon.quantity,
+        name: addon.name,
+      }))}
+      itemsSubtotal={total}
+      addonTotal={addonTotal}
+      serviceFee={serviceFee}
+      serviceFeeLabel={serviceFeeLabel}
+      discountAmount={discountAmount}
+      loyaltyDiscount={loyaltyDiscount}
+      grandTotal={finalTotal}
+      notice={cartNotice}
+    />
   );
 
   return (
