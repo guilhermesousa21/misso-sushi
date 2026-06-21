@@ -345,7 +345,6 @@ export default function Page() {
           </label>
         </div>
         <div style={{ ...styles.categoryBar, ...(isMobile ? styles.categoryBarMobile : {}) }}>
-          <div className="category-track-wrap">
           <div style={styles.categoryTrack}>
             {orderedCategories.map((category) => (
               <button
@@ -360,7 +359,6 @@ export default function Page() {
                 {getCategoryLabel(category, categories)}
               </button>
             ))}
-          </div>
           </div>
         </div>
       </nav>

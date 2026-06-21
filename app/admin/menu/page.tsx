@@ -175,9 +175,6 @@ export default function AdminMenuPage() {
       if (!menuError && menuData) {
         const nextItems = uniqueById(menuData as MenuItem[]);
         setItems(nextItems);
-        setExpandedCategories(new Set(getOrderedCategorySlugs(nextItems, nextCategories)));
-      } else {
-        setExpandedCategories(new Set(nextCategories.map((category) => category.slug)));
       }
     }
 

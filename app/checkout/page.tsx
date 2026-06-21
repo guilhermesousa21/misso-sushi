@@ -707,8 +707,9 @@ export default function CheckoutPage() {
             </div>
             <div style={styles.addonSummaryList}>
               {selectedAddonList.map((addon) => (
-                <div key={addon.id} style={styles.addonSummary}>
-                  {addon.quantity}x {addon.name}
+                <div key={addon.id} style={styles.addonSummaryRow}>
+                  <span>{addon.quantity}x {addon.name}</span>
+                  <strong>{money(Number(addon.unit_price || 0) * addon.quantity)}</strong>
                 </div>
               ))}
             </div>
@@ -753,7 +754,9 @@ export default function CheckoutPage() {
       </header>
 
       <div style={{ ...styles.shell, ...(isMobile ? styles.shellMobile : {}) }}>
-        {isMobile && <aside style={styles.summaryColumnMobile}>{orderSummaryCard}</aside>}
+        {isMobile && checkoutStep === 3 && (
+          <aside style={styles.summaryColumnMobile}>{orderSummaryCard}</aside>
+        )}
 
         <section style={styles.mainColumn}>
           <CheckoutStepper
@@ -1078,7 +1081,9 @@ export default function CheckoutPage() {
           {error && <p style={styles.error}>{error}</p>}
         </section>
 
-        {!isMobile && <aside style={styles.summaryColumn}>{orderSummaryCard}</aside>}
+        {!isMobile && checkoutStep === 3 && (
+          <aside style={styles.summaryColumn}>{orderSummaryCard}</aside>
+        )}
       </div>
 
       {isMobile && checkoutStep < 3 && (
@@ -1255,7 +1260,14 @@ const styles: Record<string, CSSProperties> = {
   summaryTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255, 253, 248, 0.78)", fontSize: 15 },
   summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },
   addonSummaryList: { display: "grid", gap: 4 },
-  addonSummary: { color: "rgba(255, 253, 248, 0.66)", fontSize: 13, lineHeight: 1.45 },
+  addonSummaryRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 16,
+    color: "rgba(255, 253, 248, 0.66)",
+    fontSize: 13,
+    lineHeight: 1.45,
+  },
   discountText: { color: "#0f7a4a" },
   loyaltyProgressTrack: {
     marginTop: 10,
