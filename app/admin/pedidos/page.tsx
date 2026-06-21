@@ -1,10 +1,19 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Toaster, toast } from "react-hot-toast";
+import {
+  buildAdminOrderSummaryText,
+  copyTextToClipboard,
+  getActiveAddons,
+  getCustomerWhatsAppUrl,
+  getOrderTotals,
+} from "../../../lib/adminOrderDetails";
 import { printOrder } from "../../../lib/printOrder";
-import { formatAddonSummary, formatPickupTime } from "../../../lib/orderFeatures";
-import { formatOrderItemLabel } from "../../../lib/itemModifiers";
+import { formatPickupTime } from "../../../lib/orderFeatures";
+import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import {
   addDaysInBrasilia,
@@ -163,6 +172,24 @@ export default function AdminOrdersPage() {
     return { average, total };
   }, [filteredOrders]);
 
+  const handleCopyPhone = async (phone?: string | null) => {
+    const value = phone?.trim();
+    if (!value) {
+      toast.error("Este pedido não tem telefone.");
+      return;
+    }
+
+    const copied = await copyTextToClipboard(value);
+    if (copied) toast.success("Telefone copiado.");
+    else toast.error("Não foi possível copiar o telefone.");
+  };
+
+  const handleCopySummary = async (order: AdminOrder) => {
+    const copied = await copyTextToClipboard(buildAdminOrderSummaryText(order));
+    if (copied) toast.success("Resumo do pedido copiado.");
+    else toast.error("Não foi possível copiar o resumo.");
+  };
+
   return (
     <AdminShell
       eyebrow="Atendimento"
@@ -173,6 +200,7 @@ export default function AdminOrdersPage() {
         </span>
       }
     >
+      <Toaster position="top-right" />
       <section style={{ ...localStyles.summaryStrip, ...(isMobile ? localStyles.summaryStripMobile : {}) }}>
         <div style={localStyles.summaryItem}>
           <span>Total no filtro</span>
@@ -269,9 +297,14 @@ export default function AdminOrdersPage() {
         <div style={localStyles.list}>
           {filteredOrders.map((order) => {
             const expanded = expandedOrderId === order.id;
-            const addonSummary = formatAddonSummary(order.addons);
             const hasNote = Boolean(order.note?.trim());
             const paymentLabel = paymentLabels[order.payment_method || ""] || order.payment_method || "—";
+            const totals = getOrderTotals(order);
+            const activeAddons = getActiveAddons(order);
+            const whatsappUrl = getCustomerWhatsAppUrl(order.phone);
+            const customerOrdersHref = order.phone?.trim()
+              ? `/admin/pedidos?cliente=${encodeURIComponent(order.phone.trim())}`
+              : "";
 
             return (
               <article key={order.id} style={localStyles.orderBlock}>
@@ -332,22 +365,131 @@ export default function AdminOrdersPage() {
 
                 {expanded && (
                   <div style={localStyles.details}>
-                    <div style={localStyles.itemList}>
-                      {(order.items || []).length > 0 ? (
-                        (order.items || []).map((item, index) => (
-                          <span key={`${order.id}-${item.id}-${index}`} style={localStyles.itemLine}>
-                            {formatOrderItemLabel(item)}
-                          </span>
-                        ))
-                      ) : (
-                        <span style={localStyles.muted}>Sem itens salvos neste pedido.</span>
-                      )}
+                    <div style={localStyles.detailActions}>
+                      {whatsappUrl ? (
+                        <a
+                          href={whatsappUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={localStyles.actionLink}
+                        >
+                          WhatsApp
+                        </a>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPhone(order.phone)}
+                        style={localStyles.actionButton}
+                      >
+                        Copiar telefone
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopySummary(order)}
+                        style={localStyles.actionButton}
+                      >
+                        Copiar resumo
+                      </button>
+                      {customerOrdersHref ? (
+                        <Link href={customerOrdersHref} style={localStyles.actionLink}>
+                          Ver pedidos do cliente
+                        </Link>
+                      ) : null}
                     </div>
-                    {addonSummary && (
-                      <p style={localStyles.detailLine}>
-                        <strong>Complementos:</strong> {addonSummary}
-                      </p>
-                    )}
+
+                    <div style={localStyles.detailBlock}>
+                      <p style={localStyles.detailEyebrow}>Itens</p>
+                      <div style={localStyles.detailRows}>
+                        {(order.items || []).length > 0 ? (
+                          (order.items || []).map((item, index) => {
+                            const quantity = item.quantity ?? 1;
+                            const unitPrice = Number(item.price || 0);
+                            const lineTotal = unitPrice * quantity;
+                            const modifierText = formatItemModifiers(item.modifiers);
+
+                            return (
+                              <div
+                                key={`${order.id}-${item.id}-${index}`}
+                                style={localStyles.detailRow}
+                              >
+                                <div style={localStyles.detailRowMain}>
+                                  <strong style={localStyles.itemLine}>
+                                    {quantity}x {item.name}
+                                  </strong>
+                                  {modifierText ? (
+                                    <span style={localStyles.detailMuted}>{modifierText}</span>
+                                  ) : null}
+                                  <span style={localStyles.detailMuted}>{money(unitPrice)} cada</span>
+                                </div>
+                                <strong style={localStyles.detailRowValue}>{money(lineTotal)}</strong>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <span style={localStyles.mutedInline}>Sem itens salvos neste pedido.</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={localStyles.totalsBox}>
+                      {totals.hasBreakdown && (
+                        <div style={localStyles.totalLine}>
+                          <span>Subtotal</span>
+                          <strong>{money(totals.itemsSubtotal)}</strong>
+                        </div>
+                      )}
+                      {activeAddons.length > 0 && (
+                        <>
+                          <div style={localStyles.totalLine}>
+                            <span>Complementos</span>
+                            <strong>{money(totals.addonTotal)}</strong>
+                          </div>
+                          <div style={localStyles.addonList}>
+                            {activeAddons.map((addon) => {
+                              const quantity = addon.quantity ?? 1;
+                              const lineTotal = Number(addon.unit_price || 0) * quantity;
+
+                              return (
+                                <div key={`${order.id}-${addon.id}`} style={localStyles.addonLine}>
+                                  {quantity}x {addon.name}
+                                  {lineTotal > 0 ? ` · ${money(lineTotal)}` : ""}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                      {totals.serviceFee > 0 && (
+                        <div style={localStyles.totalLine}>
+                          <span>{totals.serviceFeeLabel}</span>
+                          <strong>{money(totals.serviceFee)}</strong>
+                        </div>
+                      )}
+                      {totals.discountAmount > 0 && (
+                        <div style={localStyles.totalLine}>
+                          <span>
+                            Desconto cupom
+                            {order.coupon_code ? ` (${order.coupon_code})` : ""}
+                          </span>
+                          <strong style={localStyles.discountValue}>
+                            -{money(totals.discountAmount)}
+                          </strong>
+                        </div>
+                      )}
+                      {totals.loyaltyDiscount > 0 && (
+                        <div style={localStyles.totalLine}>
+                          <span>Fidelidade</span>
+                          <strong style={localStyles.discountValue}>
+                            -{money(totals.loyaltyDiscount)}
+                          </strong>
+                        </div>
+                      )}
+                      <div style={localStyles.grandTotalLine}>
+                        <span>Total</span>
+                        <strong>{money(totals.grandTotal)}</strong>
+                      </div>
+                    </div>
+
                     {hasNote && (
                       <p style={localStyles.detailNote}>
                         <strong>Observação:</strong> {order.note?.trim()}
@@ -638,10 +780,115 @@ const localStyles: Record<string, CSSProperties> = {
     borderTop: "none",
     borderRadius: "0 0 8px 8px",
     background: "#faf8f4",
-    padding: "12px 14px 14px",
+    padding: "14px",
     marginTop: -8,
     display: "grid",
+    gap: 14,
+  },
+  detailActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  actionButton: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    background: "#fff",
+    color: "#1c1a17",
+    padding: "8px 12px",
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 12,
+    textDecoration: "none",
+  },
+  actionLink: {
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    borderRadius: 999,
+    background: "#fff",
+    color: "#1c1a17",
+    padding: "8px 12px",
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 12,
+    textDecoration: "none",
+    display: "inline-flex",
+    alignItems: "center",
+  },
+  detailBlock: {
+    display: "grid",
+    gap: 8,
+  },
+  detailEyebrow: {
+    margin: 0,
+    color: "#766e64",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  detailRows: {
+    display: "grid",
     gap: 10,
+  },
+  detailRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  detailRowMain: {
+    display: "grid",
+    gap: 2,
+    minWidth: 0,
+  },
+  detailRowValue: {
+    fontSize: 14,
+    fontWeight: 850,
+    whiteSpace: "nowrap",
+  },
+  detailMuted: {
+    color: "#766e64",
+    fontSize: 12,
+    lineHeight: 1.35,
+  },
+  totalsBox: {
+    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
+    paddingTop: 12,
+    display: "grid",
+    gap: 8,
+  },
+  totalLine: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    color: "#514a43",
+    fontSize: 13,
+    fontWeight: 750,
+  },
+  grandTotalLine: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    paddingTop: 4,
+    fontSize: 15,
+    fontWeight: 900,
+    color: "#1c1a17",
+  },
+  discountValue: {
+    color: "#0f7a4a",
+  },
+  addonList: {
+    display: "grid",
+    gap: 4,
+    paddingLeft: 2,
+  },
+  addonLine: {
+    color: "#514a43",
+    fontSize: 12,
+    lineHeight: 1.4,
+    fontWeight: 700,
   },
   itemList: {
     display: "grid",
@@ -652,6 +899,10 @@ const localStyles: Record<string, CSSProperties> = {
     fontSize: 15,
     fontWeight: 800,
     lineHeight: 1.35,
+  },
+  mutedInline: {
+    color: "#766e64",
+    fontSize: 14,
   },
   detailLine: {
     margin: 0,
