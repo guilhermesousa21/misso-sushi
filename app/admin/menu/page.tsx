@@ -513,7 +513,13 @@ export default function AdminMenuPage() {
       <Toaster position="top-right" />
       <AdminShell eyebrow="Operação" title="Cardápio" action={headerActions}>
 
-        <section style={{ ...styles.toolbar, ...(isMobile ? styles.toolbarStack : {}) }}>
+        <section
+          style={{
+            ...styles.toolbar,
+            ...(isMobile ? styles.toolbarStack : {}),
+            ...(isMobile ? styles.toolbarMobile : {}),
+          }}
+        >
           <input
             type="text"
             placeholder="Buscar prato..."
@@ -1776,26 +1782,32 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: "wrap",
   },
   headerActionsMobile: {
-    display: "grid",
-    justifyContent: "stretch",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    width: "100%",
   },
   primaryButton: {
     border: "none",
-    borderRadius: 999,
+    borderRadius: 12,
     background: "#9f1d2f",
     color: "#fff",
     padding: "12px 16px",
     cursor: "pointer",
     fontWeight: 850,
+    minHeight: 48,
+    fontSize: 15,
   },
   headerSecondaryButton: {
     border: "none",
-    borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
+    borderRadius: 12,
+    background: "#f0ebe2",
+    color: "#1c1a17",
     padding: "12px 16px",
     cursor: "pointer",
     fontWeight: 850,
+    minHeight: 48,
+    fontSize: 15,
   },
   primaryButtonDisabled: {
     background: "#c9c0b4",
@@ -1818,6 +1830,11 @@ const styles: Record<string, CSSProperties> = {
   toolbarStack: {
     gridTemplateColumns: "1fr",
     gap: 8,
+  },
+  toolbarMobile: {
+    top: 0,
+    borderRadius: 14,
+    padding: 12,
   },
   input: {
     boxSizing: "border-box",
@@ -1878,8 +1895,8 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
   fullWidthMobile: {
-    gridColumn: "1 / -1",
-    width: "100%",
+    flex: "1 1 calc(50% - 4px)",
+    minWidth: 0,
   },
   categoryList: {
     display: "grid",
@@ -2200,7 +2217,7 @@ const styles: Record<string, CSSProperties> = {
   modalOverlay: {
     position: "fixed",
     inset: 0,
-    zIndex: 60,
+    zIndex: 120,
     background: "rgba(28, 26, 23, 0.46)",
     display: "grid",
     placeItems: "center",
