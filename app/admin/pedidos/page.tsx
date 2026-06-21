@@ -4,7 +4,6 @@ import type { CSSProperties } from "react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { OrderReceipt } from "../../components/OrderReceipt";
-import { printOrder } from "../../../lib/printOrder";
 import { downloadOrdersCsv } from "../../../lib/exportOrdersCsv";
 import { formatPickupTime } from "../../../lib/orderFeatures";
 import { getCustomerWhatsAppUrl } from "../../../lib/adminOrderDetails";
@@ -56,7 +55,7 @@ const getShortPickupLabel = (order: AdminOrder) => {
   return "Padrão";
 };
 
-const desktopOrderGrid = "minmax(0, 1.4fr) 140px 90px 110px 96px";
+const desktopOrderGrid = "minmax(0, 1.4fr) 140px 90px 110px";
 
 const isPaidOrder = (order: AdminOrder) => order.payment_status === "pago";
 
@@ -351,7 +350,6 @@ function AdminOrdersPageContent() {
             <span style={localStyles.tableHeadCenter}>Retirada</span>
             <span style={localStyles.tableHeadCenter}>Pagamento</span>
             <span style={localStyles.tableHeadCenter}>Total</span>
-            <span aria-hidden="true" />
           </div>
         )}
 
@@ -426,17 +424,6 @@ function AdminOrdersPageContent() {
                       <strong style={localStyles.rowTotalMobile}>{money(calcTotal(order))}</strong>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => printOrder(order)}
-                    style={{
-                      ...localStyles.printButton,
-                      ...(isMobile ? localStyles.printButtonMobile : {}),
-                    }}
-                    aria-label={`Imprimir pedido ${order.id}`}
-                  >
-                    Imprimir
-                  </button>
                 </div>
 
                 <div style={localStyles.details}>
@@ -689,7 +676,7 @@ const localStyles: Record<string, CSSProperties> = {
     minWidth: 0,
   },
   rowMainDesktop: {
-    gridColumn: "1 / 5",
+    gridColumn: "1 / -1",
     gridTemplateColumns: "subgrid",
     padding: "14px 0",
   },
@@ -790,24 +777,6 @@ const localStyles: Record<string, CSSProperties> = {
     alignSelf: "start",
     marginTop: 2,
     textAlign: "right",
-  },
-  printButton: {
-    border: "none",
-    borderLeft: "1px solid rgba(28, 26, 23, 0.08)",
-    background: "#f7f4ef",
-    color: "#1c1a17",
-    padding: "0 16px",
-    cursor: "pointer",
-    fontWeight: 850,
-    fontSize: 13,
-    whiteSpace: "nowrap",
-    alignSelf: "stretch",
-  },
-  printButtonMobile: {
-    borderLeft: "none",
-    borderTop: "1px solid rgba(28, 26, 23, 0.08)",
-    padding: "12px 14px",
-    width: "100%",
   },
   details: {
     borderWidth: 1,
