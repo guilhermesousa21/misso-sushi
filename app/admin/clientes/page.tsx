@@ -1,10 +1,10 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase } from "../../../lib/supabase";
+import { useEffect, useMemo, useState } from "react";
 import { formatBrasiliaDateTimeShort } from "../../../lib/brasiliaTime";
+import { supabase } from "../../../lib/supabase";
 import { useIsMobile } from "../../../lib/useMediaQuery";
 import {
   AdminShell,
@@ -16,6 +16,15 @@ import {
   number,
   type AdminOrder,
 } from "../AdminShell";
+
+type CustomerRow = {
+  phone: string;
+  name: string;
+  orders: AdminOrder[];
+  total: number;
+  favoriteItem: string;
+  lastOrder: AdminOrder;
+};
 
 export default function AdminCustomersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -52,7 +61,7 @@ export default function AdminCustomersPage() {
     };
   }, []);
 
-  const customers = useMemo(() => {
+  const customers = useMemo<CustomerRow[]>(() => {
     const grouped = new Map<string, AdminOrder[]>();
     orders.forEach((order) => {
       const phone = (order.phone || "Sem telefone").trim();
@@ -67,8 +76,10 @@ export default function AdminCustomersPage() {
             itemCounts.set(item.name, (itemCounts.get(item.name) || 0) + (item.quantity ?? 1));
           })
         );
-        const favoriteItem = Array.from(itemCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || "Sem itens";
+        const favoriteItem =
+          Array.from(itemCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
         const lastOrder = customerOrders[0];
+
         return {
           phone,
           name: lastOrder.name || "Cliente",
@@ -78,7 +89,12 @@ export default function AdminCustomersPage() {
           lastOrder,
         };
       })
-      .sort((a, b) => new Date(b.lastOrder.created_at).getTime() - new Date(a.lastOrder.created_at).getTime());
+      .sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        return (
+          new Date(b.lastOrder.created_at).getTime() - new Date(a.lastOrder.created_at).getTime()
+        );
+      });
   }, [orders]);
 
   const filteredCustomers = useMemo(() => {
@@ -102,399 +118,271 @@ export default function AdminCustomersPage() {
     };
   }, [customers]);
 
-  const rankedCustomers = useMemo(
-    () =>
-      [...customers].sort((a, b) => {
-        if (b.total !== a.total) return b.total - a.total;
-        if (b.orders.length !== a.orders.length) return b.orders.length - a.orders.length;
-        return a.name.localeCompare(b.name, "pt-BR");
-      }),
-    [customers]
-  );
-
   return (
     <AdminShell
       eyebrow="Relacionamento"
       title="Clientes"
-      action={<span style={styles.pill}>{loading ? "Carregando" : `${number(filteredCustomers.length)} clientes`}</span>}
+      action={
+        <span style={styles.pill}>
+          {loading ? "Carregando" : `${number(filteredCustomers.length)} clientes`}
+        </span>
+      }
     >
-      <section style={{ ...localStyles.summaryGrid, ...(isMobile ? localStyles.summaryGridMobile : {}) }}>
-        <MetricCard label="Clientes" value={number(customers.length)} />
-        <MetricCard label="Pedidos" value={number(summary.totalOrders)} />
-        <MetricCard label="Receita" value={money(summary.totalRevenue)} />
-        <MetricCard label="Ticket médio" value={money(summary.averageTicket)} />
+      <section style={{ ...localStyles.summaryStrip, ...(isMobile ? localStyles.summaryStripMobile : {}) }}>
+        <div style={localStyles.summaryItem}>
+          <span>Receita total</span>
+          <strong>{money(summary.totalRevenue)}</strong>
+        </div>
+        <div style={localStyles.summaryItem}>
+          <span>Pedidos</span>
+          <strong>{number(summary.totalOrders)}</strong>
+        </div>
+        <div style={localStyles.summaryItem}>
+          <span>Ticket médio</span>
+          <strong>{money(summary.averageTicket)}</strong>
+        </div>
       </section>
 
-      <section style={{ ...localStyles.rankingCard, ...(isMobile ? localStyles.rankingCardMobile : {}) }}>
-        <div style={localStyles.rankingHeader}>
+      <section style={{ ...localStyles.panel, ...(isMobile ? localStyles.panelMobile : {}) }}>
+        <div style={{ ...localStyles.panelHeader, ...(isMobile ? localStyles.panelHeaderMobile : {}) }}>
           <div>
-            <p style={localStyles.rankingEyebrow}>Ranking</p>
-            <h2 style={localStyles.rankingTitle}>Top clientes</h2>
+            <p style={styles.cardEyebrow}>Base</p>
+            <h2 style={styles.cardTitle}>Lista de clientes</h2>
           </div>
-          <span style={localStyles.rankingHint}>Por total gasto</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar nome ou telefone"
+            style={{ ...styles.input, ...localStyles.searchInput }}
+            aria-label="Buscar clientes"
+          />
         </div>
 
-        {loading ? (
-          <p style={localStyles.rankingEmpty}>Carregando ranking...</p>
-        ) : rankedCustomers.length === 0 ? (
-          <p style={localStyles.rankingEmpty}>Nenhum cliente no ranking ainda.</p>
-        ) : (
-          <div style={localStyles.rankingList}>
-            {rankedCustomers.map((customer, index) => (
-              <article
-                key={customer.phone}
-                style={{
-                  ...localStyles.rankingRow,
-                  ...(isMobile ? localStyles.rankingRowMobile : {}),
-                  ...(index < 3 ? localStyles.rankingRowHighlight : {}),
-                }}
-              >
-                <span
-                  style={{
-                    ...localStyles.rankBadge,
-                    ...(index === 0
-                      ? localStyles.rankBadgeGold
-                      : index === 1
-                        ? localStyles.rankBadgeSilver
-                        : index === 2
-                          ? localStyles.rankBadgeBronze
-                          : {}),
-                  }}
-                >
-                  {index + 1}º
-                </span>
-                <div style={localStyles.rankingIdentity}>
-                  <strong style={localStyles.rankingName}>{customer.name}</strong>
-                  <span style={localStyles.rankingPhone}>{customer.phone}</span>
-                </div>
-                <div style={localStyles.rankingStats}>
-                  <span>{number(customer.orders.length)} pedidos</span>
-                  <strong>{money(customer.total)}</strong>
-                </div>
-                <Link
-                  href={`/admin/pedidos?cliente=${encodeURIComponent(customer.phone)}`}
-                  style={localStyles.rankingLink}
-                >
-                  Ver
-                </Link>
-              </article>
-            ))}
+        {!isMobile && filteredCustomers.length > 0 && (
+          <div style={localStyles.tableHead}>
+            <span>Cliente</span>
+            <span>Pedidos</span>
+            <span>Total gasto</span>
+            <span>Último pedido</span>
           </div>
         )}
-      </section>
 
-      <section style={{ ...localStyles.toolbar, ...(isMobile ? localStyles.toolbarMobile : {}) }}>
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por cliente, telefone ou item favorito"
-          style={{ ...styles.input, ...localStyles.searchInput }}
-        />
-        {search.trim() && (
-          <button type="button" onClick={() => setSearch("")} style={localStyles.clearButton}>
-            Limpar
-          </button>
-        )}
-      </section>
-
-      <section style={localStyles.grid}>
-        {filteredCustomers.map((customer) => (
-          <article key={customer.phone} style={{ ...styles.card, ...(isMobile ? localStyles.cardMobile : {}) }}>
-            <div style={localStyles.customerHeader}>
-              <span style={localStyles.avatar}>{customer.name.slice(0, 1).toUpperCase()}</span>
-              <div style={localStyles.customerIdentity}>
-                <h2 style={localStyles.customerName}>{customer.name}</h2>
-                <p style={localStyles.customerPhone}>{customer.phone}</p>
+        <div style={localStyles.list}>
+          {filteredCustomers.map((customer, index) => (
+            <Link
+              key={customer.phone}
+              href={`/admin/pedidos?cliente=${encodeURIComponent(customer.phone)}`}
+              style={{
+                ...localStyles.row,
+                ...(isMobile ? localStyles.rowMobile : {}),
+              }}
+            >
+              <div style={localStyles.rowMain}>
+                {index < 3 && !search.trim() && (
+                  <span
+                    style={{
+                      ...localStyles.rankDot,
+                      ...(index === 0
+                        ? localStyles.rankDotGold
+                        : index === 1
+                          ? localStyles.rankDotSilver
+                          : localStyles.rankDotBronze),
+                    }}
+                  >
+                    {index + 1}
+                  </span>
+                )}
+                <div style={localStyles.rowIdentity}>
+                  <strong style={localStyles.rowName}>{customer.name}</strong>
+                  <span style={localStyles.rowPhone}>{customer.phone}</span>
+                  {isMobile && (
+                    <span style={localStyles.rowMeta}>
+                      {number(customer.orders.length)} pedidos · Último{" "}
+                      {formatCustomerDate(customer.lastOrder.created_at)}
+                    </span>
+                  )}
+                </div>
               </div>
-              <span style={localStyles.orderPill}>{number(customer.orders.length)} pedidos</span>
-            </div>
-
-            <div style={localStyles.metrics}>
-              <div style={localStyles.metricBox}>
-                <span>Total gasto</span>
-                <strong>{money(customer.total)}</strong>
-              </div>
-              <div style={localStyles.metricBox}>
-                <span>Favorito</span>
-                <strong>{customer.favoriteItem}</strong>
-              </div>
-            </div>
-
-            <div style={localStyles.lastOrder}>
-              <span>Último pedido</span>
-              <strong>{formatCustomerDate(customer.lastOrder.created_at)}</strong>
-            </div>
-
-            <Link href={`/admin/pedidos?cliente=${encodeURIComponent(customer.phone)}`} style={localStyles.customerLink}>
-              Ver pedidos
+              {!isMobile && (
+                <>
+                  <span style={localStyles.rowStat}>{number(customer.orders.length)}</span>
+                  <strong style={localStyles.rowTotal}>{money(customer.total)}</strong>
+                  <span style={localStyles.rowDate}>
+                    {formatCustomerDate(customer.lastOrder.created_at)}
+                  </span>
+                </>
+              )}
+              {isMobile && <strong style={localStyles.rowTotalMobile}>{money(customer.total)}</strong>}
             </Link>
-          </article>
-        ))}
-        {!loading && filteredCustomers.length === 0 && (
-          <EmptyState text="Nenhum cliente encontrado para a busca atual." />
-        )}
+          ))}
+
+          {loading && <p style={localStyles.muted}>Carregando clientes...</p>}
+          {!loading && filteredCustomers.length === 0 && (
+            <EmptyState text="Nenhum cliente encontrado para a busca atual." />
+          )}
+        </div>
       </section>
     </AdminShell>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <article style={localStyles.summaryCard}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
   );
 }
 
 const formatCustomerDate = formatBrasiliaDateTimeShort;
 
 const localStyles: Record<string, CSSProperties> = {
-  summaryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: 12,
-    marginBottom: 14,
-  },
-  summaryGridMobile: {
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 8,
-  },
-  summaryCard: {
-    background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 10,
-    padding: 14,
-    display: "grid",
-    gap: 6,
-    boxShadow: "0 10px 24px rgba(28, 26, 23, 0.04)",
-  },
-  rankingCard: {
-    background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 14,
-    boxShadow: "0 10px 24px rgba(28, 26, 23, 0.04)",
-  },
-  rankingCardMobile: {
-    padding: 14,
-  },
-  rankingHeader: {
+  summaryStrip: {
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "start",
     gap: 12,
     marginBottom: 14,
     flexWrap: "wrap",
   },
-  rankingEyebrow: {
-    color: "#9f1d2f",
+  summaryStripMobile: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 8,
+  },
+  summaryItem: {
+    flex: "1 1 160px",
+    background: "#1c1a17",
+    color: "#fffdf8",
+    borderRadius: 8,
+    padding: "14px 16px",
+    display: "grid",
+    gap: 6,
+    minWidth: 0,
+  },
+  panel: {
+    background: "#fffdf8",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 10,
+    padding: "18px 20px 8px",
+    boxShadow: "0 14px 35px rgba(28, 26, 23, 0.04)",
+  },
+  panelMobile: {
+    padding: "14px 12px 6px",
+  },
+  panelHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "end",
+    gap: 16,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  panelHeaderMobile: {
+    display: "grid",
+    alignItems: "stretch",
+    gap: 12,
+  },
+  searchInput: {
+    width: "min(100%, 320px)",
+    minWidth: 200,
+    background: "#fff",
+  },
+  tableHead: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1.4fr) 80px 120px 140px",
+    gap: 12,
+    padding: "0 14px 10px",
+    color: "#766e64",
     fontSize: 11,
     fontWeight: 850,
     textTransform: "uppercase",
   },
-  rankingTitle: {
-    marginTop: 4,
-    fontSize: 22,
-    lineHeight: 1.1,
-  },
-  rankingHint: {
-    borderRadius: 999,
-    background: "#f0ebe2",
-    color: "#625b53",
-    padding: "7px 10px",
-    fontSize: 12,
-    fontWeight: 850,
-    whiteSpace: "nowrap",
-  },
-  rankingEmpty: {
-    color: "#766e64",
-    fontSize: 14,
-  },
-  rankingList: {
+  list: {
     display: "grid",
-    gap: 8,
+    gap: 2,
   },
-  rankingRow: {
+  row: {
     display: "grid",
-    gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
+    gridTemplateColumns: "minmax(0, 1.4fr) 80px 120px 140px",
     gap: 12,
     alignItems: "center",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
+    padding: "14px",
     borderRadius: 8,
+    textDecoration: "none",
+    color: "inherit",
     background: "#fff",
-    padding: "12px 14px",
+    border: "1px solid rgba(28, 26, 23, 0.06)",
   },
-  rankingRowMobile: {
+  rowMobile: {
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gap: 10,
+    alignItems: "start",
+  },
+  rowMain: {
     display: "flex",
-    flexWrap: "wrap",
     alignItems: "center",
+    gap: 12,
+    minWidth: 0,
   },
-  rankingRowHighlight: {
-    background: "#fffaf2",
-  },
-  rankBadge: {
-    minWidth: 42,
+  rankDot: {
+    width: 28,
+    height: 28,
     borderRadius: 999,
+    display: "grid",
+    placeItems: "center",
+    fontSize: 12,
+    fontWeight: 900,
+    flexShrink: 0,
     background: "#f0ebe2",
     color: "#514a43",
-    padding: "8px 10px",
-    textAlign: "center",
-    fontWeight: 900,
-    fontSize: 13,
   },
-  rankBadgeGold: {
+  rankDotGold: {
     background: "#fef3c7",
     color: "#92400e",
   },
-  rankBadgeSilver: {
+  rankDotSilver: {
     background: "#e5e7eb",
     color: "#374151",
   },
-  rankBadgeBronze: {
+  rankDotBronze: {
     background: "#ffedd5",
     color: "#9a3412",
   },
-  rankingIdentity: {
+  rowIdentity: {
     minWidth: 0,
     display: "grid",
     gap: 3,
   },
-  rankingName: {
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+  rowName: {
+    fontSize: 16,
     lineHeight: 1.25,
-  },
-  rankingPhone: {
-    color: "#766e64",
-    fontSize: 12,
-  },
-  rankingStats: {
-    display: "grid",
-    justifyItems: "end",
-    gap: 3,
-    color: "#625b53",
-    fontSize: 12,
-    whiteSpace: "nowrap",
-    marginLeft: "auto",
-  },
-  rankingLink: {
-    borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
-    padding: "8px 12px",
-    textDecoration: "none",
-    fontWeight: 850,
-    fontSize: 13,
-    whiteSpace: "nowrap",
-  },
-  toolbar: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    gap: 10,
-    marginBottom: 14,
-    background: "#fffdf8",
-    border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 10,
-    padding: 10,
-  },
-  toolbarMobile: {
-    gridTemplateColumns: "1fr",
-    marginBottom: 10,
-  },
-  searchInput: {
-    background: "#fff",
-  },
-  clearButton: {
-    border: "none",
-    borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
-    padding: "10px 14px",
-    cursor: "pointer",
-    fontWeight: 850,
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-    gap: 12,
-  },
-  cardMobile: {
-    padding: 14,
-  },
-  customerHeader: {
-    display: "grid",
-    gridTemplateColumns: "44px minmax(0, 1fr) auto",
-    gap: 12,
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    background: "#1c1a17",
-    color: "#fffdf8",
-    display: "grid",
-    placeItems: "center",
-    fontWeight: 900,
-  },
-  customerIdentity: {
-    minWidth: 0,
-  },
-  customerName: {
-    fontSize: 20,
-    lineHeight: 1.12,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  customerPhone: {
-    marginTop: 4,
+  rowPhone: {
     color: "#766e64",
     fontSize: 13,
   },
-  orderPill: {
-    borderRadius: 999,
-    background: "#f0ebe2",
-    color: "#514a43",
-    padding: "7px 10px",
+  rowMeta: {
+    color: "#766e64",
     fontSize: 12,
+    lineHeight: 1.35,
+  },
+  rowStat: {
+    color: "#625b53",
+    fontSize: 14,
+    fontWeight: 750,
+  },
+  rowTotal: {
+    fontSize: 15,
     fontWeight: 850,
     whiteSpace: "nowrap",
   },
-  metrics: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 10,
-    marginBottom: 12,
-  },
-  metricBox: {
-    borderRadius: 8,
-    background: "#f7f4ef",
-    padding: 10,
-    display: "grid",
-    gap: 4,
-  },
-  lastOrder: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 10,
-    color: "#625b53",
-    fontSize: 13,
-    marginBottom: 14,
-  },
-  customerLink: {
-    display: "inline-flex",
-    justifyContent: "center",
-    width: "100%",
-    borderRadius: 999,
-    background: "#9f1d2f",
-    color: "#fff",
-    padding: "11px 14px",
-    textDecoration: "none",
+  rowTotalMobile: {
+    fontSize: 16,
     fontWeight: 850,
+    whiteSpace: "nowrap",
+    alignSelf: "center",
+  },
+  rowDate: {
+    color: "#766e64",
+    fontSize: 13,
+    whiteSpace: "nowrap",
+  },
+  muted: {
+    color: "#766e64",
+    padding: "12px 14px",
   },
 };
