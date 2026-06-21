@@ -3,15 +3,11 @@
 import type { CSSProperties } from "react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  getActiveAddons,
-  getCustomerWhatsAppUrl,
-  getOrderTotals,
-} from "../../../lib/adminOrderDetails";
-import { OrderSummaryCard } from "../../components/OrderSummaryCard";
+import { OrderReceipt } from "../../components/OrderReceipt";
 import { printOrder } from "../../../lib/printOrder";
 import { downloadOrdersCsv } from "../../../lib/exportOrdersCsv";
 import { formatPickupTime } from "../../../lib/orderFeatures";
+import { getCustomerWhatsAppUrl } from "../../../lib/adminOrderDetails";
 import { supabase } from "../../../lib/supabase";
 import {
   addDaysInBrasilia,
@@ -60,7 +56,7 @@ const getShortPickupLabel = (order: AdminOrder) => {
   return "Padrão";
 };
 
-const desktopOrderGrid = "minmax(0, 1.4fr) 140px 90px 138px 96px";
+const desktopOrderGrid = "minmax(0, 1.4fr) 140px 90px 110px 96px";
 
 const isPaidOrder = (order: AdminOrder) => order.payment_status === "pago";
 
@@ -101,7 +97,6 @@ function AdminOrdersPageContent() {
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedOrderId, setExpandedOrderId] = useState<string | number | null>(null);
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>("30d");
   const [dateFrom, setDateFrom] = useState("");
@@ -117,7 +112,6 @@ function AdminOrdersPageContent() {
     setSearch(cliente);
     if (cliente.trim()) {
       setDateRange("all");
-      setExpandedOrderId(null);
     }
   }, [searchParams]);
 
@@ -127,7 +121,6 @@ function AdminOrdersPageContent() {
 
     setSearch(value);
     setDateRange("all");
-    setExpandedOrderId(null);
     router.push(`/admin/pedidos?cliente=${encodeURIComponent(value)}`);
   };
 
@@ -364,7 +357,6 @@ function AdminOrdersPageContent() {
 
         <div style={localStyles.list}>
           {filteredOrders.map((order) => {
-            const expanded = expandedOrderId === order.id;
             const hasNote = Boolean(order.note?.trim());
             const hasCoupon =
               Boolean(order.coupon_code?.trim()) || Number(order.discount_amount || 0) > 0;
@@ -372,8 +364,6 @@ function AdminOrdersPageContent() {
               ? `Cupom ${order.coupon_code.trim()}`
               : "Cupom aplicado";
             const paymentLabel = paymentLabels[order.payment_method || ""] || order.payment_method || "—";
-            const totals = getOrderTotals(order);
-            const activeAddons = getActiveAddons(order);
             const whatsappUrl = getCustomerWhatsAppUrl(order.phone);
             const customerPhone = order.phone?.trim() || "";
 
@@ -383,15 +373,12 @@ function AdminOrdersPageContent() {
                   style={{
                     ...localStyles.row,
                     ...(isMobile ? localStyles.rowMobile : localStyles.rowDesktop),
-                    ...(expanded ? { borderColor: "rgba(28, 26, 23, 0.14)" } : {}),
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setExpandedOrderId(expanded ? null : order.id)}
+                  <div
                     style={{
-                      ...localStyles.rowMainButton,
-                      ...(isMobile ? localStyles.rowMainButtonMobile : localStyles.rowMainButtonDesktop),
+                      ...localStyles.rowMain,
+                      ...(isMobile ? localStyles.rowMainMobile : localStyles.rowMainDesktop),
                     }}
                   >
                     <div style={localStyles.rowIdentity}>
@@ -432,19 +419,13 @@ function AdminOrdersPageContent() {
                       <>
                         <span style={localStyles.pickupBadge}>{getShortPickupLabel(order)}</span>
                         <span style={localStyles.paymentBadge}>{paymentLabel}</span>
-                        <div style={localStyles.totalCell}>
-                          <strong style={localStyles.rowTotal}>{money(calcTotal(order))}</strong>
-                          <span style={localStyles.expandIcon}>{expanded ? "▲" : "▼"}</span>
-                        </div>
+                        <strong style={localStyles.rowTotal}>{money(calcTotal(order))}</strong>
                       </>
                     )}
                     {isMobile && (
-                      <>
-                        <strong style={localStyles.rowTotalMobile}>{money(calcTotal(order))}</strong>
-                        <span style={localStyles.expandIcon}>{expanded ? "▲" : "▼"}</span>
-                      </>
+                      <strong style={localStyles.rowTotalMobile}>{money(calcTotal(order))}</strong>
                     )}
-                  </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => printOrder(order)}
@@ -458,62 +439,31 @@ function AdminOrdersPageContent() {
                   </button>
                 </div>
 
-                {expanded && (
-                  <div style={localStyles.details}>
-                    <div style={localStyles.detailActions}>
-                      {whatsappUrl ? (
-                        <a
-                          href={whatsappUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={localStyles.actionLink}
-                        >
-                          WhatsApp
-                        </a>
-                      ) : null}
-                      {customerPhone ? (
-                        <button
-                          type="button"
-                          onClick={() => applyCustomerFilter(customerPhone)}
-                          style={localStyles.actionLink}
-                        >
-                          Ver pedidos do cliente
-                        </button>
-                      ) : null}
-                    </div>
-
-                    <OrderSummaryCard
-                      variant="light"
-                      title={`Pedido #${order.id}`}
-                      items={(order.items || []).map((item, index) => ({
-                        key: `${order.id}-${item.id}-${index}`,
-                        quantity: item.quantity ?? 1,
-                        name: item.name,
-                        unitPrice: Number(item.price || 0),
-                        modifiers: item.modifiers,
-                      }))}
-                      addons={activeAddons.map((addon) => ({
-                        key: `${order.id}-${addon.id}`,
-                        quantity: addon.quantity ?? 1,
-                        name: addon.name,
-                      }))}
-                      itemsSubtotal={totals.itemsSubtotal}
-                      addonTotal={totals.addonTotal}
-                      serviceFee={totals.serviceFee}
-                      serviceFeeLabel={totals.serviceFeeLabel}
-                      discountAmount={totals.discountAmount}
-                      loyaltyDiscount={totals.loyaltyDiscount}
-                      grandTotal={totals.grandTotal}
-                      emptyItemsText="Sem itens salvos neste pedido."
-                    />
-
-                    {hasNote && (
-                      <p style={localStyles.detailNote}>
-                        <strong>Observação:</strong> {order.note?.trim()}
-                      </p>
-                    )}
+                <div style={localStyles.details}>
+                  <div style={localStyles.detailActions}>
+                    {whatsappUrl ? (
+                      <a
+                        href={whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={localStyles.actionLink}
+                      >
+                        WhatsApp
+                      </a>
+                    ) : null}
+                    {customerPhone ? (
+                      <button
+                        type="button"
+                        onClick={() => applyCustomerFilter(customerPhone)}
+                        style={localStyles.actionLink}
+                      >
+                        Ver pedidos do cliente
+                      </button>
+                    ) : null}
                   </div>
-                )}
+
+                  <OrderReceipt order={order} />
+                </div>
               </article>
             );
           })}
@@ -720,7 +670,7 @@ const localStyles: Record<string, CSSProperties> = {
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: "rgba(28, 26, 23, 0.06)",
-    borderRadius: 8,
+    borderRadius: "8px 8px 0 0",
     overflow: "hidden",
   },
   rowDesktop: {
@@ -733,24 +683,18 @@ const localStyles: Record<string, CSSProperties> = {
     gap: 0,
     padding: 0,
   },
-  rowMainButton: {
+  rowMain: {
     display: "grid",
     alignItems: "center",
-    border: "none",
-    background: "transparent",
-    color: "inherit",
-    cursor: "pointer",
-    textAlign: "left",
-    font: "inherit",
     minWidth: 0,
   },
-  rowMainButtonDesktop: {
+  rowMainDesktop: {
     gridColumn: "1 / 5",
     gridTemplateColumns: "subgrid",
     padding: "14px 0",
   },
-  rowMainButtonMobile: {
-    gridTemplateColumns: "minmax(0, 1fr) auto 24px",
+  rowMainMobile: {
+    gridTemplateColumns: "minmax(0, 1fr) auto",
     gap: 10,
     alignItems: "start",
     padding: "14px",
@@ -837,13 +781,7 @@ const localStyles: Record<string, CSSProperties> = {
     fontWeight: 850,
     whiteSpace: "nowrap",
     textAlign: "center",
-  },
-  totalCell: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    minWidth: 0,
+    justifySelf: "center",
   },
   rowTotalMobile: {
     fontSize: 16,
@@ -851,19 +789,7 @@ const localStyles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
     alignSelf: "start",
     marginTop: 2,
-  },
-  expandIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    background: "#f0ebe2",
-    color: "#514a43",
-    display: "grid",
-    placeItems: "center",
-    fontSize: 11,
-    fontWeight: 900,
-    lineHeight: 1,
-    flexShrink: 0,
+    textAlign: "right",
   },
   printButton: {
     border: "none",
@@ -884,12 +810,13 @@ const localStyles: Record<string, CSSProperties> = {
     width: "100%",
   },
   details: {
-    border: "1px solid rgba(28, 26, 23, 0.06)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(28, 26, 23, 0.06)",
     borderTop: "none",
     borderRadius: "0 0 8px 8px",
     background: "#faf8f4",
     padding: "14px",
-    marginTop: -8,
     display: "grid",
     gap: 14,
   },
@@ -911,14 +838,6 @@ const localStyles: Record<string, CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     font: "inherit",
-  },
-  detailNote: {
-    margin: 0,
-    color: "#514a43",
-    fontSize: 13,
-    lineHeight: 1.45,
-    borderLeft: "3px solid #9f1d2f",
-    paddingLeft: 10,
   },
   muted: {
     color: "#766e64",
