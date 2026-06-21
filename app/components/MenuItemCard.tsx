@@ -114,6 +114,7 @@ export function MenuItemCard({
           style={{
             ...styles.cardFooter,
             ...(isMobile ? styles.cardFooterMobile : {}),
+            ...(isMobile && featured ? styles.cardFooterFeaturedMobile : {}),
           }}
         >
           <strong
@@ -146,6 +147,7 @@ export function MenuItemCard({
               style={{
                 ...styles.quantityControl,
                 ...(isMobile ? styles.quantityControlMobile : {}),
+                ...(isMobile && featured ? styles.quantityControlFeaturedMobile : {}),
               }}
             >
               <button
@@ -348,6 +350,12 @@ const styles: Record<string, CSSProperties> = {
   },
   cardFooterMobile: {
     gap: 8,
+    minWidth: 0,
+  },
+  cardFooterFeaturedMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 8,
   },
   price: {
     fontSize: 16,
@@ -367,30 +375,35 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
   addButtonMobile: {
-    minHeight: 44,
-    padding: "10px 14px",
-    fontSize: 13,
+    minHeight: 40,
+    padding: "9px 12px",
+    fontSize: 12,
+    alignSelf: "flex-end",
   },
   addButtonDisabled: {
     opacity: 0.5,
     cursor: "not-allowed",
   },
   quantityControl: {
-    height: 38,
-    display: "grid",
-    gridTemplateColumns: "38px 34px 38px",
+    display: "inline-grid",
+    gridTemplateColumns: "36px 28px 36px",
     alignItems: "center",
+    justifyItems: "center",
     background: colors.warm,
     borderRadius: 999,
-    padding: 2,
+    padding: 4,
+    flexShrink: 0,
   },
   quantityControlMobile: {
-    height: 44,
-    gridTemplateColumns: "44px 34px 44px",
+    gridTemplateColumns: "38px 24px 38px",
+    padding: 3,
+  },
+  quantityControlFeaturedMobile: {
+    alignSelf: "flex-end",
   },
   quantityButton: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     border: "none",
     borderRadius: 999,
     background: colors.surface,
@@ -398,11 +411,15 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     fontSize: 18,
     fontWeight: 800,
+    display: "grid",
+    placeItems: "center",
+    lineHeight: 1,
+    padding: 0,
   },
   quantityButtonMobile: {
-    width: 44,
-    height: 44,
-    fontSize: 18,
+    width: 38,
+    height: 38,
+    fontSize: 17,
   },
   quantityButtonDark: {
     background: colors.brand,

@@ -520,7 +520,12 @@ export default function Page() {
                         {money(item.price * item.quantity)}
                       </p>
                     </div>
-                    <div style={styles.quantityControl}>
+                    <div
+                      style={{
+                        ...styles.quantityControl,
+                        ...(isMobile ? styles.quantityControlMobile : {}),
+                      }}
+                    >
                       <button
                         type="button"
                         onClick={() => decrease(item.lineKey)}
@@ -849,21 +854,22 @@ const styles: Record<string, CSSProperties> = {
     gap: 10,
   },
   quantityControl: {
-    height: 38,
-    display: "grid",
-    gridTemplateColumns: "38px 34px 38px",
+    display: "inline-grid",
+    gridTemplateColumns: "36px 28px 36px",
     alignItems: "center",
+    justifyItems: "center",
     background: "#f0ebe2",
     borderRadius: 999,
-    padding: 2,
+    padding: 4,
+    flexShrink: 0,
   },
   quantityControlMobile: {
-    height: 44,
-    gridTemplateColumns: "44px 34px 44px",
+    gridTemplateColumns: "38px 24px 38px",
+    padding: 3,
   },
   quantityButton: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     border: "none",
     borderRadius: 999,
     background: "#fffdf8",
@@ -871,11 +877,15 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     fontSize: 18,
     fontWeight: 800,
+    display: "grid",
+    placeItems: "center",
+    lineHeight: 1,
+    padding: 0,
   },
   quantityButtonMobile: {
-    width: 44,
-    height: 44,
-    fontSize: 18,
+    width: 38,
+    height: 38,
+    fontSize: 17,
   },
   quantityButtonDark: {
     background: "#9f1d2f",
@@ -1021,7 +1031,7 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 16,
+    gap: 12,
     padding: "12px 0",
     borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
   },
