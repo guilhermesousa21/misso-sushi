@@ -1,4 +1,12 @@
 import { formatBrasiliaDateTime } from "./brasiliaTime";
+import {
+  formatReceiptItemLine,
+  formatReceiptPayment,
+  formatReceiptPickup,
+  getReceiptSubtotal,
+  getReceiptTotal,
+  receiptMoney,
+} from "./orderReceipt";
 
 type PrintableItem = {
   id?: number;
@@ -37,12 +45,6 @@ export type PrintableOrder = {
   payment_status?: string | null;
 };
 
-const money = (value: number) =>
-  value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-
 const escapeHtml = (value: string) =>
   value
     .replace(/&/g, "&amp;")
@@ -51,30 +53,8 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-const formatItemLine = (item: PrintableItem) => {
-  const quantity = item.quantity ?? 1;
-  const modifiers = (item.modifiers || []).filter(Boolean).join(", ");
-  return `${quantity}x ${item.name}${modifiers ? ` (${modifiers})` : ""}`;
-};
-
-const getTotal = (order: PrintableOrder) =>
-  typeof order.total === "number"
-    ? order.total
-    : (order.items || []).reduce(
-        (sum, item) => sum + Number(item.price || 0) * (item.quantity ?? 1),
-        0
-      );
-
-const getSubtotal = (order: PrintableOrder) =>
-  typeof order.subtotal === "number" ? order.subtotal : getTotal(order);
-
 const formatDateTime = (value?: string | null) =>
   value ? formatBrasiliaDateTime(value) : formatBrasiliaDateTime(new Date());
-
-const formatPickup = (order: PrintableOrder) =>
-  order.fulfillment_type === "scheduled" && order.scheduled_for
-    ? `Agendada para ${formatDateTime(order.scheduled_for)}`
-    : "O quanto antes";
 
 export function printOrder(order: PrintableOrder) {
   const printWindow = window.open("", "_blank", "width=420,height=720");
@@ -84,7 +64,7 @@ export function printOrder(order: PrintableOrder) {
   }
 
   const items = order.items || [];
-  const subtotal = getSubtotal(order);
+  const subtotal = getReceiptSubtotal(order);
   const discount = Number(order.discount_amount || 0);
   const loyaltyDiscount = Number(order.loyalty_discount || 0);
   const serviceFee = Number(order.service_fee || 0);
@@ -92,11 +72,8 @@ export function printOrder(order: PrintableOrder) {
     (sum, addon) => sum + Number(addon.unit_price || 0) * (addon.quantity ?? 1),
     0
   );
-  const total = getTotal(order);
-  const paymentStatus = order.payment_status || "pendente";
-  const paymentLabel = order.payment_method
-    ? `${order.payment_method.toUpperCase()} - ${paymentStatus}`
-    : paymentStatus;
+  const total = getReceiptTotal(order);
+  const paymentLabel = formatReceiptPayment(order);
 
   const itemRows =
     items.length > 0
@@ -108,10 +85,10 @@ export function printOrder(order: PrintableOrder) {
             return `
               <tr>
                 <td>
-                  <strong>${escapeHtml(formatItemLine(item))}</strong>
-                  <span>${money(Number(item.price || 0))} cada</span>
+                  <strong>${escapeHtml(formatReceiptItemLine(item))}</strong>
+                  <span>${receiptMoney(Number(item.price || 0))} cada</span>
                 </td>
-                <td>${money(lineTotal)}</td>
+                <td>${receiptMoney(lineTotal)}</td>
               </tr>
             `;
           })
@@ -122,7 +99,7 @@ export function printOrder(order: PrintableOrder) {
     .map((addon) => {
       const quantity = addon.quantity ?? 1;
       const lineTotal = Number(addon.unit_price || 0) * quantity;
-      return `${quantity}x ${addon.name}${lineTotal > 0 ? ` - ${money(lineTotal)}` : ""}`;
+      return `${quantity}x ${addon.name}${lineTotal > 0 ? ` - ${receiptMoney(lineTotal)}` : ""}`;
     })
     .join(", ");
 
@@ -227,7 +204,7 @@ export function printOrder(order: PrintableOrder) {
           <section class="section">
             <div class="line"><strong>Cliente</strong><span>${escapeHtml(order.name || "Cliente")}</span></div>
             <div class="line"><strong>Telefone</strong><span>${escapeHtml(order.phone || "Não informado")}</span></div>
-            <div class="line"><strong>Retirada</strong><span>${escapeHtml(formatPickup(order))}</span></div>
+            <div class="line"><strong>Retirada</strong><span>${escapeHtml(formatReceiptPickup(order))}</span></div>
             <div class="line"><strong>Status</strong><span>${escapeHtml(order.status || "recebido")}</span></div>
           </section>
 
@@ -249,28 +226,28 @@ export function printOrder(order: PrintableOrder) {
 
           <section class="section">
             <div class="line"><span>Pagamento</span><strong>${escapeHtml(paymentLabel)}</strong></div>
-            <div class="line"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
+            <div class="line"><span>Subtotal</span><strong>${receiptMoney(subtotal)}</strong></div>
             ${
               addonTotal > 0
-                ? `<div class="line"><span>Complementos</span><strong>${money(addonTotal)}</strong></div>`
+                ? `<div class="line"><span>Complementos</span><strong>${receiptMoney(addonTotal)}</strong></div>`
                 : ""
             }
             ${
               serviceFee > 0
-                ? `<div class="line"><span>${escapeHtml(order.service_fee_label || "Taxa de embalagem")}</span><strong>${money(serviceFee)}</strong></div>`
+                ? `<div class="line"><span>${escapeHtml(order.service_fee_label || "Taxa de embalagem")}</span><strong>${receiptMoney(serviceFee)}</strong></div>`
                 : ""
             }
             ${
               discount > 0
-                ? `<div class="line"><span>Desconto${order.coupon_code ? ` (${escapeHtml(order.coupon_code)})` : ""}</span><strong>-${money(discount)}</strong></div>`
+                ? `<div class="line"><span>Desconto${order.coupon_code ? ` (${escapeHtml(order.coupon_code)})` : ""}</span><strong>-${receiptMoney(discount)}</strong></div>`
                 : ""
             }
             ${
               loyaltyDiscount > 0
-                ? `<div class="line"><span>Fidelidade</span><strong>-${money(loyaltyDiscount)}</strong></div>`
+                ? `<div class="line"><span>Fidelidade</span><strong>-${receiptMoney(loyaltyDiscount)}</strong></div>`
                 : ""
             }
-            <div class="line total"><span>Total</span><strong>${money(total)}</strong></div>
+            <div class="line total"><span>Total</span><strong>${receiptMoney(total)}</strong></div>
           </section>
 
           <footer>Impresso pelo painel Misso Sushi</footer>

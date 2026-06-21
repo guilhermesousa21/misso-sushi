@@ -1001,7 +1001,7 @@ const localStyles: Record<string, CSSProperties> = {
   modalOverlay: {
     position: "fixed",
     inset: 0,
-    zIndex: 70,
+    zIndex: 120,
     background: "rgba(28, 26, 23, 0.46)",
     display: "grid",
     placeItems: "center",

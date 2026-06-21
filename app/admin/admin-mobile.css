@@ -1,0 +1,24 @@
+.admin-root {
+  min-height: 100%;
+}
+
+@media (max-width: 767px) {
+  .admin-root {
+    min-height: 100dvh;
+    overscroll-behavior: none;
+  }
+
+  .admin-app-shell {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: #f7f4ef;
+  }
+
+  .admin-app-content {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+}
