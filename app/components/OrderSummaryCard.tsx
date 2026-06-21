@@ -28,6 +28,7 @@ type OrderSummaryCardProps = {
   title?: string;
   emptyItemsText?: string;
   notice?: string | null;
+  variant?: "dark" | "light";
 };
 
 export function OrderSummaryCard({
@@ -44,58 +45,60 @@ export function OrderSummaryCard({
   title = "Seu pedido",
   emptyItemsText = "Nenhum item neste pedido.",
   notice,
+  variant = "dark",
 }: OrderSummaryCardProps) {
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const showSubtotal = discountAmount > 0 || serviceFee > 0 || addonTotal > 0;
+  const palette = variant === "light" ? lightStyles : darkStyles;
 
   return (
-    <div style={styles.summaryCard}>
-      <div style={styles.cardHeader}>
+    <div style={palette.summaryCard}>
+      <div style={sharedStyles.cardHeader}>
         <div>
-          <p style={styles.cardEyebrow}>{eyebrow}</p>
-          <h2 style={styles.cardTitle}>{title}</h2>
+          <p style={sharedStyles.cardEyebrow}>{eyebrow}</p>
+          <h2 style={sharedStyles.cardTitle}>{title}</h2>
         </div>
-        <span style={styles.summaryPill}>
+        <span style={palette.summaryPill}>
           {itemCount} {itemCount === 1 ? "item" : "itens"}
         </span>
       </div>
 
-      {notice ? <p style={styles.noticeError}>{notice}</p> : null}
+      {notice ? <p style={palette.noticeError}>{notice}</p> : null}
 
-      <div style={styles.orderList}>
+      <div style={sharedStyles.orderList}>
         {items.length > 0 ? (
           items.map((item) => (
-            <div key={item.key} style={styles.summaryOrderRow}>
+            <div key={item.key} style={palette.summaryOrderRow}>
               <div>
-                <strong style={styles.itemName}>
+                <strong style={sharedStyles.itemName}>
                   {item.quantity}x {item.name}
                 </strong>
-                <p style={styles.summaryMuted}>{money(item.unitPrice)} cada</p>
+                <p style={palette.summaryMuted}>{money(item.unitPrice)} cada</p>
               </div>
               <strong>{money(item.unitPrice * item.quantity)}</strong>
             </div>
           ))
         ) : (
-          <p style={styles.summaryMuted}>{emptyItemsText}</p>
+          <p style={palette.summaryMuted}>{emptyItemsText}</p>
         )}
       </div>
 
-      <div style={styles.summaryTotalBox}>
+      <div style={sharedStyles.summaryTotalBox}>
         {showSubtotal && (
-          <div style={styles.summaryTotalLine}>
+          <div style={palette.summaryTotalLine}>
             <span>Subtotal</span>
             <strong>{money(itemsSubtotal)}</strong>
           </div>
         )}
         {addonTotal > 0 && (
           <>
-            <div style={styles.summaryTotalLine}>
+            <div style={palette.summaryTotalLine}>
               <span>Complementos</span>
               <strong>{money(addonTotal)}</strong>
             </div>
-            <div style={styles.addonSummaryList}>
+            <div style={sharedStyles.addonSummaryList}>
               {addons.map((addon) => (
-                <div key={addon.key} style={styles.addonSummary}>
+                <div key={addon.key} style={palette.addonSummary}>
                   {addon.quantity}x {addon.name}
                 </div>
               ))}
@@ -103,24 +106,24 @@ export function OrderSummaryCard({
           </>
         )}
         {serviceFee > 0 && (
-          <div style={styles.summaryTotalLine}>
+          <div style={palette.summaryTotalLine}>
             <span>{serviceFeeLabel}</span>
             <strong>{money(serviceFee)}</strong>
           </div>
         )}
         {discountAmount > 0 && (
-          <div style={styles.summaryTotalLine}>
+          <div style={palette.summaryTotalLine}>
             <span>Desconto cupom</span>
-            <strong style={styles.discountText}>-{money(discountAmount)}</strong>
+            <strong style={sharedStyles.discountText}>-{money(discountAmount)}</strong>
           </div>
         )}
         {loyaltyDiscount > 0 && (
-          <div style={styles.summaryTotalLine}>
+          <div style={palette.summaryTotalLine}>
             <span>Fidelidade</span>
-            <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
+            <strong style={sharedStyles.discountText}>-{money(loyaltyDiscount)}</strong>
           </div>
         )}
-        <div style={styles.summaryGrandTotalLine}>
+        <div style={palette.summaryGrandTotalLine}>
           <span>Total</span>
           <strong>{money(grandTotal)}</strong>
         </div>
@@ -129,15 +132,7 @@ export function OrderSummaryCard({
   );
 }
 
-const styles: Record<string, CSSProperties> = {
-  summaryCard: {
-    background: "#171512",
-    color: "#fffdf8",
-    border: "1px solid rgba(255, 253, 248, 0.08)",
-    borderRadius: 8,
-    padding: 22,
-    boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)",
-  },
+const sharedStyles: Record<string, CSSProperties> = {
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -160,6 +155,45 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.12,
     fontWeight: 850,
   },
+  noticeError: {
+    margin: "0 0 12px",
+    fontSize: 13,
+    fontWeight: 850,
+    lineHeight: 1.4,
+  },
+  orderList: {
+    display: "grid",
+    gap: 13,
+  },
+  itemName: {
+    display: "block",
+    lineHeight: 1.35,
+    fontWeight: 850,
+  },
+  summaryTotalBox: {
+    display: "grid",
+    gap: 10,
+    marginTop: 18,
+    padding: 0,
+  },
+  addonSummaryList: {
+    display: "grid",
+    gap: 4,
+  },
+  discountText: {
+    color: "#0f7a4a",
+  },
+};
+
+const darkStyles: Record<string, CSSProperties> = {
+  summaryCard: {
+    background: "#171512",
+    color: "#fffdf8",
+    border: "1px solid rgba(255, 253, 248, 0.08)",
+    borderRadius: 8,
+    padding: 22,
+    boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)",
+  },
   summaryPill: {
     borderRadius: 999,
     background: "rgba(255, 253, 248, 0.12)",
@@ -170,15 +204,8 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
   noticeError: {
-    margin: "0 0 12px",
+    ...sharedStyles.noticeError,
     color: "#ffb4b4",
-    fontSize: 13,
-    fontWeight: 850,
-    lineHeight: 1.4,
-  },
-  orderList: {
-    display: "grid",
-    gap: 13,
   },
   summaryOrderRow: {
     display: "flex",
@@ -187,23 +214,12 @@ const styles: Record<string, CSSProperties> = {
     paddingBottom: 13,
     borderBottom: "1px solid rgba(255, 253, 248, 0.12)",
   },
-  itemName: {
-    display: "block",
-    lineHeight: 1.35,
-    fontWeight: 850,
-  },
   summaryMuted: {
     marginTop: 4,
     marginBottom: 0,
     color: "rgba(255, 253, 248, 0.68)",
     fontSize: 13,
     lineHeight: 1.4,
-  },
-  summaryTotalBox: {
-    display: "grid",
-    gap: 10,
-    marginTop: 18,
-    padding: 0,
   },
   summaryTotalLine: {
     display: "flex",
@@ -221,16 +237,68 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 22,
     fontWeight: 850,
   },
-  addonSummaryList: {
-    display: "grid",
-    gap: 4,
-  },
   addonSummary: {
     color: "rgba(255, 253, 248, 0.66)",
     fontSize: 13,
     lineHeight: 1.45,
   },
-  discountText: {
-    color: "#0f7a4a",
+};
+
+const lightStyles: Record<string, CSSProperties> = {
+  summaryCard: {
+    background: "#fff",
+    color: "#1c1a17",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    padding: 22,
+    boxShadow: "0 8px 18px rgba(28, 26, 23, 0.04)",
+  },
+  summaryPill: {
+    borderRadius: 999,
+    background: "#f0ebe2",
+    padding: "7px 10px",
+    color: "#514a43",
+    fontSize: 13,
+    fontWeight: 850,
+    whiteSpace: "nowrap",
+  },
+  noticeError: {
+    ...sharedStyles.noticeError,
+    color: "#991b1b",
+  },
+  summaryOrderRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 18,
+    paddingBottom: 13,
+    borderBottom: "1px solid rgba(28, 26, 23, 0.08)",
+  },
+  summaryMuted: {
+    marginTop: 4,
+    marginBottom: 0,
+    color: "#766e64",
+    fontSize: 13,
+    lineHeight: 1.4,
+  },
+  summaryTotalLine: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 16,
+    color: "#625b53",
+    fontSize: 15,
+    fontWeight: 750,
+  },
+  summaryGrandTotalLine: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 16,
+    color: "#1c1a17",
+    fontSize: 22,
+    fontWeight: 850,
+  },
+  addonSummary: {
+    color: "#766e64",
+    fontSize: 13,
+    lineHeight: 1.45,
   },
 };

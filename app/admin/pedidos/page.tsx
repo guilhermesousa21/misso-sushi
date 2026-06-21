@@ -362,6 +362,7 @@ export default function AdminOrdersPage() {
                     </div>
 
                     <OrderSummaryCard
+                      variant="light"
                       title={`Pedido #${order.id}`}
                       items={(order.items || []).map((item, index) => ({
                         key: `${order.id}-${item.id}-${index}`,
