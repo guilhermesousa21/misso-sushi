@@ -860,6 +860,46 @@ export default function AdminMenuPage() {
                         </div>
                       </div>
                       <div style={{ ...styles.itemActions, ...(isMobile ? styles.itemActionsMobile : {}) }}>
+                        {isMobile ? (
+                          <>
+                            <div style={styles.itemActionsLeftMobile}>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void toggleItemActive(item);
+                                }}
+                                aria-pressed={itemActive}
+                                style={{
+                                  ...styles.itemSwitch,
+                                  ...(itemActive ? styles.itemSwitchActive : styles.itemSwitchPaused),
+                                }}
+                                aria-label={itemActive ? "Pausar item" : "Ativar item"}
+                              >
+                                <span
+                                  style={{
+                                    ...styles.itemSwitchThumb,
+                                    ...(itemActive ? styles.itemSwitchThumbActive : {}),
+                                  }}
+                                />
+                              </button>
+                              <span style={styles.itemSwitchLabel}>
+                                {itemActive ? "Ativo" : "Pausado"}
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingItem(item)}
+                              style={styles.secondaryButtonMobile}
+                            >
+                              <Pencil size={14} strokeWidth={2.2} />
+                              Editar
+                            </Button>
+                          </>
+                        ) : (
+                          <>
                         <button
                           type="button"
                           onClick={(event) => {
@@ -880,7 +920,7 @@ export default function AdminMenuPage() {
                             }}
                           />
                         </button>
-                        <span style={{ ...styles.itemSwitchLabel, ...(isMobile ? styles.itemSwitchLabelMobile : {}) }}>
+                        <span style={styles.itemSwitchLabel}>
                           {itemActive ? "Ativo" : "Pausado"}
                         </span>
                         <Button
@@ -888,11 +928,12 @@ export default function AdminMenuPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setEditingItem(item)}
-                          style={isMobile ? styles.secondaryButtonMobile : undefined}
                         >
                           <Pencil size={14} strokeWidth={2.2} />
                           Editar
                         </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                       );
@@ -1987,6 +2028,7 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryListMobile: {
     gap: 10,
+    paddingBottom: 8,
   },
   categoryCard: {
     background: "#fffdf8",
@@ -2278,12 +2320,19 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: "wrap",
   },
   itemActionsMobile: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "center",
+    columnGap: 8,
+    width: "100%",
+    paddingTop: 8,
+    borderTop: "1px solid rgba(28, 26, 23, 0.06)",
+  },
+  itemActionsLeftMobile: {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    width: "100%",
-    paddingTop: 4,
-    borderTop: "1px solid rgba(28, 26, 23, 0.06)",
+    minWidth: 0,
   },
   itemSwitch: {
     width: 40,
@@ -2322,14 +2371,10 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     minWidth: 48,
   },
-  itemSwitchLabelMobile: {
-    flex: 1,
-    minWidth: 0,
-  },
   secondaryButton: getButtonStyle("ghost", "sm"),
   secondaryButtonMobile: {
+    justifySelf: "end",
     flexShrink: 0,
-    marginLeft: "auto",
     minHeight: 40,
     padding: "10px 14px",
   },

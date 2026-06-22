@@ -455,7 +455,7 @@ function baseStyles(): Record<string, CSSProperties> {
       minWidth: 0,
     },
     contentMobile: {
-      padding: "12px 12px calc(104px + env(safe-area-inset-bottom, 0px))",
+      padding: "12px 12px calc(132px + env(safe-area-inset-bottom, 0px))",
     },
     header: {
       display: "flex",
