@@ -261,8 +261,8 @@ export default function PedidoPage({
         </p>
 
         {(order.items || []).length > 0 && (
-          <div style={styles.summaryCard}>
-            <div style={styles.cardHeader}>
+          <div style={{ ...styles.summaryCard, ...(isMobile ? styles.summaryCardMobile : {}) }}>
+            <div style={{ ...styles.cardHeader, ...(isMobile ? styles.cardHeaderMobile : {}) }}>
               <div>
                 <p style={styles.cardEyebrow}>Resumo</p>
                 <h2 style={styles.cardTitle}>Seu pedido</h2>
@@ -279,8 +279,8 @@ export default function PedidoPage({
                 const modifierText = formatItemModifiers(item.modifiers);
 
                 return (
-                  <div key={`${item.id}-${index}`} style={styles.summaryOrderRow}>
-                    <div>
+                  <div key={`${item.id}-${index}`} style={{ ...styles.summaryOrderRow, ...(isMobile ? styles.summaryOrderRowMobile : {}) }}>
+                    <div style={styles.summaryOrderMain}>
                       <strong style={styles.itemName}>
                         {quantity}x {item.name}
                         {modifierText ? ` (${modifierText})` : ""}
@@ -471,12 +471,20 @@ const styles: Record<string, CSSProperties> = {
     padding: 22,
     boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)",
   },
+  summaryCardMobile: {
+    marginTop: 18,
+    padding: 18,
+  },
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "start",
     gap: 16,
     marginBottom: 18,
+  },
+  cardHeaderMobile: {
+    gap: 10,
+    marginBottom: 14,
   },
   cardEyebrow: {
     color: "#9f1d2f",
@@ -509,6 +517,14 @@ const styles: Record<string, CSSProperties> = {
     gap: 18,
     paddingBottom: 13,
     borderBottom: "1px solid rgba(255, 253, 248, 0.12)",
+  },
+  summaryOrderRowMobile: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gap: 12,
+  },
+  summaryOrderMain: {
+    minWidth: 0,
   },
   itemName: {
     display: "block",

@@ -2381,7 +2381,7 @@ const styles: Record<string, CSSProperties> = {
   },
   itemActionsMobile: {
     display: "grid",
-    gridTemplateColumns: "minmax(112px, 1fr) auto",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(118px, auto)",
     alignItems: "center",
     columnGap: 8,
     width: "100%",
@@ -2439,8 +2439,10 @@ const styles: Record<string, CSSProperties> = {
     justifySelf: "end",
     marginLeft: "auto",
     flexShrink: 0,
+    minWidth: 118,
     minHeight: 39,
     padding: "10px 14px",
+    justifyContent: "center",
     boxShadow: "none",
   },
   inactiveButton: {

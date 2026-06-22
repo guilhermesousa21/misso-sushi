@@ -438,6 +438,7 @@ export default function AdminPanel() {
               key={order.id}
               style={{
                 ...styles.card,
+                ...(isMobile ? styles.cardMobile : {}),
                 ...(delayed ? styles.cardDelayed : {}),
               }}
             >
@@ -506,7 +507,7 @@ export default function AdminPanel() {
                   ...(isMobile ? styles.actionsMobile : {}),
                 }}
               >
-                <Button type="button" variant="ghost" size="sm" onClick={() => printOrder(order)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => printOrder(order)} style={isMobile ? styles.actionButtonMobile : undefined}>
                   <Printer size={15} strokeWidth={2.2} />
                   Imprimir
                 </Button>
@@ -516,6 +517,7 @@ export default function AdminPanel() {
                   variant={kitchenStatus === "pronto" || kitchenStatus === "retirado" ? "ghost" : "secondary"}
                   onClick={() => setConfirmation({ action: "ready", order })}
                   disabled={kitchenStatus === "pronto" || kitchenStatus === "retirado"}
+                  style={isMobile ? styles.actionButtonMobile : undefined}
                 >
                   <CheckCircle2 size={15} strokeWidth={2.2} />
                   {kitchenStatus === "pronto" || kitchenStatus === "retirado" ? "Pronto" : "Marcar pronto"}
@@ -526,6 +528,7 @@ export default function AdminPanel() {
                   variant={kitchenStatus === "retirado" ? "ghost" : kitchenStatus === "pronto" ? "primary" : "ghost"}
                   onClick={() => setConfirmation({ action: "picked_up", order })}
                   disabled={kitchenStatus !== "pronto"}
+                  style={isMobile ? styles.actionButtonMobile : undefined}
                 >
                   <PackageCheck size={15} strokeWidth={2.2} />
                   {kitchenStatus === "retirado" ? "Retirado" : "Marcar retirado"}
@@ -740,6 +743,10 @@ const styles: Record<string, CSSProperties> = {
     padding: 20,
     boxShadow: "var(--shadow-card)",
   },
+  cardMobile: {
+    padding: 14,
+    borderRadius: 10,
+  },
   cardDelayed: {
     borderColor: "rgba(153, 27, 27, 0.28)",
     boxShadow: "0 14px 35px rgba(153, 27, 27, 0.12)",
@@ -869,6 +876,12 @@ const styles: Record<string, CSSProperties> = {
   },
   actionsMobile: {
     gridTemplateColumns: "1fr",
+    gap: 7,
+  },
+  actionButtonMobile: {
+    width: "100%",
+    minHeight: 46,
+    justifyContent: "center",
   },
   actionsTablet: {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",

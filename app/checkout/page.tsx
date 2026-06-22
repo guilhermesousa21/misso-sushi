@@ -672,8 +672,8 @@ export default function CheckoutPage() {
         : isFormValid;
 
   const orderSummaryCard = (
-    <div style={styles.summaryCard}>
-      <div style={styles.cardHeader}>
+    <div style={{ ...styles.summaryCard, ...(isMobile ? styles.summaryCardMobile : {}) }}>
+      <div style={{ ...styles.cardHeader, ...(isMobile ? styles.cardHeaderMobile : {}) }}>
         <div>
           <p style={styles.cardEyebrow}>Resumo</p>
           <h2 style={styles.cardTitle}>Seu pedido</h2>
@@ -683,8 +683,8 @@ export default function CheckoutPage() {
       {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
       <div style={styles.orderList}>
         {cart.map((item) => (
-          <div key={item.lineKey} style={styles.summaryOrderRow}>
-            <div>
+          <div key={item.lineKey} style={{ ...styles.summaryOrderRow, ...(isMobile ? styles.summaryOrderRowMobile : {}) }}>
+            <div style={styles.summaryOrderMain}>
               <strong style={styles.itemName}>{item.quantity}x {item.name}</strong>
               <p style={styles.summaryMuted}>{money(Number(item.price))} cada</p>
             </div>
@@ -772,7 +772,7 @@ export default function CheckoutPage() {
 
           {checkoutStep === 1 && (
             <>
-              <div style={styles.card}>
+              <div style={{ ...styles.card, ...(isMobile ? styles.cardMobile : {}) }}>
                 <h2 style={styles.sectionTitle}>Dados para contato</h2>
                 <div style={{ ...styles.formGrid, ...(isMobile ? styles.formGridMobile : {}) }}>
                   <Input
@@ -800,7 +800,7 @@ export default function CheckoutPage() {
               </div>
 
               {[10, 11].includes(onlyDigits(phone).length) && (
-                <div style={styles.card}>
+                <div style={{ ...styles.card, ...(isMobile ? styles.cardMobile : {}) }}>
                   <div style={styles.inlineHeader}>
                     <h2 style={styles.sectionTitle}>Fidelidade</h2>
                     {loyaltyStatus?.eligibleNow && (
@@ -843,7 +843,7 @@ export default function CheckoutPage() {
 
           {checkoutStep === 2 && (
             <>
-              <div style={styles.card}>
+              <div style={{ ...styles.card, ...(isMobile ? styles.cardMobile : {}) }}>
                 <h2 style={styles.sectionTitle}>Retirada</h2>
                 <p style={styles.mutedSmall}>
                   Por padrão, seu pedido entra na fila de preparo assim que o pagamento for confirmado.
@@ -969,7 +969,7 @@ export default function CheckoutPage() {
 
           {checkoutStep === 3 && (
             <>
-              <div style={styles.card}>
+              <div style={{ ...styles.card, ...(isMobile ? styles.cardMobile : {}) }}>
                 <div style={styles.inlineHeader}>
                   <h2 style={styles.sectionTitle}>Cupom</h2>
                   {appliedCoupon && <span style={styles.inlineMeta}>-{money(discountAmount)}</span>}
@@ -1006,7 +1006,7 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              <div style={styles.card}>
+              <div style={{ ...styles.card, ...(isMobile ? styles.cardMobile : {}) }}>
                 <h2 style={styles.sectionTitle}>Pagamento</h2>
                 <div style={styles.methods}>
                   {(["pix", "card"] as PaymentMethod[]).map((option) => (
@@ -1167,8 +1167,11 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: 4,
   },
   card: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.07)", borderRadius: 10, padding: 18, boxShadow: "0 8px 18px rgba(28, 26, 23, 0.035)" },
+  cardMobile: { padding: 14 },
   summaryCard: { background: "#171512", color: "#fffdf8", border: "1px solid rgba(255, 253, 248, 0.08)", borderRadius: 8, padding: 22, boxShadow: "0 16px 36px rgba(23, 21, 18, 0.16)" },
+  summaryCardMobile: { padding: 18 },
   cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16, marginBottom: 18 },
+  cardHeaderMobile: { gap: 10, marginBottom: 14 },
   cardEyebrow: { color: "#9f1d2f", fontSize: 11, fontWeight: 850, textTransform: "uppercase", letterSpacing: 0 },
   cardTitle: { marginTop: 5, fontSize: 23, lineHeight: 1.12 },
   sectionTitle: { margin: "0 0 14px", fontSize: 20, lineHeight: 1.12 },
@@ -1281,6 +1284,8 @@ const styles: Record<string, CSSProperties> = {
   grandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#1c1a17", fontSize: 22, fontWeight: 850 },
   summaryMuted: { marginTop: 4, color: "rgba(255, 253, 248, 0.68)", fontSize: 13, lineHeight: 1.4 },
   summaryOrderRow: { display: "flex", justifyContent: "space-between", gap: 18, paddingBottom: 13, borderBottom: "1px solid rgba(255, 253, 248, 0.12)" },
+  summaryOrderRowMobile: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12 },
+  summaryOrderMain: { minWidth: 0 },
   summaryTotalBox: { display: "grid", gap: 10, marginTop: 18, padding: "0" },
   summaryTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255, 253, 248, 0.78)", fontSize: 15 },
   summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },

@@ -353,6 +353,9 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
   },
   cardFooterMobile: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "center",
     gap: 8,
     minWidth: 0,
   },
@@ -367,6 +370,7 @@ const styles: Record<string, CSSProperties> = {
   },
   priceMobile: {
     fontSize: 14,
+    minWidth: 0,
   },
   addButton: {
     border: "none",
@@ -380,7 +384,7 @@ const styles: Record<string, CSSProperties> = {
   },
   addButtonMobile: {
     minHeight: 40,
-    padding: "9px 12px",
+    padding: "9px 11px",
     fontSize: 12,
     alignSelf: "flex-end",
   },
