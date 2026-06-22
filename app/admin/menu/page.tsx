@@ -4,7 +4,16 @@ import type { CSSProperties, PointerEvent } from "react";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import Image from "next/image";
-import { FolderPlus, Pencil, Plus, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  FolderPlus,
+  GripVertical,
+  Pencil,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 import {
   defaultMenuCategories,
@@ -500,11 +509,11 @@ export default function AdminMenuPage() {
     <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
       <Button type="button" onClick={() => handleAddItem()} style={isMobile ? styles.headerButtonMobile : undefined}>
         <Plus size={16} strokeWidth={2.5} />
-        Novo item
+        {isMobile ? "Item" : "Novo item"}
       </Button>
       <Button type="button" variant="secondary" onClick={() => setCreatingCategoryModalOpen(true)} style={isMobile ? styles.headerButtonMobile : undefined}>
         <FolderPlus size={16} strokeWidth={2.2} />
-        Nova categoria
+        {isMobile ? "Categoria" : "Nova categoria"}
       </Button>
     </div>
   );
@@ -641,7 +650,11 @@ export default function AdminMenuPage() {
                         ...(isMobile ? styles.categoryToggleMobile : {}),
                       }}
                     >
-                      {categoryExpanded ? "↑" : "↓"}
+                      {categoryExpanded ? (
+                        <ChevronUp size={18} strokeWidth={2.5} />
+                      ) : (
+                        <ChevronDown size={18} strokeWidth={2.5} />
+                      )}
                     </button>
                     <div style={styles.categoryTitleText}>
                       <h2 style={{ ...styles.categoryTitle, ...(isMobile ? styles.categoryTitleMobile : {}) }}>
@@ -695,7 +708,7 @@ export default function AdminMenuPage() {
                           ...styles.categoryDragHandleMobile,
                         }}
                       >
-                        ⋮⋮
+                        <GripVertical size={18} strokeWidth={2.4} />
                       </span>
                     )}
                   </div>
@@ -738,7 +751,7 @@ export default function AdminMenuPage() {
                       title="Arrastar categoria"
                       style={canReorder ? styles.categoryDragHandle : styles.categoryDragHandleDisabled}
                     >
-                      ⋮⋮
+                      <GripVertical size={18} strokeWidth={2.4} />
                     </span>
                     )}
                     <button
@@ -830,9 +843,12 @@ export default function AdminMenuPage() {
                     >
                       <div style={{ ...styles.itemMain, ...(isMobile ? styles.itemMainMobile : {}) }}>
                         <span
-                          style={canReorder ? styles.dragHandle : styles.dragHandleDisabled}
+                          style={{
+                            ...(canReorder ? styles.dragHandle : styles.dragHandleDisabled),
+                            ...(isMobile ? styles.itemDragHandleMobile : {}),
+                          }}
                         >
-                          ::
+                          <GripVertical size={isMobile ? 17 : 18} strokeWidth={2.4} />
                         </span>
                         {item.image && (
                           <Image
@@ -848,7 +864,7 @@ export default function AdminMenuPage() {
                             <span>Sem foto</span>
                           </div>
                         )}
-                        <div>
+                        <div style={styles.itemText}>
                           <h3 style={{ ...styles.itemName, ...(isMobile ? styles.itemNameMobile : {}) }}>{item.name}</h3>
                           <p style={styles.itemPrice}>{money(Number(item.price))}</p>
                           <div style={styles.itemStatusLine}>
@@ -1869,7 +1885,7 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: "border-box",
   },
   contentMobile: {
-    padding: "22px 14px 42px",
+    padding: "18px 10px 34px",
   },
   header: {
     display: "flex",
@@ -1887,8 +1903,10 @@ const styles: Record<string, CSSProperties> = {
   headerMobile: {
     display: "grid",
     alignItems: "start",
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 10,
+    borderRadius: 12,
+    padding: 16,
   },
   eyebrow: {
     color: "#ff304f",
@@ -1902,7 +1920,8 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1,
   },
   titleMobile: {
-    fontSize: 32,
+    fontSize: 28,
+    lineHeight: 1.05,
   },
   headerActions: {
     display: "flex",
@@ -1914,7 +1933,7 @@ const styles: Record<string, CSSProperties> = {
   headerActionsMobile: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
-    gap: 8,
+    gap: 7,
     width: "100%",
   },
   primaryButton: getButtonStyle("primary", "md"),
@@ -1939,10 +1958,12 @@ const styles: Record<string, CSSProperties> = {
   },
   toolbarStack: {
     gridTemplateColumns: "1fr",
-    gap: 8,
+    gap: 7,
     position: "static",
     top: "auto",
-    marginBottom: 10,
+    marginBottom: 8,
+    borderRadius: 10,
+    padding: 8,
   },
   searchWrap: {
     position: "relative",
@@ -1971,7 +1992,8 @@ const styles: Record<string, CSSProperties> = {
     background: "var(--color-surface)",
   },
   controlMobile: {
-    padding: 11,
+    minHeight: 44,
+    padding: "10px 11px",
     fontSize: 16,
   },
   notice: {
@@ -2018,17 +2040,18 @@ const styles: Record<string, CSSProperties> = {
   },
   headerButtonMobile: {
     width: "100%",
-    minHeight: 44,
+    minHeight: 42,
     padding: "10px 8px",
     fontSize: 13,
+    boxShadow: "none",
   },
   categoryList: {
     display: "grid",
     gap: 16,
   },
   categoryListMobile: {
-    gap: 10,
-    paddingBottom: 8,
+    gap: 9,
+    paddingBottom: 14,
   },
   categoryCard: {
     background: "#fffdf8",
@@ -2041,6 +2064,7 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryCardMobile: {
     padding: 0,
+    borderRadius: 10,
   },
   categoryHeader: {
     display: "flex",
@@ -2057,8 +2081,8 @@ const styles: Record<string, CSSProperties> = {
   categoryHeaderMobile: {
     display: "flex",
     flexDirection: "column",
-    gap: 10,
-    padding: "12px 14px",
+    gap: 9,
+    padding: "11px 12px",
     marginBottom: 0,
   },
   categoryHeaderActions: {
@@ -2071,7 +2095,7 @@ const styles: Record<string, CSSProperties> = {
   categoryHeaderActionsMobile: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
-    gap: 8,
+    gap: 7,
     width: "100%",
   },
   categoryTitleGroup: {
@@ -2082,9 +2106,9 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryTitleGroupMobile: {
     display: "grid",
-    gridTemplateColumns: "auto minmax(0, 1fr) auto",
+    gridTemplateColumns: "36px minmax(0, 1fr) 36px",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     width: "100%",
   },
   categoryTitleText: {
@@ -2104,8 +2128,8 @@ const styles: Record<string, CSSProperties> = {
     flex: "0 0 auto",
   },
   categoryToggleMobile: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     fontSize: 16,
   },
   categoryDragHandle: {
@@ -2129,8 +2153,8 @@ const styles: Record<string, CSSProperties> = {
   categoryDragHandleMobile: {
     display: "grid",
     placeItems: "center",
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: 8,
     border: "1px solid rgba(28, 26, 23, 0.1)",
     background: "#fff",
@@ -2151,13 +2175,21 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.2,
     userSelect: "none",
   },
+  itemDragHandleMobile: {
+    display: "grid",
+    placeItems: "center",
+    width: 18,
+    minHeight: 52,
+    padding: 0,
+  },
   cardEyebrow: eyebrowStyle,
   categoryTitle: {
     fontSize: 21,
     lineHeight: 1.15,
   },
   categoryTitleMobile: {
-    fontSize: 18,
+    fontSize: 17,
+    lineHeight: 1.15,
   },
   categoryMeta: {
     marginTop: 3,
@@ -2176,8 +2208,8 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
   },
   categoryActionButtonMobile: {
-    minHeight: 44,
-    padding: "11px 12px",
+    minHeight: 42,
+    padding: "10px 12px",
     width: "100%",
     textAlign: "center",
     boxSizing: "border-box",
@@ -2188,8 +2220,8 @@ const styles: Record<string, CSSProperties> = {
     padding: 14,
   },
   itemListMobile: {
-    padding: "10px 12px 12px",
-    gap: 8,
+    padding: "9px 10px 10px",
+    gap: 7,
   },
   emptyCategoryText: {
     color: "#766e64",
@@ -2241,9 +2273,13 @@ const styles: Record<string, CSSProperties> = {
   },
   itemCardMobile: {
     display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr)",
     alignItems: "stretch",
-    gap: 10,
-    padding: 10,
+    gap: 9,
+    padding: 9,
+    width: "100%",
+    boxSizing: "border-box",
+    borderRadius: 10,
   },
   itemMain: {
     minWidth: 0,
@@ -2252,8 +2288,11 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
   },
   itemMainMobile: {
-    alignItems: "flex-start",
+    display: "grid",
+    gridTemplateColumns: "18px 68px minmax(0, 1fr)",
+    alignItems: "start",
     gap: 8,
+    minWidth: 0,
   },
   itemImage: {
     borderRadius: 8,
@@ -2262,8 +2301,8 @@ const styles: Record<string, CSSProperties> = {
     flex: "0 0 auto",
   },
   itemImageMobile: {
-    width: 64,
-    height: 48,
+    width: 68,
+    height: 52,
   },
   itemImagePlaceholder: {
     width: 92,
@@ -2279,13 +2318,16 @@ const styles: Record<string, CSSProperties> = {
     textTransform: "uppercase",
     flex: "0 0 auto",
   },
+  itemText: {
+    minWidth: 0,
+  },
   itemName: {
     fontSize: 17,
     lineHeight: 1.25,
   },
   itemNameMobile: {
-    fontSize: 14,
-    lineHeight: 1.18,
+    fontSize: 15,
+    lineHeight: 1.16,
   },
   itemPrice: {
     color: "#625b53",
@@ -2321,17 +2363,20 @@ const styles: Record<string, CSSProperties> = {
   },
   itemActionsMobile: {
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gridTemplateColumns: "minmax(112px, 1fr) auto",
     alignItems: "center",
     columnGap: 8,
     width: "100%",
-    paddingTop: 8,
+    justifySelf: "stretch",
+    boxSizing: "border-box",
+    minHeight: 45,
+    paddingTop: 7,
     borderTop: "1px solid rgba(28, 26, 23, 0.06)",
   },
   itemActionsLeftMobile: {
     display: "flex",
     alignItems: "center",
-    gap: 8,
+    gap: 7,
     minWidth: 0,
   },
   itemSwitch: {
@@ -2374,9 +2419,11 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: getButtonStyle("ghost", "sm"),
   secondaryButtonMobile: {
     justifySelf: "end",
+    marginLeft: "auto",
     flexShrink: 0,
-    minHeight: 40,
+    minHeight: 39,
     padding: "10px 14px",
+    boxShadow: "none",
   },
   inactiveButton: {
     background: "#f0ebe2",
