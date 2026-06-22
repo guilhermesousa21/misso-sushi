@@ -43,6 +43,7 @@ export type OperationalSettings = {
 };
 
 export const defaultServiceFeeLabel = "Taxa de embalagem";
+export const defaultAverageTime = "35 a 50 min";
 export const defaultPickupSlotMinutes = 30;
 export const defaultMinPickupMinutes = 35;
 export const defaultMaxAdvanceDays = 1;
@@ -83,6 +84,9 @@ export const getServiceFee = (settings?: OperationalSettings | null) => {
 
 export const getServiceFeeLabel = (settings?: OperationalSettings | null) =>
   settings?.service_fee_label?.trim() || defaultServiceFeeLabel;
+
+export const getAverageTimeLabel = (settings?: OperationalSettings | null) =>
+  settings?.average_time?.trim() || defaultAverageTime;
 
 export const getPickupSlotMinutes = (settings?: OperationalSettings | null) =>
   clampPositiveInteger(settings?.pickup_slot_minutes, defaultPickupSlotMinutes);

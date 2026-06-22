@@ -24,6 +24,7 @@ import {
   buildPickupSlots,
   getCheckoutAddons,
   formatPickupTime,
+  getAverageTimeLabel,
   getOrderSlotLimit,
   getPickupSlotMinutes,
   getServiceFee,
@@ -154,7 +155,6 @@ export default function CheckoutPage() {
 
   const [storeOpen, setStoreOpen] = useState(true);
   const [manualOpen, setManualOpen] = useState(true);
-  const [averageTime, setAverageTime] = useState("35 a 50 min");
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
   const [operationalSettings, setOperationalSettings] = useState<OperationalSettings | null>(null);
   const [availableAddons, setAvailableAddons] = useState(getCheckoutAddons(null));
@@ -168,6 +168,7 @@ export default function CheckoutPage() {
 
   const serviceFee = getServiceFee(operationalSettings);
   const serviceFeeLabel = getServiceFeeLabel(operationalSettings);
+  const averageTime = getAverageTimeLabel(operationalSettings);
   const pickupSlots = buildPickupSlots(operationalSettings);
   const slotLimit = getOrderSlotLimit(operationalSettings);
   const selectedAddonList = availableAddons
@@ -196,7 +197,6 @@ export default function CheckoutPage() {
       setAvailableAddons(getCheckoutAddons(settings));
       setBusinessHours(savedBusinessHours);
       setManualOpen(manuallyOpen);
-      setAverageTime(data?.average_time || "35 a 50 min");
       setStoreOpen(
         data
           ? isStoreAcceptingOrders(manuallyOpen, new Date(), savedBusinessHours)

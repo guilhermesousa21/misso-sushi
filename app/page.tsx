@@ -14,6 +14,7 @@ import {
   weeklyBusinessHours,
   type BusinessHours,
 } from "../lib/storeHours";
+import { getAverageTimeLabel } from "../lib/orderFeatures";
 import { useIsMobile } from "../lib/useMediaQuery";
 import {
   defaultMenuCategories,
@@ -57,7 +58,7 @@ export default function Page() {
   const [storeOpen, setStoreOpen] = useState(true);
   const [manualOpen, setManualOpen] = useState(true);
   const [businessHours, setBusinessHours] = useState<BusinessHours>(weeklyBusinessHours);
-  const [averageTime, setAverageTime] = useState("35 a 50 min");
+  const [averageTime, setAverageTime] = useState(getAverageTimeLabel(null));
   const [topItems, setTopItems] = useState<Record<number, number>>({});
   const [menuError, setMenuError] = useState("");
   const [menuLoading, setMenuLoading] = useState(true);
@@ -128,7 +129,7 @@ export default function Page() {
         setBusinessHours(savedBusinessHours);
         setManualOpen(manuallyOpen);
         setStoreOpen(isStoreAcceptingOrders(manuallyOpen, new Date(), savedBusinessHours));
-        if (settings.average_time) setAverageTime(String(settings.average_time));
+        setAverageTime(getAverageTimeLabel(settings));
       } else {
         setStoreOpen(isWithinBusinessHours(new Date(), weeklyBusinessHours));
       }
