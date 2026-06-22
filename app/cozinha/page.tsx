@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   PackageCheck,
@@ -114,6 +114,19 @@ const isKitchenOrderDelayed = (order: Order, now: Date, delayMinutes: number) =>
 
   return minutesSinceAt(order.created_at, now) > delayMinutes;
 };
+
+const sortQueueOrders = (items: Order[]) =>
+  [...items].sort((a, b) => {
+    const aPickup = a.scheduled_for || a.created_at;
+    const bPickup = b.scheduled_for || b.created_at;
+    return new Date(aPickup).getTime() - new Date(bPickup).getTime();
+  });
+
+const sortPickedUpOrders = (items: Order[]) =>
+  [...items].sort(
+    (a, b) =>
+      parseSupabaseDate(b.created_at).getTime() - parseSupabaseDate(a.created_at).getTime()
+  );
 
 export default function AdminPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -253,54 +266,70 @@ export default function AdminPanel() {
     }
   }
 
-  const todayKey = toBrasiliaDateKey(now);
-  const todayOrders = orders.filter(
-    (order) => toBrasiliaDateKey(order.created_at) === todayKey
-  );
-  const queueOrders = todayOrders.filter((order) => !isOrderPickedUp(order));
-  const pickedUpOrders = todayOrders.filter(isOrderPickedUp);
+  const todayOrders = useMemo(() => {
+    const todayKey = toBrasiliaDateKey(now);
+    return orders.filter((order) => toBrasiliaDateKey(order.created_at) === todayKey);
+  }, [now, orders]);
 
-  const sortQueueOrders = (items: Order[]) =>
-    [...items].sort((a, b) => {
-      const aPickup = a.scheduled_for || a.created_at;
-      const bPickup = b.scheduled_for || b.created_at;
-      return new Date(aPickup).getTime() - new Date(bPickup).getTime();
-    });
-
-  const sortPickedUpOrders = (items: Order[]) =>
-    [...items].sort(
-      (a, b) =>
-        parseSupabaseDate(b.created_at).getTime() - parseSupabaseDate(a.created_at).getTime()
-    );
-
-  const receivedOrders = queueOrders.filter(
-    (order) =>
-      normalizeKitchenStatus(order.status) === "recebido" &&
-      !isKitchenOrderDelayed(order, now, delayMinutes)
-  );
-  const readyOrders = queueOrders.filter(
-    (order) => normalizeKitchenStatus(order.status) === "pronto"
-  );
-  const delayedOrders = queueOrders.filter((order) =>
-    isKitchenOrderDelayed(order, now, delayMinutes)
+  const queueOrders = useMemo(
+    () => todayOrders.filter((order) => !isOrderPickedUp(order)),
+    [todayOrders]
   );
 
-  const orderMatchesFilter = (order: Order, filterValue: KitchenFilter | null) => {
-    if (!filterValue) return true;
+  const pickedUpOrders = useMemo(
+    () => todayOrders.filter(isOrderPickedUp),
+    [todayOrders]
+  );
 
-    const kitchenStatus = normalizeKitchenStatus(order.status);
-    if (filterValue === "recebidos") {
-      return kitchenStatus === "recebido" && !isKitchenOrderDelayed(order, now, delayMinutes);
-    }
-    if (filterValue === "prontos") return kitchenStatus === "pronto";
-    if (filterValue === "retirados") return isOrderPickedUp(order);
-    return isKitchenOrderDelayed(order, now, delayMinutes);
-  };
+  const receivedOrders = useMemo(
+    () =>
+      queueOrders.filter(
+        (order) =>
+          normalizeKitchenStatus(order.status) === "recebido" &&
+          !isKitchenOrderDelayed(order, now, delayMinutes)
+      ),
+    [delayMinutes, now, queueOrders]
+  );
 
-  const filteredOrders =
-    filter === "retirados"
-      ? sortPickedUpOrders(pickedUpOrders)
-      : sortQueueOrders(queueOrders).filter((order) => orderMatchesFilter(order, filter));
+  const readyOrders = useMemo(
+    () =>
+      queueOrders.filter(
+        (order) => normalizeKitchenStatus(order.status) === "pronto"
+      ),
+    [queueOrders]
+  );
+
+  const delayedOrders = useMemo(
+    () =>
+      queueOrders.filter((order) =>
+        isKitchenOrderDelayed(order, now, delayMinutes)
+      ),
+    [delayMinutes, now, queueOrders]
+  );
+
+  const filteredOrders = useMemo(
+    () => {
+      if (filter === "retirados") return sortPickedUpOrders(pickedUpOrders);
+
+      const sortedOrders = sortQueueOrders(queueOrders);
+      if (!filter) return sortedOrders;
+
+      return sortedOrders.filter((order) => {
+        const kitchenStatus = normalizeKitchenStatus(order.status);
+
+        if (filter === "recebidos") {
+          return (
+            kitchenStatus === "recebido" &&
+            !isKitchenOrderDelayed(order, now, delayMinutes)
+          );
+        }
+
+        if (filter === "prontos") return kitchenStatus === "pronto";
+        return isKitchenOrderDelayed(order, now, delayMinutes);
+      });
+    },
+    [delayMinutes, filter, now, pickedUpOrders, queueOrders]
+  );
 
   const filterEmptyMessages: Record<KitchenFilter, string> = {
     recebidos: "Nenhum pedido recebido no momento.",
@@ -316,22 +345,25 @@ export default function AdminPanel() {
     alert?: boolean;
     success?: boolean;
     pickedUp?: boolean;
-  }[] = [
-    { key: "recebidos", label: "Recebidos", count: receivedOrders.length },
-    { key: "prontos", label: "Prontos", count: readyOrders.length, success: true },
-    {
-      key: "atrasados",
-      label: "Atrasados",
-      count: delayedOrders.length,
-      alert: true,
-    },
-    {
-      key: "retirados",
-      label: "Retirados",
-      count: pickedUpOrders.length,
-      pickedUp: true,
-    },
-  ];
+  }[] = useMemo(
+    () => [
+      { key: "recebidos", label: "Recebidos", count: receivedOrders.length },
+      { key: "prontos", label: "Prontos", count: readyOrders.length, success: true },
+      {
+        key: "atrasados",
+        label: "Atrasados",
+        count: delayedOrders.length,
+        alert: true,
+      },
+      {
+        key: "retirados",
+        label: "Retirados",
+        count: pickedUpOrders.length,
+        pickedUp: true,
+      },
+    ],
+    [delayedOrders.length, pickedUpOrders.length, readyOrders.length, receivedOrders.length]
+  );
 
   const showEmptyBoard =
     filter === "retirados"
@@ -375,8 +407,8 @@ export default function AdminPanel() {
                     setFilter((current) => (current === item.key ? null : item.key))
                   }
                 >
-                  <span>{item.label}</span>
-                  <strong>{item.count}</strong>
+                  <span style={styles.headerStatLabel}>{item.label}</span>
+                  <strong style={styles.headerStatCount}>{item.count}</strong>
                 </button>
               );
             })}
@@ -385,8 +417,8 @@ export default function AdminPanel() {
       </header>
 
       {showEmptyBoard ? (
-        <section style={styles.emptyState}>
-          <h2>
+        <section style={{ ...styles.emptyState, ...(isMobile ? styles.emptyStateMobile : {}) }}>
+          <h2 style={{ ...styles.emptyTitle, ...(isMobile ? styles.emptyTitleMobile : {}) }}>
             {filter
               ? filterEmptyMessages[filter]
               : "Nenhum pedido na cozinha hoje."}
@@ -598,7 +630,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "28px 20px 56px",
   },
   pageMobile: {
-    padding: "18px 12px calc(24px + env(safe-area-inset-bottom, 0px))",
+    padding: "18px 10px calc(24px + env(safe-area-inset-bottom, 0px))",
   },
   header: {
     maxWidth: 1180,
@@ -611,7 +643,7 @@ const styles: Record<string, CSSProperties> = {
   headerMobile: {
     display: "grid",
     alignItems: "start",
-    gap: 12,
+    gap: 14,
   },
   headerSide: {
     display: "grid",
@@ -623,10 +655,12 @@ const styles: Record<string, CSSProperties> = {
     justifyItems: "stretch",
   },
   title: {
-    marginTop: 4,
-    fontSize: "clamp(36px, 5vw, 58px)",
-    lineHeight: 1,
-    fontFamily: "var(--font-dm-serif), Georgia, serif",
+    marginTop: 8,
+    fontSize: "clamp(34px, 5vw, 56px)",
+    lineHeight: 1.02,
+    fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
+    fontWeight: 850,
+    letterSpacing: 0,
   },
   headerStats: {
     display: "grid",
@@ -638,6 +672,7 @@ const styles: Record<string, CSSProperties> = {
     width: "100%",
     minWidth: 0,
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 8,
   },
   headerStatsTablet: {
     minWidth: 0,
@@ -646,10 +681,12 @@ const styles: Record<string, CSSProperties> = {
   headerStatButton: {
     background: "var(--color-dark)",
     color: "var(--color-surface)",
-    borderRadius: 12,
-    padding: "12px 14px",
+    borderRadius: 14,
+    padding: "15px 16px",
+    minHeight: 92,
     display: "grid",
-    gap: 4,
+    alignContent: "space-between",
+    gap: 8,
     border: "none",
     textAlign: "left",
     cursor: "pointer",
@@ -673,6 +710,16 @@ const styles: Record<string, CSSProperties> = {
   headerStatPickedUp: {
     background: "#3730a3",
   },
+  headerStatLabel: {
+    fontSize: 18,
+    lineHeight: 1.15,
+    fontWeight: 650,
+  },
+  headerStatCount: {
+    fontSize: 26,
+    lineHeight: 1,
+    fontWeight: 850,
+  },
   grid: {
     maxWidth: 1180,
     margin: "0 auto",
@@ -682,6 +729,7 @@ const styles: Record<string, CSSProperties> = {
   },
   gridMobile: {
     gridTemplateColumns: "1fr",
+    gap: 10,
   },
   card: {
     background: "var(--color-surface)",
@@ -968,8 +1016,26 @@ const styles: Record<string, CSSProperties> = {
     margin: "0 auto",
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.08)",
-    borderRadius: 8,
-    padding: 28,
+    borderRadius: 12,
+    padding: 36,
     color: "#625b53",
+    boxShadow: "0 8px 18px rgba(28, 26, 23, 0.035)",
+  },
+  emptyStateMobile: {
+    padding: "28px 26px",
+    borderRadius: 10,
+  },
+  emptyTitle: {
+    margin: 0,
+    maxWidth: 620,
+    fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
+    fontSize: 38,
+    lineHeight: 1.22,
+    fontWeight: 850,
+    letterSpacing: 0,
+  },
+  emptyTitleMobile: {
+    fontSize: 32,
+    lineHeight: 1.24,
   },
 };
