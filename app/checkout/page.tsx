@@ -933,6 +933,12 @@ export default function CheckoutPage() {
             <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
           </div>
         )}
+        {note.trim() && (
+          <div style={styles.orderNote}>
+            <span style={styles.orderNoteLabel}>Observação</span>
+            <p style={styles.orderNoteText}>{note.trim()}</p>
+          </div>
+        )}
         <div style={styles.summaryGrandTotalLine}>
           <span>Total</span>
           <strong>{money(finalTotal)}</strong>
@@ -1511,6 +1517,28 @@ const styles: Record<string, CSSProperties> = {
     overflowWrap: "anywhere",
   },
   discountText: { color: "#0f7a4a" },
+  orderNote: {
+    display: "grid",
+    gap: 4,
+    padding: "10px 12px",
+    borderRadius: 8,
+    background: "rgba(255, 253, 248, 0.06)",
+    border: "1px solid rgba(255, 253, 248, 0.1)",
+  },
+  orderNoteLabel: {
+    color: "rgba(255, 253, 248, 0.55)",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  orderNoteText: {
+    color: "rgba(255, 253, 248, 0.82)",
+    fontSize: 13,
+    lineHeight: 1.45,
+    overflowWrap: "anywhere",
+    margin: 0,
+  },
   loyaltyProgressTrack: {
     marginTop: 10,
     height: 8,
