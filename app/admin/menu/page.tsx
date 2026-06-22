@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, PointerEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import Image from "next/image";
 import {
@@ -419,24 +419,42 @@ export default function AdminMenuPage() {
     await persistDroppedItems(getItemsAfterItemDrop(draggedItem, targetCategory));
   };
 
-  const filteredItems = items.filter(
-    (item) =>
-      (normalize(item.name).includes(normalize(search)) ||
-        normalize(item.description || "").includes(normalize(search))) &&
-      (filterCategory ? item.category === filterCategory : true)
+  const filteredItems = useMemo(() => {
+    const normalizedSearch = normalize(search);
+
+    return items.filter(
+      (item) =>
+        (normalize(item.name).includes(normalizedSearch) ||
+          normalize(item.description || "").includes(normalizedSearch)) &&
+        (filterCategory ? item.category === filterCategory : true)
+    );
+  }, [filterCategory, items, search]);
+
+  const groupedItems = useMemo(
+    () =>
+      filteredItems.reduce((acc, item) => {
+        acc[item.category] = acc[item.category] || [];
+        acc[item.category].push(item);
+        return acc;
+      }, {} as Record<string, MenuItem[]>),
+    [filteredItems]
   );
 
-  const groupedItems = filteredItems.reduce((acc, item) => {
-    acc[item.category] = acc[item.category] || [];
-    acc[item.category].push(item);
-    return acc;
-  }, {} as Record<string, MenuItem[]>);
-  const orderedCategories = getOrderedCategorySlugs(filteredItems, categories, !filterCategory);
-  const categoryOptions = sortCategories(categories);
-  const itemCountByCategory = items.reduce((acc, item) => {
-    acc[item.category] = (acc[item.category] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const orderedCategories = useMemo(
+    () => getOrderedCategorySlugs(filteredItems, categories, !filterCategory),
+    [categories, filterCategory, filteredItems]
+  );
+
+  const categoryOptions = useMemo(() => sortCategories(categories), [categories]);
+
+  const itemCountByCategory = useMemo(
+    () =>
+      items.reduce((acc, item) => {
+        acc[item.category] = (acc[item.category] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+    [items]
+  );
   const toggleItemActive = async (item: MenuItem) => {
     const nextActive = item.active === false || item.availability_status === "inativo";
     const payload = {
