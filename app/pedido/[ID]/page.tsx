@@ -5,9 +5,20 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import {
   clearPixPaymentSession,
+  getPixSessionCountdownSeconds,
   readPixPaymentSession,
   writePixPaymentSession,
 } from "../../../lib/pixPaymentSession";
+import {
+  expireOrderPayment,
+  getPixCountdownSeconds,
+  isPaymentExpired,
+  isPaymentPaid,
+  isPaymentRecoverable,
+  isWithinRecoveryWindow,
+  PIX_PAYMENT_TTL_MS,
+  PIX_PAYMENT_TTL_SECONDS,
+} from "../../../lib/pendingPayment";
 import { getOrderPickupLabel, money, type OperationalSettings } from "../../../lib/orderFeatures";
 import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
@@ -64,8 +75,7 @@ const statusIndex = (status: string) =>
     steps.findIndex((step) => step.key === status)
   );
 
-const isPaymentConfirmed = (order: Order) =>
-  (order.payment_status || "").trim().toLowerCase() === "pago";
+const isPaymentConfirmed = (order: Order) => isPaymentPaid(order.payment_status);
 
 const getCustomerStatus = (order: Order) => {
   if (!isPaymentConfirmed(order)) {
@@ -94,6 +104,9 @@ export default function PedidoPage({
   const [pixQr, setPixQr] = useState("");
   const [showPix, setShowPix] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [pixCountdown, setPixCountdown] = useState(0);
+  const [pixUiExpired, setPixUiExpired] = useState(false);
+  const [pixPaymentStartedAt, setPixPaymentStartedAt] = useState<number | null>(null);
   const { ID: orderId } = use(params);
   const router = useRouter();
   const { clear, addToCart } = useCart();
@@ -106,22 +119,41 @@ export default function PedidoPage({
         supabase.from("store_settings").select("average_time").limit(1).maybeSingle(),
       ]);
 
-      if (data) setOrder(data);
+      let nextOrder = data as Order | null;
       if (settingsData) setOperationalSettings(settingsData as OperationalSettings);
 
-      const pixSession = readPixPaymentSession();
-      if (
-        pixSession &&
-        pixSession.orderId === Number(orderId) &&
-        (data as Order | null)?.payment_status?.trim().toLowerCase() !== "pago"
-      ) {
-        setPixQr(pixSession.pixQr);
-        setPixCode(pixSession.pixCode);
-        setShowPix(true);
+      if (nextOrder && isPaymentRecoverable(nextOrder.payment_status)) {
+        const pixSession = readPixPaymentSession();
+        if (pixSession && pixSession.orderId === Number(orderId)) {
+          const remaining = getPixSessionCountdownSeconds(pixSession);
+          setPixPaymentStartedAt(pixSession.expiresAt - PIX_PAYMENT_TTL_MS);
+          setPixCountdown(remaining);
+
+          if (remaining > 0 && !isPaymentExpired(nextOrder.payment_status)) {
+            setPixQr(pixSession.pixQr);
+            setPixCode(pixSession.pixCode);
+            setShowPix(true);
+            setPixUiExpired(false);
+          } else {
+            try {
+              await expireOrderPayment(Number(orderId));
+              nextOrder = { ...nextOrder, payment_status: "expirado" };
+              clearPixPaymentSession();
+              setShowPix(false);
+              setPixUiExpired(true);
+            } catch {
+              setPixUiExpired(isPaymentExpired(nextOrder.payment_status));
+            }
+          }
+        } else if (isPaymentExpired(nextOrder.payment_status)) {
+          setPixUiExpired(true);
+        }
       }
+
+      if (nextOrder) setOrder(nextOrder);
     }
 
-    loadOrder();
+    void loadOrder();
 
     const channel = supabase
       .channel(`pedido-${orderId}`)
@@ -140,6 +172,35 @@ export default function PedidoPage({
       supabase.removeChannel(channel);
     };
   }, [orderId]);
+
+  useEffect(() => {
+    if (!showPix || pixPaymentStartedAt === null || !order) return;
+
+    const tick = window.setInterval(() => {
+      const remaining = getPixCountdownSeconds(pixPaymentStartedAt);
+      setPixCountdown(remaining);
+      if (remaining <= 0) {
+        window.clearInterval(tick);
+        void (async () => {
+          try {
+            await expireOrderPayment(order.id);
+            setOrder((current) =>
+              current ? { ...current, payment_status: "expirado" } : current
+            );
+          } catch {
+            // Keep local UI expired even if API fails.
+          }
+          clearPixPaymentSession();
+          setShowPix(false);
+          setPixUiExpired(true);
+          setPixCode("");
+          setPixQr("");
+        })();
+      }
+    }, 1000);
+
+    return () => window.clearInterval(tick);
+  }, [showPix, pixPaymentStartedAt, order]);
 
   useEffect(() => {
     if (!order || !isPaymentConfirmed(order)) return;
@@ -181,8 +242,18 @@ export default function PedidoPage({
   const serviceFeeLabel = order.service_fee_label?.trim() || "Taxa de embalagem";
   const orderTotal = Number(order.total || 0);
   const paymentMethod = (order.payment_method || "pix").toLowerCase();
-  const isPaymentPending =
-    !isPaid && (order.payment_status || "pendente").trim().toLowerCase() === "pendente";
+  const isAwaitingPayment =
+    !isPaid && isPaymentRecoverable(order.payment_status) && isWithinRecoveryWindow(order.created_at);
+  const paymentExpired = isPaymentExpired(order.payment_status) || pixUiExpired;
+  const showActivePix = isAwaitingPayment && showPix && pixCountdown > 0 && !paymentExpired;
+  const showExpiredPix = isAwaitingPayment && paymentExpired && paymentMethod === "pix";
+  const paymentActionLabel = paymentExpired
+    ? "Gerar novo PIX"
+    : paymentMethod === "card"
+      ? "Realizar pagamento"
+      : showPix
+        ? "Atualizar PIX"
+        : "Realizar pagamento";
 
   const handleContinuePayment = async () => {
     setPaymentError("");
@@ -224,16 +295,25 @@ export default function PedidoPage({
 
       await supabase
         .from("orders")
-        .update({ mercado_pago_payment_id: String(pixData.payment_id) })
+        .update({
+          payment_status: "pendente",
+          mercado_pago_payment_id: String(pixData.payment_id),
+        })
         .eq("id", order.id);
 
+      const startedAt = Date.now();
+      setOrder((current) => (current ? { ...current, payment_status: "pendente" } : current));
       setPixQr(pixData.qr_code_base64 || "");
       setPixCode(pixData.qr_code || "");
       setShowPix(true);
+      setPixUiExpired(false);
+      setPixPaymentStartedAt(startedAt);
+      setPixCountdown(PIX_PAYMENT_TTL_SECONDS);
       writePixPaymentSession({
         orderId: order.id,
         pixQr: pixData.qr_code_base64 || "",
         pixCode: pixData.qr_code || "",
+        expiresAt: startedAt + PIX_PAYMENT_TTL_MS,
       });
     } catch (error) {
       setPaymentError(error instanceof Error ? error.message : "Não foi possível continuar o pagamento.");
@@ -386,17 +466,31 @@ export default function PedidoPage({
           <OrderTimeline steps={steps} currentIndex={current} isPaid={isPaid} />
         </div>
 
-        {isPaymentPending && showPix && (pixCode || pixQr) && (
+        {showActivePix && (pixCode || pixQr) && (
           <PixPaymentPanel
             amountLabel={money(orderTotal)}
             pixCode={pixCode}
             pixQr={pixQr}
             copyFeedback={copyFeedback}
+            countdownSeconds={pixCountdown}
             onCopy={() => void handleCopyPix()}
           />
         )}
 
-        {isPaymentPending && !showPix && (
+        {showExpiredPix && (
+          <PixPaymentPanel
+            amountLabel={money(orderTotal)}
+            pixCode=""
+            pixQr=""
+            copyFeedback={false}
+            expired
+            onCopy={() => undefined}
+            onRegenerate={() => void handleContinuePayment()}
+            regenerateLoading={paymentLoading}
+          />
+        )}
+
+        {isAwaitingPayment && !showActivePix && !showExpiredPix && (
           <>
             <Button
               type="button"
@@ -411,13 +505,15 @@ export default function PedidoPage({
             >
               {paymentLoading
                 ? "Preparando pagamento..."
-                : `Realizar pagamento · ${money(orderTotal)}`}
+                : `${paymentActionLabel} · ${money(orderTotal)}`}
             </Button>
             {!isMobile && (
               <p style={styles.payHint}>
                 {paymentMethod === "card"
                   ? "Você será redirecionado ao Mercado Pago para concluir o pagamento."
-                  : "Seu pedido só entra na cozinha após a confirmação do pagamento."}
+                  : paymentExpired
+                    ? "Vamos gerar um novo PIX para o mesmo pedido, sem refazer o carrinho."
+                    : "Seu pedido só entra na cozinha após a confirmação do pagamento."}
               </p>
             )}
           </>
@@ -432,7 +528,7 @@ export default function PedidoPage({
         )}
       </section>
 
-      {isMobile && isPaymentPending && !showPix && (
+      {isMobile && isAwaitingPayment && !showActivePix && !showExpiredPix && (
         <div style={styles.mobilePayBar}>
           <div style={styles.mobilePayMeta}>
             <span>Pedido #{order.id}</span>
@@ -445,7 +541,7 @@ export default function PedidoPage({
             size="md"
             fullWidth
           >
-            {paymentLoading ? "Preparando..." : "Realizar pagamento"}
+            {paymentLoading ? "Preparando..." : paymentActionLabel}
           </Button>
         </div>
       )}

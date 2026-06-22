@@ -13,6 +13,7 @@ import { Input } from "../components/ui/Input";
 import { useCallback, useEffect, useState } from "react";
 import { formatCustomerPhone, isValidCustomerPhone, onlyDigits } from "../../lib/customerPhone";
 import { readCheckoutDraft } from "../../lib/checkoutDraft";
+import { getPendingPaymentLabel } from "../../lib/pendingPayment";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { getOrderPickupLabel, money, type OperationalSettings } from "../../lib/orderFeatures";
 import { formatBrasiliaDateTimeShort } from "../../lib/brasiliaTime";
@@ -33,6 +34,7 @@ type CustomerOrder = {
   total?: number | null;
   status?: string | null;
   payment_status?: string | null;
+  payment_method?: string | null;
   created_at?: string | null;
   fulfillment_type?: string | null;
   scheduled_for?: string | null;
@@ -56,6 +58,7 @@ export default function MeusPedidosPage() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<CustomerOrder[]>([]);
   const [operationalSettings, setOperationalSettings] = useState<OperationalSettings | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -73,6 +76,7 @@ export default function MeusPedidosPage() {
         return;
       }
       setOrders(data.orders || []);
+      setPendingOrders(data.pendingOrders || []);
       if (data.phone) setPhone(formatCustomerPhone(String(data.phone)));
       setStep("orders");
     } catch {
@@ -174,6 +178,7 @@ export default function MeusPedidosPage() {
   const handleLogout = async () => {
     await fetch("/api/customer/logout", { method: "POST" });
     setOrders([]);
+    setPendingOrders([]);
     setPhone("");
     setCode("");
     setDevCode("");
@@ -283,49 +288,86 @@ export default function MeusPedidosPage() {
 
           {loading ? (
             <p style={styles.muted}>Carregando pedidos...</p>
-          ) : orders.length === 0 ? (
+          ) : pendingOrders.length === 0 && orders.length === 0 ? (
             <div style={styles.emptyBox}>
-              <p style={styles.muted}>Nenhum pedido pago encontrado para este telefone.</p>
+              <p style={styles.muted}>Nenhum pedido encontrado para este telefone.</p>
               <Button fullWidth onClick={() => router.push("/")}>
                 Fazer um pedido
               </Button>
             </div>
           ) : (
             <div style={styles.orderList}>
-              {orders.map((order) => (
-                <article key={order.id} style={styles.orderCard}>
-                  <div style={{ ...styles.orderCardHeader, ...(isMobile ? styles.orderCardHeaderMobile : {}) }}>
-                    <div>
-                      <strong style={styles.orderId}>Pedido #{order.id}</strong>
-                      <p style={styles.mutedSmall}>
-                        {order.created_at
-                          ? formatBrasiliaDateTimeShort(order.created_at)
-                          : "Data não informada"}
-                      </p>
-                    </div>
-                    <Badge variant="brand">
-                      {statusLabels[order.status || ""] || order.status || "Recebido"}
-                    </Badge>
-                  </div>
-                  <p style={styles.pickupLine}>{getOrderPickupLabel(order, operationalSettings)}</p>
-                  <div style={styles.itemList}>
-                    {(order.items || []).map((item, index) => (
-                      <span key={`${order.id}-${item.id}-${index}`} style={styles.itemLine}>
-                        {formatOrderItemLabel(item)}
-                      </span>
-                    ))}
-                  </div>
-                  {order.note?.trim() && (
-                    <p style={styles.noteLine}>Obs: {order.note.trim()}</p>
-                  )}
-                  <div style={styles.orderFooter}>
-                    <strong>{money(Number(order.total || 0))}</strong>
-                    <Link href={`/pedido/${order.id}`} style={styles.detailLink}>
-                      Acompanhar <ArrowRight size={14} strokeWidth={2.5} />
-                    </Link>
-                  </div>
-                </article>
-              ))}
+              {pendingOrders.length > 0 && (
+                <section style={styles.pendingSection}>
+                  <h3 style={styles.pendingSectionTitle}>Pagamentos pendentes</h3>
+                  <p style={styles.mutedSmall}>
+                    Estes pedidos ainda não foram pagos. A cozinha só recebe após a confirmação.
+                  </p>
+                  {pendingOrders.map((order) => (
+                    <article key={`pending-${order.id}`} style={styles.pendingOrderCard}>
+                      <div style={{ ...styles.orderCardHeader, ...(isMobile ? styles.orderCardHeaderMobile : {}) }}>
+                        <div>
+                          <strong style={styles.orderId}>Pedido #{order.id}</strong>
+                          <p style={styles.mutedSmall}>
+                            {order.created_at
+                              ? formatBrasiliaDateTimeShort(order.created_at)
+                              : "Data não informada"}
+                          </p>
+                        </div>
+                        <Badge variant="error">
+                          {getPendingPaymentLabel(order.payment_status)}
+                        </Badge>
+                      </div>
+                      <div style={styles.orderFooter}>
+                        <strong>{money(Number(order.total || 0))}</strong>
+                        <Link href={`/pedido/${order.id}`} style={styles.detailLink}>
+                          Continuar pagamento <ArrowRight size={14} strokeWidth={2.5} />
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+              )}
+
+              {orders.length > 0 && (
+                <section style={styles.paidSection}>
+                  <h3 style={styles.pendingSectionTitle}>Pedidos pagos</h3>
+                  {orders.map((order) => (
+                    <article key={order.id} style={styles.orderCard}>
+                      <div style={{ ...styles.orderCardHeader, ...(isMobile ? styles.orderCardHeaderMobile : {}) }}>
+                        <div>
+                          <strong style={styles.orderId}>Pedido #{order.id}</strong>
+                          <p style={styles.mutedSmall}>
+                            {order.created_at
+                              ? formatBrasiliaDateTimeShort(order.created_at)
+                              : "Data não informada"}
+                          </p>
+                        </div>
+                        <Badge variant="brand">
+                          {statusLabels[order.status || ""] || order.status || "Recebido"}
+                        </Badge>
+                      </div>
+                      <p style={styles.pickupLine}>{getOrderPickupLabel(order, operationalSettings)}</p>
+                      <div style={styles.itemList}>
+                        {(order.items || []).map((item, index) => (
+                          <span key={`${order.id}-${item.id}-${index}`} style={styles.itemLine}>
+                            {formatOrderItemLabel(item)}
+                          </span>
+                        ))}
+                      </div>
+                      {order.note?.trim() && (
+                        <p style={styles.noteLine}>Obs: {order.note.trim()}</p>
+                      )}
+                      <div style={styles.orderFooter}>
+                        <strong>{money(Number(order.total || 0))}</strong>
+                        <Link href={`/pedido/${order.id}`} style={styles.detailLink}>
+                          Acompanhar <ArrowRight size={14} strokeWidth={2.5} />
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+              )}
             </div>
           )}
         </section>
@@ -404,7 +446,22 @@ const styles: Record<string, CSSProperties> = {
     gap: 12,
     justifyItems: "start",
   },
-  orderList: { display: "grid", gap: 12 },
+  orderList: { display: "grid", gap: 18 },
+  pendingSection: { display: "grid", gap: 12 },
+  paidSection: { display: "grid", gap: 12 },
+  pendingSectionTitle: {
+    margin: 0,
+    fontSize: 18,
+    lineHeight: 1.2,
+    fontWeight: 850,
+  },
+  pendingOrderCard: {
+    background: "#fff8ef",
+    border: "1px solid rgba(159, 29, 47, 0.18)",
+    borderRadius: 10,
+    padding: 16,
+    boxShadow: "0 8px 18px rgba(159, 29, 47, 0.06)",
+  },
   orderCard: {
     background: "#fffdf8",
     border: "1px solid rgba(28, 26, 23, 0.07)",

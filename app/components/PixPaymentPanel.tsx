@@ -14,6 +14,10 @@ type PixPaymentPanelProps = {
   pixQr: string;
   copyFeedback: boolean;
   onCopy: () => void;
+  countdownSeconds?: number;
+  expired?: boolean;
+  onRegenerate?: () => void;
+  regenerateLoading?: boolean;
 };
 
 export function PixPaymentPanel({
@@ -22,22 +26,35 @@ export function PixPaymentPanel({
   pixQr,
   copyFeedback,
   onCopy,
+  countdownSeconds,
+  expired = false,
+  onRegenerate,
+  regenerateLoading = false,
 }: PixPaymentPanelProps) {
   const isMobile = useIsMobile();
   const qrSize = isMobile ? 190 : 210;
+  const showCountdown = typeof countdownSeconds === "number" && !expired;
 
   return (
     <div style={styles.panel}>
       <div style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
         <BrandLogo size="sm" />
         <div>
-          <p style={styles.title}>Pagamento PIX</p>
+          <p style={styles.title}>{expired ? "PIX expirado" : "Pagamento PIX"}</p>
           <p style={styles.hint}>
-            Escaneie o QR Code ou copie o código. A página atualiza sozinha após a confirmação.
+            {expired
+              ? "O prazo deste PIX acabou. Gere um novo código para concluir o mesmo pedido, sem refazer o carrinho."
+              : "Escaneie o QR Code ou copie o código. A página atualiza sozinha após a confirmação."}
           </p>
+          {showCountdown && (
+            <p style={styles.countdown}>
+              Tempo restante: <strong>{formatCountdown(countdownSeconds)}</strong>
+            </p>
+          )}
         </div>
       </div>
 
+      {!expired && (
       <div
         style={{ ...styles.body, ...(isMobile ? styles.bodyMobile : {}) }}
         className="pix-payment-panel-body"
@@ -88,9 +105,24 @@ export function PixPaymentPanel({
           </div>
         )}
       </div>
+      )}
+
+      {expired && onRegenerate && (
+        <div style={styles.expiredActions}>
+          <Button type="button" fullWidth size="lg" onClick={onRegenerate} disabled={regenerateLoading}>
+            {regenerateLoading ? "Gerando novo PIX..." : "Gerar novo PIX"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
+
+const formatCountdown = (seconds: number) => {
+  const minutes = Math.floor(Math.max(0, seconds) / 60);
+  const remainingSeconds = Math.max(0, seconds) % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+};
 
 const styles: Record<string, CSSProperties> = {
   panel: {
@@ -124,6 +156,15 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
     lineHeight: 1.45,
     maxWidth: 420,
+  },
+  countdown: {
+    marginTop: 8,
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: 850,
+  },
+  expiredActions: {
+    padding: "16px 20px",
   },
   body: {
     display: "grid",

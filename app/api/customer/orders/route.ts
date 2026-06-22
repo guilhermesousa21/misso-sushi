@@ -5,7 +5,14 @@ import {
   customerSessionCookieName,
   verifyCustomerSessionToken,
 } from "../../../../lib/customerSession";
+import {
+  isPaymentRecoverable,
+  isWithinRecoveryWindow,
+} from "../../../../lib/pendingPayment";
 import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin";
+
+const orderFields =
+  "id,name,phone,items,total,status,payment_status,payment_method,created_at,fulfillment_type,scheduled_for,note";
 
 export async function GET() {
   try {
@@ -19,19 +26,38 @@ export async function GET() {
     const lookupKeys = phoneLookupKeys(session.phone);
     const supabase = getSupabaseAdmin();
 
-    const { data, error } = await supabase
-      .from("orders")
-      .select(
-        "id,name,phone,items,total,status,payment_status,created_at,fulfillment_type,scheduled_for,note"
-      )
-      .eq("payment_status", "pago")
-      .in("phone", lookupKeys)
-      .order("created_at", { ascending: false })
-      .limit(20);
+    const [{ data: paidOrders, error: paidError }, { data: pendingData, error: pendingError }] =
+      await Promise.all([
+        supabase
+          .from("orders")
+          .select(orderFields)
+          .eq("payment_status", "pago")
+          .in("phone", lookupKeys)
+          .order("created_at", { ascending: false })
+          .limit(20),
+        supabase
+          .from("orders")
+          .select(orderFields)
+          .in("phone", lookupKeys)
+          .in("payment_status", ["pendente", "expirado", "falhou"])
+          .eq("status", "aguardando_pagamento")
+          .order("created_at", { ascending: false })
+          .limit(5),
+      ]);
 
-    if (error) throw error;
+    if (paidError) throw paidError;
+    if (pendingError) throw pendingError;
 
-    return NextResponse.json({ orders: data || [], phone: session.phone });
+    const pendingOrders = (pendingData || []).filter(
+      (order) =>
+        isPaymentRecoverable(order.payment_status) && isWithinRecoveryWindow(order.created_at)
+    );
+
+    return NextResponse.json({
+      orders: paidOrders || [],
+      pendingOrders,
+      phone: session.phone,
+    });
   } catch {
     return NextResponse.json({ error: "Não foi possível carregar seus pedidos." }, { status: 500 });
   }

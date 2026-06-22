@@ -31,6 +31,7 @@ import { MenuItemCard } from "./components/MenuItemCard";
 import { MenuPageSkeleton } from "./components/MenuPageSkeleton";
 import { colors } from "../lib/designTokens";
 import { readMenuBrowseDraft, writeMenuBrowseDraft } from "../lib/menuBrowseDraft";
+import { clearPixPaymentSession } from "../lib/pixPaymentSession";
 
 type CartLine = CartItem;
 
@@ -332,6 +333,7 @@ export default function Page() {
   const handleCheckout = () => {
     if (cart.length === 0 || !storeOpen) return;
     setOpenCart(false);
+    clearPixPaymentSession();
     writeMenuBrowseDraft({
       searchTerm,
       activeCategory,

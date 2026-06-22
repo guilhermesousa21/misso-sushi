@@ -18,10 +18,15 @@ import {
 } from "../../lib/checkoutDraft";
 import {
   clearPixPaymentSession,
-  getPixSessionCountdownSeconds,
-  readPixPaymentSession,
   writePixPaymentSession,
 } from "../../lib/pixPaymentSession";
+import {
+  expireOrderPayment,
+  formatPaymentCountdown,
+  getPendingPaymentLabel,
+  PIX_PAYMENT_TTL_MS,
+  PIX_PAYMENT_TTL_SECONDS,
+} from "../../lib/pendingPayment";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../lib/supabase";
 import {
@@ -77,7 +82,13 @@ type Promotion = {
 
 type CheckoutState = "form" | "generating" | "awaiting_pix" | "paid";
 
-const PIX_WAIT_SECONDS = 15 * 60;
+type PendingOrderSummary = {
+  id: number;
+  total?: number | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  created_at?: string | null;
+};
 
 const sanitizeName = (value: string) =>
   value
@@ -134,11 +145,7 @@ const optionalOrderColumns = [
 const getMissingSchemaColumn = (message: string) =>
   optionalOrderColumns.find((column) => message.includes(`'${column}' column`));
 
-const formatCountdown = (seconds: number) => {
-  const minutes = Math.floor(Math.max(0, seconds) / 60);
-  const remainingSeconds = Math.max(0, seconds) % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
-};
+const formatCountdown = (seconds: number) => formatPaymentCountdown(seconds);
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -162,7 +169,7 @@ export default function CheckoutPage() {
   const [pixQr, setPixQr] = useState("");
   const [pixCode, setPixCode] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
-  const [pixCountdown, setPixCountdown] = useState(PIX_WAIT_SECONDS);
+  const [pixCountdown, setPixCountdown] = useState(PIX_PAYMENT_TTL_SECONDS);
   const [error, setError] = useState("");
 
   const [storeOpen, setStoreOpen] = useState(true);
@@ -172,6 +179,8 @@ export default function CheckoutPage() {
   const [availableAddons, setAvailableAddons] = useState(getCheckoutAddons(null));
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [cartNotice, setCartNotice] = useState("");
+  const [pendingOrders, setPendingOrders] = useState<PendingOrderSummary[]>([]);
+  const [pixExpired, setPixExpired] = useState(false);
   const [scheduledOrderCounts, setScheduledOrderCounts] = useState<Record<string, number>>({});
 
   const [loyaltyStatus, setLoyaltyStatus] = useState<LoyaltyStatus | null>(null);
@@ -198,34 +207,41 @@ export default function CheckoutPage() {
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
-    const draft = readCheckoutDraft();
-    if (draft.name) setName(draft.name);
-    if (draft.phone) setPhone(draft.phone);
-    if (draft.note) setNote(draft.note);
-    if (draft.wantsScheduledPickup) setWantsScheduledPickup(true);
-    if (draft.scheduledFor) setScheduledFor(draft.scheduledFor);
-    if (Object.keys(draft.selectedAddons).length > 0) {
-      setSelectedAddons(draft.selectedAddons);
-    }
-    if (draft.method !== "pix") setMethod(draft.method);
-    if (draft.checkoutStep !== 1) setCheckoutStep(draft.checkoutStep);
-    if (draft.couponCode) setCouponCode(draft.couponCode);
-    if (draft.appliedCoupon) {
-      setAppliedCoupon(draft.appliedCoupon as Promotion);
-      pendingCouponRevalidation.current = draft.appliedCoupon.code;
+    async function hydrateDraft() {
+      const draft = readCheckoutDraft();
+      if (draft.name) setName(draft.name);
+      if (draft.phone) setPhone(draft.phone);
+      if (draft.note) setNote(draft.note);
+      if (draft.wantsScheduledPickup) setWantsScheduledPickup(true);
+      if (draft.scheduledFor) setScheduledFor(draft.scheduledFor);
+      if (Object.keys(draft.selectedAddons).length > 0) {
+        setSelectedAddons(draft.selectedAddons);
+      }
+      if (draft.method !== "pix") setMethod(draft.method);
+      if (draft.checkoutStep !== 1) setCheckoutStep(draft.checkoutStep);
+      if (draft.couponCode) setCouponCode(draft.couponCode);
+      if (draft.appliedCoupon) {
+        setAppliedCoupon(draft.appliedCoupon as Promotion);
+        pendingCouponRevalidation.current = draft.appliedCoupon.code;
+      }
+
+      setCheckoutDraftReady(true);
     }
 
-    const pixSession = readPixPaymentSession();
-    if (pixSession) {
-      setPendingOrderId(pixSession.orderId);
-      setPixQr(pixSession.pixQr);
-      setPixCode(pixSession.pixCode);
-      setPixCountdown(getPixSessionCountdownSeconds(pixSession));
-      setCheckoutState("awaiting_pix");
-    }
-
-    setCheckoutDraftReady(true);
+    void hydrateDraft();
   }, []);
+
+  useEffect(() => {
+    if (!cartLoaded || cart.length === 0) return;
+    if (checkoutState === "awaiting_pix" || checkoutState === "generating" || checkoutState === "paid") {
+      return;
+    }
+    clearPixPaymentSession();
+    setPendingOrderId(null);
+    setPixCode("");
+    setPixQr("");
+    setPixExpired(false);
+  }, [cartLoaded, cart.length, checkoutState]);
 
   useEffect(() => {
     if (!checkoutDraftReady) return;
@@ -426,6 +442,36 @@ export default function CheckoutPage() {
   }, [phone]);
 
   useEffect(() => {
+    const digits = onlyDigits(phone);
+    if (![10, 11].includes(digits.length)) {
+      setPendingOrders([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch("/api/customer/pending-orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: digits }),
+        });
+        const data = await res.json();
+        if (!cancelled && res.ok) {
+          setPendingOrders(data.pendingOrders || []);
+        }
+      } catch {
+        if (!cancelled) setPendingOrders([]);
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [phone]);
+
+  useEffect(() => {
     if (!pendingOrderId || checkoutState !== "awaiting_pix") return;
     let redirected = false;
     const markAsPaid = () => {
@@ -473,11 +519,35 @@ export default function CheckoutPage() {
     if (checkoutState !== "awaiting_pix") return;
 
     const countdown = window.setInterval(() => {
-      setPixCountdown((current) => Math.max(0, current - 1));
+      setPixCountdown((current: number) => Math.max(0, current - 1));
     }, 1000);
 
     return () => window.clearInterval(countdown);
   }, [checkoutState, pendingOrderId]);
+
+  useEffect(() => {
+    if (checkoutState !== "awaiting_pix" || pixCountdown > 0 || !pendingOrderId || pixExpired) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        await expireOrderPayment(pendingOrderId);
+      } catch {
+        // Keep guiding the user to regenerate payment on the order page.
+      }
+      if (cancelled) return;
+      clearPixPaymentSession();
+      setPixExpired(true);
+      setPixCode("");
+      setPixQr("");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutState, pixCountdown, pendingOrderId, pixExpired]);
 
   const selectedSlotIsAvailable =
     !wantsScheduledPickup ||
@@ -595,12 +665,14 @@ export default function CheckoutPage() {
       await supabase.from("orders").update({ mercado_pago_payment_id: String(pixData.payment_id) }).eq("id", savedOrder.id);
       setPixQr(pixData.qr_code_base64 || "");
       setPixCode(pixData.qr_code || "");
-      setPixCountdown(PIX_WAIT_SECONDS);
+      setPixCountdown(PIX_PAYMENT_TTL_SECONDS);
+      setPixExpired(false);
       setCheckoutState("awaiting_pix");
       writePixPaymentSession({
         orderId: savedOrder.id,
         pixQr: pixData.qr_code_base64 || "",
         pixCode: pixData.qr_code || "",
+        expiresAt: Date.now() + PIX_PAYMENT_TTL_MS,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível gerar o PIX.");
@@ -694,6 +766,14 @@ export default function CheckoutPage() {
                 Seu pedido foi liberado para preparo. Vamos abrir o acompanhamento agora.
               </p>
             </div>
+          ) : pixExpired ? (
+            <div style={styles.pixHeader}>
+              <p style={styles.eyebrow}>Missô Sushi</p>
+              <h1 style={styles.pixTitle}>PIX expirado</h1>
+              <p style={styles.muted}>
+                O prazo deste pagamento acabou. Seu pedido continua salvo e você pode gerar um novo PIX sem refazer o carrinho.
+              </p>
+            </div>
           ) : (
             <div style={styles.pixHeader}>
               <p style={styles.eyebrow}>Missô Sushi</p>
@@ -709,7 +789,7 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {!isPaid && (
+          {!isPaid && !pixExpired && (
             <div style={{ ...styles.pixPanel, ...(isMobile ? styles.pixPanelMobile : {}) }}>
               <div style={styles.pixQrBox}>
                 {(pixCode || pixQr) && (
@@ -748,8 +828,32 @@ export default function CheckoutPage() {
                       Acompanhar pedido →
                     </Link>
                   )}
+                  <Link
+                    href="/"
+                    onClick={() => clearPixPaymentSession()}
+                    style={styles.pixMenuLink}
+                  >
+                    Voltar ao cardápio
+                  </Link>
                 </div>
               )}
+            </div>
+          )}
+
+          {!isPaid && pixExpired && pendingOrderId && (
+            <div style={{ ...styles.pixPanel, ...(isMobile ? styles.pixPanelMobile : {}) }}>
+              <div style={styles.pixExpiredBox}>
+                <strong style={styles.pixAmount}>{money(finalTotal)}</strong>
+                <p style={styles.pixInfoText}>
+                  Pedido #{pendingOrderId} aguardando pagamento. A cozinha só recebe depois da confirmação.
+                </p>
+                <Link href={`/pedido/${pendingOrderId}`} style={styles.regeneratePixButton}>
+                  Gerar novo PIX
+                </Link>
+                <Link href="/" style={styles.orderLink}>
+                  Voltar ao cardápio
+                </Link>
+              </div>
             </div>
           )}
         </section>
@@ -815,6 +919,24 @@ export default function CheckoutPage() {
         <span style={styles.summaryPill}>{itemCount} itens</span>
       </div>
       {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
+      {pendingOrders.length > 0 && checkoutState === "form" && (
+        <div style={styles.pendingOrdersBanner}>
+          <p style={styles.pendingOrdersTitle}>Você tem pagamento pendente</p>
+          {pendingOrders.map((pendingOrder) => (
+            <div key={pendingOrder.id} style={styles.pendingOrderRow}>
+              <div>
+                <strong>Pedido #{pendingOrder.id}</strong>
+                <p style={styles.pendingOrderMeta}>
+                  {getPendingPaymentLabel(pendingOrder.payment_status)} · {money(Number(pendingOrder.total || 0))}
+                </p>
+              </div>
+              <Link href={`/pedido/${pendingOrder.id}`} style={styles.pendingOrderAction}>
+                Continuar pagamento
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={styles.orderList}>
         {cart.map((item) => (
           <div key={item.lineKey} style={{ ...styles.summaryOrderRow, ...(isMobile ? styles.summaryOrderRowMobile : {}) }}>
@@ -1490,6 +1612,76 @@ const styles: Record<string, CSSProperties> = {
   pixConfirmedBox: { maxWidth: 600, borderRadius: 8, background: "#fffdf8", border: "1px solid rgba(22, 163, 74, 0.22)", padding: 28, boxShadow: "0 18px 45px rgba(22, 163, 74, 0.1)" },
   pixConfirmedText: { marginTop: 12, color: "#0f7a4a", fontWeight: 850, lineHeight: 1.5 },
   orderLink: { marginTop: 14, color: "#625b53", fontWeight: 800, textDecoration: "none", textAlign: "center" },
+  pixExpiredBox: {
+    background: "#fffdf8",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderRadius: 8,
+    padding: 24,
+    display: "grid",
+    justifyItems: "center",
+    gap: 12,
+    textAlign: "center",
+  },
+  regeneratePixButton: {
+    display: "inline-flex",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 999,
+    background: "#1c1a17",
+    color: "#fffdf8",
+    padding: "14px 18px",
+    fontWeight: 850,
+    textDecoration: "none",
+    width: "100%",
+    maxWidth: 320,
+  },
+  pendingOrdersBanner: {
+    marginBottom: 14,
+    borderRadius: 10,
+    background: "rgba(255, 253, 248, 0.08)",
+    border: "1px solid rgba(255, 253, 248, 0.12)",
+    padding: 14,
+    display: "grid",
+    gap: 10,
+  },
+  pendingOrdersTitle: {
+    margin: 0,
+    color: "#fffdf8",
+    fontSize: 14,
+    fontWeight: 850,
+  },
+  pendingOrderRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  pendingOrderMeta: {
+    marginTop: 4,
+    color: "rgba(255, 253, 248, 0.72)",
+    fontSize: 13,
+    lineHeight: 1.4,
+  },
+  pendingOrderAction: {
+    color: "#fffdf8",
+    background: "#9f1d2f",
+    borderRadius: 999,
+    padding: "10px 14px",
+    fontWeight: 850,
+    textDecoration: "none",
+    fontSize: 13,
+    whiteSpace: "nowrap",
+  },
+  pixMenuLink: {
+    marginTop: 10,
+    display: "inline-flex",
+    justifyContent: "center",
+    color: "#625b53",
+    fontWeight: 800,
+    textDecoration: "none",
+    width: "100%",
+  },
   newOrderLink: { marginTop: 10, display: "inline-flex", justifyContent: "center", color: "#fffdf8", background: "#1c1a17", borderRadius: 999, padding: "12px 16px", fontWeight: 850, textDecoration: "none" },
   primaryLink: { marginTop: 22, display: "inline-flex", background: "#1c1a17", color: "#fffdf8", textDecoration: "none", borderRadius: 999, padding: "13px 18px", fontWeight: 850 },
   stepNav: {

@@ -1,4 +1,5 @@
 import { readStorageJson, removeStorage, writeStorageJson } from "./clientStorage";
+import { PIX_PAYMENT_TTL_MS } from "./pendingPayment";
 
 export type PixPaymentSession = {
   orderId: number;
@@ -8,7 +9,6 @@ export type PixPaymentSession = {
 };
 
 const storageKey = "misso-sushi-pix-session";
-const PIX_SESSION_TTL_MS = 15 * 60 * 1000;
 
 const isPixPaymentSession = (value: unknown): value is PixPaymentSession => {
   if (!value || typeof value !== "object") return false;
@@ -49,7 +49,7 @@ export const writePixPaymentSession = (input: {
     orderId: input.orderId,
     pixQr: input.pixQr,
     pixCode: input.pixCode,
-    expiresAt: input.expiresAt ?? Date.now() + PIX_SESSION_TTL_MS,
+    expiresAt: input.expiresAt ?? Date.now() + PIX_PAYMENT_TTL_MS,
   } satisfies PixPaymentSession);
 };
 
