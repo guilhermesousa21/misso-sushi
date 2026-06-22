@@ -618,7 +618,12 @@ export default function AdminMenuPage() {
                     ...(!categoryExpanded ? styles.categoryHeaderClosed : {}),
                   }}
                 >
-                  <div style={styles.categoryTitleGroup}>
+                  <div
+                    style={{
+                      ...styles.categoryTitleGroup,
+                      ...(isMobile ? styles.categoryTitleGroupMobile : {}),
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={() => toggleCategoryExpanded(category)}
@@ -631,8 +636,8 @@ export default function AdminMenuPage() {
                     >
                       {categoryExpanded ? "↑" : "↓"}
                     </button>
-                    <div>
-                      <h2 style={styles.categoryTitle}>
+                    <div style={styles.categoryTitleText}>
+                      <h2 style={{ ...styles.categoryTitle, ...(isMobile ? styles.categoryTitleMobile : {}) }}>
                         {getCategoryLabel(category, categories)}
                       </h2>
                       <p style={styles.categoryMeta}>
@@ -641,8 +646,54 @@ export default function AdminMenuPage() {
                           : "Categoria pausada"}
                       </p>
                     </div>
+                    {isMobile && (
+                      <span
+                        onPointerDown={(event) => {
+                          if (!canReorder) return;
+                          event.preventDefault();
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                          flushSync(() => {
+                            setDragged({ type: "category", category });
+                            setDropTarget({ type: "category", category });
+                          });
+                        }}
+                        onPointerMove={(event) => {
+                          if (dragged?.type !== "category" || dragged.category !== category) {
+                            return;
+                          }
+                          const targetCategory = getCategoryDropTargetFromPoint(event);
+                          if (targetCategory) {
+                            setDropTarget({ type: "category", category: targetCategory });
+                          }
+                        }}
+                        onPointerUp={(event) => {
+                          if (dragged?.type !== "category" || dragged.category !== category) {
+                            clearDragState();
+                            return;
+                          }
+                          const targetCategory =
+                            getCategoryDropTargetFromPoint(event) ||
+                            (dropTarget?.type === "category" ? dropTarget.category : null);
+                          if (targetCategory && targetCategory !== category) {
+                            void handleCategoryDrop(targetCategory);
+                            return;
+                          }
+                          clearDragState();
+                        }}
+                        onPointerCancel={clearDragState}
+                        title="Arrastar categoria"
+                        aria-label="Arrastar categoria"
+                        style={{
+                          ...(canReorder ? styles.categoryDragHandle : styles.categoryDragHandleDisabled),
+                          ...styles.categoryDragHandleMobile,
+                        }}
+                      >
+                        ⋮⋮
+                      </span>
+                    )}
                   </div>
                   <div style={{ ...styles.categoryHeaderActions, ...(isMobile ? styles.categoryHeaderActionsMobile : {}) }}>
+                    {!isMobile && (
                     <span
                       onPointerDown={(event) => {
                         if (!canReorder) return;
@@ -682,6 +733,7 @@ export default function AdminMenuPage() {
                     >
                       ⋮⋮
                     </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleAddItem(category)}
@@ -1126,11 +1178,11 @@ function CategoryCreateModal({
 
   return (
     <div style={{ ...styles.modalOverlay, ...(isMobile ? styles.modalOverlayMobile : {}) }}>
-      <div style={{ ...styles.modal, ...styles.categoryModal, ...(isMobile ? styles.modalMobile : {}) }}>
-        <div style={styles.modalHeader}>
+      <div style={{ ...styles.modal, ...styles.categoryModal, ...(isMobile ? styles.modalMobile : {}), ...(isMobile ? styles.categoryModalMobile : {}) }}>
+        <div style={{ ...styles.modalHeader, ...(isMobile ? styles.modalHeaderMobile : {}) }}>
           <div>
             <p style={styles.cardEyebrow}>Cardápio</p>
-            <h2 style={styles.modalTitle}>Nova categoria</h2>
+            <h2 style={{ ...styles.modalTitle, ...(isMobile ? styles.modalTitleMobile : {}) }}>Nova categoria</h2>
           </div>
           <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
             <X size={16} strokeWidth={2.2} />
@@ -1152,7 +1204,7 @@ function CategoryCreateModal({
               autoFocus
               maxLength={60}
               placeholder="Ex: Combos especiais"
-              style={styles.input}
+              style={{ ...styles.input, ...(isMobile ? styles.modalInputMobile : {}) }}
             />
           </label>
           {name.trim() && !slug && (
@@ -1163,8 +1215,12 @@ function CategoryCreateModal({
           )}
         </div>
 
-        <div style={styles.modalActions}>
-          <button type="button" onClick={onClose} style={styles.secondaryButton}>
+        <div style={{ ...styles.modalActions, ...(isMobile ? styles.modalActionsMobile : {}) }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ ...styles.secondaryButton, ...(isMobile ? styles.modalActionButtonMobile : {}) }}
+          >
             Cancelar
           </button>
           <button
@@ -1174,6 +1230,7 @@ function CategoryCreateModal({
             style={{
               ...styles.primaryButton,
               ...(!canSave ? styles.primaryButtonDisabled : {}),
+              ...(isMobile ? styles.modalActionButtonMobile : {}),
             }}
           >
             {saving ? "Criando..." : "Criar categoria"}
@@ -1266,11 +1323,11 @@ function CategoryEditModal({
 
   return (
     <div style={{ ...styles.modalOverlay, ...(isMobile ? styles.modalOverlayMobile : {}) }}>
-      <div style={{ ...styles.modal, ...styles.categoryModal, ...(isMobile ? styles.modalMobile : {}) }}>
-        <div style={styles.modalHeader}>
+      <div style={{ ...styles.modal, ...styles.categoryModal, ...(isMobile ? styles.modalMobile : {}), ...(isMobile ? styles.categoryModalMobile : {}) }}>
+        <div style={{ ...styles.modalHeader, ...(isMobile ? styles.modalHeaderMobile : {}) }}>
           <div>
             <p style={styles.cardEyebrow}>Categoria</p>
-            <h2 style={styles.modalTitle}>Editar categoria</h2>
+            <h2 style={{ ...styles.modalTitle, ...(isMobile ? styles.modalTitleMobile : {}) }}>Editar categoria</h2>
           </div>
           <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
             <X size={16} strokeWidth={2.2} />
@@ -1286,7 +1343,7 @@ function CategoryEditModal({
                 setName(event.target.value);
                 setConfirmDelete(false);
               }}
-              style={styles.input}
+              style={{ ...styles.input, ...(isMobile ? styles.modalInputMobile : {}) }}
             />
           </label>
 
@@ -1301,7 +1358,7 @@ function CategoryEditModal({
           )}
         </div>
 
-        <div style={styles.modalActions}>
+        <div style={{ ...styles.modalActions, ...(isMobile ? styles.modalActionsMobile : {}) }}>
           <button
             type="button"
             onClick={handleDelete}
@@ -1310,6 +1367,7 @@ function CategoryEditModal({
               ...styles.deleteButton,
               ...(confirmDelete ? styles.deleteButtonConfirm : {}),
               ...(!canDelete ? styles.disabledSoftButton : {}),
+              ...(isMobile ? styles.modalActionButtonMobile : {}),
             }}
           >
             {deleting
@@ -1325,6 +1383,7 @@ function CategoryEditModal({
             style={{
               ...styles.primaryButton,
               ...(!canSave ? styles.primaryButtonDisabled : {}),
+              ...(isMobile ? styles.modalActionButtonMobile : {}),
             }}
           >
             {saving ? "Salvando..." : "Salvar alterações"}
@@ -1484,17 +1543,19 @@ function EditModal({
           ...(isMobile ? styles.modalMobile : {}),
         }}
       >
-        <div style={{ ...styles.modalHeader, ...(compact ? styles.modalHeaderCompact : {}) }}>
+        <div style={{ ...styles.modalHeader, ...(compact ? styles.modalHeaderCompact : {}), ...(isMobile ? styles.modalHeaderMobile : {}) }}>
           <div>
             <p style={styles.cardEyebrow}>Cardápio</p>
-            <h2 style={styles.modalTitle}>{isNewItem ? "Adicionar item" : "Editar item"}</h2>
+            <h2 style={{ ...styles.modalTitle, ...(isMobile ? styles.modalTitleMobile : {}) }}>
+              {isNewItem ? "Adicionar item" : "Editar item"}
+            </h2>
           </div>
           <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Fechar">
             <X size={16} strokeWidth={2.2} />
           </Button>
         </div>
 
-        <div style={{ ...styles.modalBody, ...(compact ? styles.modalBodyCompact : {}) }}>
+        <div style={{ ...styles.modalBody, ...(compact ? styles.modalBodyCompact : {}), ...(isMobile ? styles.modalBodyMobile : {}) }}>
           <section style={styles.modalPanel}>
             <label style={styles.field}>
               <span style={styles.label}>Nome do prato</span>
@@ -1506,7 +1567,7 @@ function EditModal({
                   setForm({ ...form, name: event.target.value });
                 }}
                 placeholder="Ex: Hot philadelphia"
-                style={styles.input}
+                style={{ ...styles.input, ...(isMobile ? styles.modalInputMobile : {}) }}
               />
             </label>
 
@@ -1523,7 +1584,7 @@ function EditModal({
                     setForm({ ...form, price: Number(event.target.value) });
                   }}
                   placeholder="Preço"
-                  style={styles.input}
+                  style={{ ...styles.input, ...(isMobile ? styles.modalInputMobile : {}) }}
                 />
               </label>
 
@@ -1540,7 +1601,7 @@ function EditModal({
                       category_order: getCategoryOrder(category, categories),
                     });
                   }}
-                  style={styles.select}
+                  style={{ ...styles.select, ...(isMobile ? styles.modalInputMobile : {}) }}
                 >
                   {categories.map((category) => (
                     <option key={category.slug} value={category.slug}>
@@ -1561,7 +1622,7 @@ function EditModal({
                   setForm({ ...form, description: event.target.value });
                 }}
                 placeholder="Detalhe ingredientes, porções ou observações importantes."
-                style={styles.textarea}
+                style={{ ...styles.textarea, ...(isMobile ? styles.modalInputMobile : {}) }}
               />
             </label>
 
@@ -1577,7 +1638,7 @@ function EditModal({
                   setConfirmDelete(false);
                   setForm({ ...form, availability_status: event.target.value });
                 }}
-                style={styles.select}
+                style={{ ...styles.select, ...(isMobile ? styles.modalInputMobile : {}) }}
               >
                 <option value="ativo">Ativo</option>
                 <option value="inativo">Pausado</option>
@@ -1596,7 +1657,7 @@ function EditModal({
               <h3 style={styles.imageTitle}>Foto do item</h3>
             </div>
 
-            <label style={styles.uploadCard}>
+            <label style={{ ...styles.uploadCard, ...(isMobile ? styles.uploadCardMobile : {}) }}>
               <input
                 type="file"
                 accept="image/*"
@@ -1641,7 +1702,13 @@ function EditModal({
           </aside>
         </div>
 
-        <div style={{ ...styles.modalActions, ...(compact ? styles.modalActionsCompact : {}) }}>
+        <div
+          style={{
+            ...styles.modalActions,
+            ...(compact ? styles.modalActionsCompact : {}),
+            ...(isMobile ? styles.modalActionsMobile : {}),
+          }}
+        >
           <button
             type="button"
             onClick={handleDelete}
@@ -1649,6 +1716,7 @@ function EditModal({
             style={{
               ...styles.deleteButton,
               ...(confirmDelete ? styles.deleteButtonConfirm : {}),
+              ...(isMobile ? styles.modalActionButtonMobile : {}),
             }}
           >
             {isNewItem
@@ -1666,6 +1734,7 @@ function EditModal({
             style={{
               ...styles.primaryButton,
               ...(!canSave ? styles.primaryButtonDisabled : {}),
+              ...(isMobile ? styles.modalActionButtonMobile : {}),
             }}
           >
             {saving ? "Salvando..." : isNewItem ? "Criar item" : "Salvar alterações"}
@@ -1937,7 +2006,8 @@ const styles: Record<string, CSSProperties> = {
     borderBottom: "none",
   },
   categoryHeaderMobile: {
-    display: "grid",
+    display: "flex",
+    flexDirection: "column",
     gap: 10,
     padding: "12px 14px",
     marginBottom: 0,
@@ -1959,6 +2029,16 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     gap: 12,
     alignItems: "center",
+    minWidth: 0,
+  },
+  categoryTitleGroupMobile: {
+    display: "grid",
+    gridTemplateColumns: "auto minmax(0, 1fr) auto",
+    alignItems: "center",
+    gap: 10,
+    width: "100%",
+  },
+  categoryTitleText: {
     minWidth: 0,
   },
   categoryToggle: {
@@ -1997,6 +2077,17 @@ const styles: Record<string, CSSProperties> = {
     userSelect: "none",
     padding: "8px 4px",
   },
+  categoryDragHandleMobile: {
+    display: "grid",
+    placeItems: "center",
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    border: "1px solid rgba(28, 26, 23, 0.1)",
+    background: "#fff",
+    padding: 0,
+    flexShrink: 0,
+  },
   dragHandle: {
     color: "#9f1d2f",
     cursor: "grab",
@@ -2015,6 +2106,9 @@ const styles: Record<string, CSSProperties> = {
   categoryTitle: {
     fontSize: 21,
     lineHeight: 1.15,
+  },
+  categoryTitleMobile: {
+    fontSize: 18,
   },
   categoryMeta: {
     marginTop: 3,
@@ -2037,6 +2131,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "11px 12px",
     width: "100%",
     textAlign: "center",
+    boxSizing: "border-box",
   },
   itemList: {
     display: "grid",
@@ -2262,6 +2357,43 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: "16px 16px 0 0",
     padding: "16px 14px calc(16px + env(safe-area-inset-bottom, 0px))",
   },
+  categoryModalMobile: {
+    width: "100%",
+  },
+  modalHeaderMobile: {
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  modalTitleMobile: {
+    fontSize: 22,
+    lineHeight: 1.1,
+  },
+  modalBodyMobile: {
+    gridTemplateColumns: "1fr",
+    gap: 14,
+  },
+  modalInputMobile: {
+    fontSize: 16,
+    minHeight: 44,
+    boxSizing: "border-box",
+  },
+  uploadCardMobile: {
+    minHeight: 180,
+  },
+  modalActionsMobile: {
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 8,
+    marginTop: 14,
+    paddingTop: 14,
+  },
+  modalActionButtonMobile: {
+    width: "100%",
+    minHeight: 44,
+    boxSizing: "border-box",
+    justifyContent: "center",
+    textAlign: "center",
+  },
   categoryModal: {
     width: "min(560px, 100%)",
   },
@@ -2438,6 +2570,8 @@ const styles: Record<string, CSSProperties> = {
   },
   modalActionsCompact: {
     display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: 8,
   },
   deleteButton: {
     border: "1px solid rgba(153, 27, 27, 0.16)",
