@@ -21,6 +21,7 @@ import {
   eyebrowStyle,
   pageTitleStyle,
   pageTitleMobileStyle,
+  pageTitleAdminMobileStyle,
 } from "../../lib/uiStyles";
 import { BrandLogo } from "../components/BrandLogo";
 import { Button } from "../components/ui/Button";
@@ -452,7 +453,7 @@ function baseStyles(): Record<string, CSSProperties> {
       minWidth: 0,
     },
     contentMobile: {
-      padding: "16px 10px 96px",
+      padding: "12px 12px calc(104px + env(safe-area-inset-bottom, 0px))",
     },
     header: {
       display: "flex",
@@ -464,15 +465,11 @@ function baseStyles(): Record<string, CSSProperties> {
     headerMobile: {
       display: "grid",
       alignItems: "start",
-      gap: 8,
-      marginBottom: 12,
+      gap: 10,
+      marginBottom: 10,
     },
     headerActionMobile: {
       width: "100%",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "flex-start",
-      overflowX: "auto",
     },
     eyebrow: {
       color: "#9f1d2f",
@@ -481,7 +478,7 @@ function baseStyles(): Record<string, CSSProperties> {
       textTransform: "uppercase",
     },
     title: pageTitleStyle,
-    titleMobile: pageTitleMobileStyle,
+    titleMobile: pageTitleAdminMobileStyle,
     muted: {
       color: "#625b53",
       lineHeight: 1.5,

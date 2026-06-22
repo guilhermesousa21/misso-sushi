@@ -133,7 +133,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <header style={{ ...fat.toolbar, ...(isMobile ? fat.toolbarMobile : {}) }}>
-        <nav style={fat.viewSwitch} aria-label="Visualização">
+        <nav style={{ ...fat.viewSwitch, ...(isMobile ? fat.viewSwitchMobile : {}) }} aria-label="Visualização">
           {(["painel", "pedidos"] as PageView[]).map((option) => (
             <button
               key={option}
@@ -141,6 +141,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
               onClick={() => setView(option)}
               style={{
                 ...fat.viewBtn,
+                ...(isMobile ? fat.viewBtnMobile : {}),
                 ...(view === option ? fat.viewBtnActive : {}),
               }}
             >
@@ -150,7 +151,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
         </nav>
 
         <div style={{ ...fat.toolbarRight, ...(isMobile ? fat.toolbarRightStack : {}) }}>
-          <div style={fat.periodPills} role="group" aria-label="Período">
+          <div style={{ ...fat.periodPills, ...(isMobile ? fat.periodPillsMobile : {}) }} role="group" aria-label="Período">
             {(Object.keys(dateRangeLabels) as DateRange[]).map((option) => (
               <button
                 key={option}
@@ -158,6 +159,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
                 onClick={() => setDateRange(option)}
                 style={{
                   ...fat.periodBtn,
+                  ...(isMobile ? fat.periodBtnMobile : {}),
                   ...(dateRange === option ? fat.periodBtnActive : {}),
                 }}
               >
@@ -172,7 +174,7 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar pedido ou cliente"
-              style={fat.searchInput}
+              style={{ ...fat.searchInput, ...(isMobile ? fat.searchInputMobile : {}) }}
               aria-label="Buscar"
             />
           </label>
@@ -184,14 +186,14 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
               type="date"
               value={dateFrom}
               onChange={(event) => setDateFrom(event.target.value)}
-              style={fat.dateInput}
+              style={{ ...fat.dateInput, ...(isMobile ? fat.dateInputMobile : {}) }}
               aria-label="Data inicial"
             />
             <input
               type="date"
               value={dateTo}
               onChange={(event) => setDateTo(event.target.value)}
-              style={fat.dateInput}
+              style={{ ...fat.dateInput, ...(isMobile ? fat.dateInputMobile : {}) }}
               aria-label="Data final"
             />
           </div>

@@ -496,11 +496,11 @@ export default function AdminMenuPage() {
 
   const headerActions = (
     <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
-      <Button type="button" onClick={() => handleAddItem()} style={isMobile ? styles.fullWidthMobile : undefined}>
+      <Button type="button" onClick={() => handleAddItem()} style={isMobile ? styles.headerButtonMobile : undefined}>
         <Plus size={16} strokeWidth={2.5} />
         Novo item
       </Button>
-      <Button type="button" variant="secondary" onClick={() => setCreatingCategoryModalOpen(true)} style={isMobile ? styles.fullWidthMobile : undefined}>
+      <Button type="button" variant="secondary" onClick={() => setCreatingCategoryModalOpen(true)} style={isMobile ? styles.headerButtonMobile : undefined}>
         <FolderPlus size={16} strokeWidth={2.2} />
         Nova categoria
       </Button>
@@ -538,7 +538,7 @@ export default function AdminMenuPage() {
           </Select>
         </section>
         {(search.trim() || filterCategory) && (
-          <div style={styles.activeFilterBar}>
+          <div style={{ ...styles.activeFilterBar, ...(isMobile ? styles.activeFilterBarMobile : {}) }}>
             <span>
               Mostrando resultados filtrados
             </span>
@@ -624,7 +624,10 @@ export default function AdminMenuPage() {
                       onClick={() => toggleCategoryExpanded(category)}
                       aria-expanded={categoryExpanded}
                       aria-label={`${categoryExpanded ? "Fechar" : "Abrir"} ${getCategoryLabel(category, categories)}`}
-                      style={styles.categoryToggle}
+                      style={{
+                        ...styles.categoryToggle,
+                        ...(isMobile ? styles.categoryToggleMobile : {}),
+                      }}
                     >
                       {categoryExpanded ? "↑" : "↓"}
                     </button>
@@ -684,7 +687,7 @@ export default function AdminMenuPage() {
                       onClick={() => handleAddItem(category)}
                       style={{
                         ...styles.categoryActionButton,
-                        ...(isMobile ? styles.fullWidthMobile : {}),
+                        ...(isMobile ? styles.categoryActionButtonMobile : {}),
                       }}
                     >
                       + Item
@@ -694,7 +697,7 @@ export default function AdminMenuPage() {
                       onClick={() => setEditingCategory(editableCategory)}
                       style={{
                         ...styles.categoryActionButton,
-                        ...(isMobile ? styles.fullWidthMobile : {}),
+                        ...(isMobile ? styles.categoryActionButtonMobile : {}),
                       }}
                     >
                       Editar
@@ -703,7 +706,7 @@ export default function AdminMenuPage() {
                 </div>
 
                 {categoryExpanded && (
-                  <div style={styles.itemList}>
+                  <div style={{ ...styles.itemList, ...(isMobile ? styles.itemListMobile : {}) }}>
                     {itemsInCategory.length === 0 && (
                       <p style={styles.emptyCategoryText}>Nenhum item nesta categoria.</p>
                     )}
@@ -1085,6 +1088,7 @@ function CategoryCreateModal({
   onClose: () => void;
   onSave: (category: MenuCategory) => void;
 }) {
+  const isMobile = useIsMobile();
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const slug = normalizeCategorySlug(name);
@@ -1121,8 +1125,8 @@ function CategoryCreateModal({
   };
 
   return (
-    <div style={styles.modalOverlay}>
-      <div style={{ ...styles.modal, ...styles.categoryModal }}>
+    <div style={{ ...styles.modalOverlay, ...(isMobile ? styles.modalOverlayMobile : {}) }}>
+      <div style={{ ...styles.modal, ...styles.categoryModal, ...(isMobile ? styles.modalMobile : {}) }}>
         <div style={styles.modalHeader}>
           <div>
             <p style={styles.cardEyebrow}>Cardápio</p>
@@ -1193,6 +1197,7 @@ function CategoryEditModal({
   onSave: (category: MenuCategory) => void;
   onDelete: (category: MenuCategory) => void;
 }) {
+  const isMobile = useIsMobile();
   const [name, setName] = useState(category.name);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -1260,8 +1265,8 @@ function CategoryEditModal({
   };
 
   return (
-    <div style={styles.modalOverlay}>
-      <div style={{ ...styles.modal, ...styles.categoryModal }}>
+    <div style={{ ...styles.modalOverlay, ...(isMobile ? styles.modalOverlayMobile : {}) }}>
+      <div style={{ ...styles.modal, ...styles.categoryModal, ...(isMobile ? styles.modalMobile : {}) }}>
         <div style={styles.modalHeader}>
           <div>
             <p style={styles.cardEyebrow}>Categoria</p>
@@ -1343,6 +1348,7 @@ function EditModal({
   onClose: () => void;
   onSave: (item: MenuItem | DeletedMenuItem) => void;
 }) {
+  const isMobile = useIsMobile();
   const [form, setForm] = useState<EditableMenuItem>(item);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -1470,8 +1476,14 @@ function EditModal({
   };
 
   return (
-    <div style={styles.modalOverlay}>
-      <div style={{ ...styles.modal, ...(compact ? styles.modalCompact : {}) }}>
+    <div style={{ ...styles.modalOverlay, ...(isMobile ? styles.modalOverlayMobile : {}) }}>
+      <div
+        style={{
+          ...styles.modal,
+          ...(compact ? styles.modalCompact : {}),
+          ...(isMobile ? styles.modalMobile : {}),
+        }}
+      >
         <div style={{ ...styles.modalHeader, ...(compact ? styles.modalHeaderCompact : {}) }}>
           <div>
             <p style={styles.cardEyebrow}>Cardápio</p>
@@ -1784,7 +1796,9 @@ const styles: Record<string, CSSProperties> = {
   },
   headerActionsMobile: {
     display: "grid",
-    justifyContent: "stretch",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+    width: "100%",
   },
   primaryButton: getButtonStyle("primary", "md"),
   headerSecondaryButton: getButtonStyle("secondary", "md"),
@@ -1809,6 +1823,9 @@ const styles: Record<string, CSSProperties> = {
   toolbarStack: {
     gridTemplateColumns: "1fr",
     gap: 8,
+    position: "static",
+    top: "auto",
+    marginBottom: 10,
   },
   searchWrap: {
     position: "relative",
@@ -1863,6 +1880,11 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 13,
     fontWeight: 750,
   },
+  activeFilterBarMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 8,
+  },
   clearFilterButton: {
     border: "none",
     borderRadius: 999,
@@ -1876,6 +1898,12 @@ const styles: Record<string, CSSProperties> = {
   fullWidthMobile: {
     gridColumn: "1 / -1",
     width: "100%",
+  },
+  headerButtonMobile: {
+    width: "100%",
+    minHeight: 44,
+    padding: "10px 8px",
+    fontSize: 13,
   },
   categoryList: {
     display: "grid",
@@ -1894,7 +1922,7 @@ const styles: Record<string, CSSProperties> = {
     transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border 140ms ease",
   },
   categoryCardMobile: {
-    padding: 10,
+    padding: 0,
   },
   categoryHeader: {
     display: "flex",
@@ -1910,8 +1938,9 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryHeaderMobile: {
     display: "grid",
-    gap: 8,
-    marginBottom: 10,
+    gap: 10,
+    padding: "12px 14px",
+    marginBottom: 0,
   },
   categoryHeaderActions: {
     display: "flex",
@@ -1922,7 +1951,9 @@ const styles: Record<string, CSSProperties> = {
   },
   categoryHeaderActionsMobile: {
     display: "grid",
-    justifyContent: "stretch",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+    width: "100%",
   },
   categoryTitleGroup: {
     display: "flex",
@@ -1931,8 +1962,8 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
   },
   categoryToggle: {
-    width: 30,
-    height: 30,
+    width: 36,
+    height: 36,
     border: "1px solid rgba(28, 26, 23, 0.12)",
     borderRadius: 8,
     background: "#fff",
@@ -1942,6 +1973,11 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     placeItems: "center",
     flex: "0 0 auto",
+  },
+  categoryToggleMobile: {
+    width: 40,
+    height: 40,
+    fontSize: 16,
   },
   categoryDragHandle: {
     color: "#b8afa4",
@@ -1996,10 +2032,20 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     fontSize: 13,
   },
+  categoryActionButtonMobile: {
+    minHeight: 44,
+    padding: "11px 12px",
+    width: "100%",
+    textAlign: "center",
+  },
   itemList: {
     display: "grid",
     gap: 10,
     padding: 14,
+  },
+  itemListMobile: {
+    padding: "10px 12px 12px",
+    gap: 8,
   },
   emptyCategoryText: {
     color: "#766e64",
@@ -2051,9 +2097,9 @@ const styles: Record<string, CSSProperties> = {
   },
   itemCardMobile: {
     display: "grid",
-    alignItems: "start",
-    gap: 9,
-    padding: 9,
+    alignItems: "stretch",
+    gap: 10,
+    padding: 10,
   },
   itemMain: {
     minWidth: 0,
@@ -2130,8 +2176,13 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: "wrap",
   },
   itemActionsMobile: {
-    justifyContent: "space-between",
-    gap: 6,
+    display: "grid",
+    gridTemplateColumns: "auto 1fr auto",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    paddingTop: 4,
+    borderTop: "1px solid rgba(28, 26, 23, 0.06)",
   },
   itemSwitch: {
     width: 40,
@@ -2172,8 +2223,10 @@ const styles: Record<string, CSSProperties> = {
   },
   secondaryButton: getButtonStyle("ghost", "sm"),
   secondaryButtonMobile: {
-    padding: "9px 12px",
-    marginLeft: "auto",
+    justifySelf: "end",
+    minHeight: 40,
+    padding: "10px 14px",
+    marginLeft: 0,
   },
   inactiveButton: {
     background: "#f0ebe2",
@@ -2188,6 +2241,12 @@ const styles: Record<string, CSSProperties> = {
     placeItems: "center",
     padding: 20,
   },
+  modalOverlayMobile: {
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-end",
+    padding: 0,
+  },
   modal: {
     width: "min(920px, 100%)",
     maxHeight: "92vh",
@@ -2196,6 +2255,12 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: 14,
     padding: 22,
     boxShadow: "0 18px 45px rgba(28, 26, 23, 0.22)",
+  },
+  modalMobile: {
+    width: "100%",
+    maxHeight: "min(94vh, 100%)",
+    borderRadius: "16px 16px 0 0",
+    padding: "16px 14px calc(16px + env(safe-area-inset-bottom, 0px))",
   },
   categoryModal: {
     width: "min(560px, 100%)",

@@ -28,6 +28,9 @@ export const fat = {
   toolbarMobile: {
     gridTemplateColumns: "1fr",
     top: 0,
+    position: "static",
+    padding: 10,
+    gap: 10,
   } satisfies CSSProperties,
 
   viewSwitch: {
@@ -37,6 +40,11 @@ export const fat = {
     background: "var(--color-warm)",
     borderRadius: 10,
     width: "fit-content",
+  } satisfies CSSProperties,
+
+  viewSwitchMobile: {
+    display: "flex",
+    width: "100%",
   } satisfies CSSProperties,
 
   viewBtn: {
@@ -49,6 +57,12 @@ export const fat = {
     fontWeight: 850,
     fontSize: 13,
     transition: "background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
+  } satisfies CSSProperties,
+
+  viewBtnMobile: {
+    flex: 1,
+    minHeight: 44,
+    padding: "11px 10px",
   } satisfies CSSProperties,
 
   viewBtnActive: {
@@ -74,6 +88,12 @@ export const fat = {
     gap: 6,
   } satisfies CSSProperties,
 
+  periodPillsMobile: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: 6,
+  } satisfies CSSProperties,
+
   periodBtn: {
     border: "1px solid rgba(28, 26, 23, 0.08)",
     borderRadius: 10,
@@ -84,6 +104,14 @@ export const fat = {
     fontWeight: 850,
     fontSize: 12,
     whiteSpace: "nowrap",
+  } satisfies CSSProperties,
+
+  periodBtnMobile: {
+    minHeight: 40,
+    padding: "10px 8px",
+    fontSize: 12,
+    textAlign: "center",
+    whiteSpace: "normal",
   } satisfies CSSProperties,
 
   periodBtnActive: {
@@ -104,6 +132,12 @@ export const fat = {
     padding: "11px 13px 11px 36px",
     fontSize: 13,
     background: "#fff",
+  } satisfies CSSProperties,
+
+  searchInputMobile: {
+    fontSize: 16,
+    minHeight: 44,
+    padding: "12px 13px 12px 36px",
   } satisfies CSSProperties,
 
   searchIcon: {
@@ -147,6 +181,22 @@ export const fat = {
 
   summaryStack: {
     gridTemplateColumns: "1fr",
+  } satisfies CSSProperties,
+
+  summaryStatsMobile: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 10,
+  } satisfies CSSProperties,
+
+  revenueCardMobile: {
+    padding: 16,
+    gap: 10,
+  } satisfies CSSProperties,
+
+  statCardMobile: {
+    minHeight: 96,
+    padding: 14,
   } satisfies CSSProperties,
 
   revenueCard: {
@@ -246,6 +296,16 @@ export const fat = {
 
   panelTight: {
     padding: 14,
+  } satisfies CSSProperties,
+
+  panelHeaderMobile: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 8,
+  } satisfies CSSProperties,
+
+  panelTightMobile: {
+    padding: 12,
   } satisfies CSSProperties,
 
   panelHeader: {
@@ -368,6 +428,12 @@ export const fat = {
     color: "#514a43",
   } satisfies CSSProperties,
 
+  paymentLineMobile: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 4,
+  } satisfies CSSProperties,
+
   paymentBar: {
     height: 8,
     borderRadius: 999,
@@ -414,6 +480,12 @@ export const fat = {
     background: "#fff",
     fontSize: 13,
     outlineColor: "#9f1d2f",
+  } satisfies CSSProperties,
+
+  dateInputMobile: {
+    fontSize: 16,
+    minHeight: 44,
+    padding: "11px 12px",
   } satisfies CSSProperties,
 
   empty: {

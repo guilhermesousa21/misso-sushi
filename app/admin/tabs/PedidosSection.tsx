@@ -54,20 +54,34 @@ function OrderCard({ order, isMobile }: { order: AdminOrder; isMobile: boolean }
           style={{ ...s.mainBtn, ...(isMobile ? s.mainBtnMobile : {}) }}
           aria-expanded={open}
         >
-          <span style={s.idBadge}>#{order.id}</span>
-          <div style={s.info}>
-            <strong style={s.name}>{order.name ? formatDisplayName(order.name) : "Cliente"}</strong>
-            <span style={s.phone}>{order.phone || "Sem telefone"}</span>
-            <span style={s.date}>{formatBrasiliaDateTimeShort(order.created_at)}</span>
-          </div>
-          {!isMobile && (
-            <div style={s.tags}>
-              <span style={{ ...s.tag, ...(scheduled ? s.tagScheduled : s.tagDefault) }}>{pickupLabel}</span>
-              <span style={{ ...s.tag, ...(paymentKey === "pix" ? s.tagPix : s.tagCard) }}>{paymentLabel}</span>
-            </div>
+          {isMobile ? (
+            <>
+              <div style={s.mainBtnTopMobile}>
+                <span style={s.idBadge}>#{order.id}</span>
+                <strong style={s.name}>{order.name ? formatDisplayName(order.name) : "Cliente"}</strong>
+              </div>
+              <div style={s.info}>
+                <span style={s.phone}>{order.phone || "Sem telefone"}</span>
+                <span style={s.date}>{formatBrasiliaDateTimeShort(order.created_at)}</span>
+              </div>
+              <strong style={{ ...s.total, ...s.totalMobile }}>{money(total)}</strong>
+            </>
+          ) : (
+            <>
+              <span style={s.idBadge}>#{order.id}</span>
+              <div style={s.info}>
+                <strong style={s.name}>{order.name ? formatDisplayName(order.name) : "Cliente"}</strong>
+                <span style={s.phone}>{order.phone || "Sem telefone"}</span>
+                <span style={s.date}>{formatBrasiliaDateTimeShort(order.created_at)}</span>
+              </div>
+              <div style={s.tags}>
+                <span style={{ ...s.tag, ...(scheduled ? s.tagScheduled : s.tagDefault) }}>{pickupLabel}</span>
+                <span style={{ ...s.tag, ...(paymentKey === "pix" ? s.tagPix : s.tagCard) }}>{paymentLabel}</span>
+              </div>
+              <strong style={s.total}>{money(total)}</strong>
+            </>
           )}
-          <strong style={s.total}>{money(total)}</strong>
-          <span style={{ ...s.chevron, ...(open ? s.chevronOpen : {}) }} aria-hidden="true">
+          <span style={{ ...s.chevron, ...(open ? s.chevronOpen : {}), ...(isMobile ? s.chevronMobile : {}) }} aria-hidden="true">
             ▼
           </span>
         </button>
@@ -130,8 +144,8 @@ export default function PedidosSection({
   const revenue = orders.reduce((sum, order) => sum + calcTotal(order), 0);
 
   return (
-    <section style={{ ...fat.panel, ...(embedded ? { marginTop: 0 } : {}) }}>
-      <div style={fat.panelHeader}>
+    <section style={{ ...fat.panel, ...(embedded ? { marginTop: 0 } : {}), ...(isMobile ? fat.panelTightMobile : {}) }}>
+      <div style={{ ...fat.panelHeader, ...(isMobile ? fat.panelHeaderMobile : {}) }}>
         <div>
           <h2 style={{ ...fat.panelTitle, fontSize: 17 }}>Histórico de pedidos</h2>
           <p style={fat.panelSubtitle}>
@@ -192,9 +206,18 @@ const s: Record<string, CSSProperties> = {
     width: "100%",
   },
   mainBtnMobile: {
-    gridTemplateColumns: "auto minmax(0, 1fr) auto 26px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    alignItems: "stretch",
+    padding: "12px 44px 12px 14px",
+    position: "relative",
+  },
+  mainBtnTopMobile: {
+    display: "flex",
+    alignItems: "center",
     gap: 10,
-    alignItems: "start",
+    minWidth: 0,
   },
   idBadge: {
     background: "#1c1a17",
@@ -223,6 +246,10 @@ const s: Record<string, CSSProperties> = {
   tagPix: { background: "#ecfdf5", color: "#0f7a4a" },
   tagCard: { background: "#eff6ff", color: "#1d4ed8" },
   total: { fontSize: 15, fontWeight: 900, whiteSpace: "nowrap" },
+  totalMobile: {
+    fontSize: 16,
+    alignSelf: "flex-end",
+  },
   chevron: {
     width: 26,
     height: 26,
@@ -236,6 +263,13 @@ const s: Record<string, CSSProperties> = {
     transition: "transform 0.2s ease",
   },
   chevronOpen: { transform: "rotate(180deg)", background: "#fce8eb", color: "#9f1d2f" },
+  chevronMobile: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+  },
   printBtn: {
     border: "none",
     borderLeft: "1px solid rgba(28, 26, 23, 0.08)",
@@ -250,8 +284,10 @@ const s: Record<string, CSSProperties> = {
   printBtnMobile: {
     borderLeft: "none",
     borderTop: "1px solid rgba(28, 26, 23, 0.08)",
-    padding: "12px",
+    padding: "14px",
     width: "100%",
+    minHeight: 44,
+    fontSize: 13,
   },
   details: {
     borderTop: "1px dashed rgba(28, 26, 23, 0.1)",

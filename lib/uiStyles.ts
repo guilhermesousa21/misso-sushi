@@ -167,3 +167,8 @@ export const pageTitleMobileStyle: CSSProperties = {
   fontSize: 30,
   lineHeight: 1,
 };
+
+export const pageTitleAdminMobileStyle: CSSProperties = {
+  fontSize: 24,
+  lineHeight: 1.05,
+};

@@ -129,7 +129,7 @@ export default function FaturamentoInsights({
   return (
     <div style={fat.page}>
       <section style={{ ...fat.summary, ...(isMobile || isTablet ? fat.summaryStack : {}) }}>
-        <article style={fat.revenueCard}>
+        <article style={{ ...fat.revenueCard, ...(isMobile ? fat.revenueCardMobile : {}) }}>
           <span style={fat.revenueAccent} aria-hidden="true" />
           <span style={fat.heroLabel}>Receita no período</span>
           <strong style={fat.heroValue}>{loading ? "—" : money(analytics.totalRevenue)}</strong>
@@ -140,23 +140,26 @@ export default function FaturamentoInsights({
           </span>
         </article>
 
-        <StatCard label="Hoje" value={loading ? "—" : money(analytics.todayRevenue)} detail="Entrada do dia" />
-        <StatCard label="Ticket médio" value={loading ? "—" : money(analytics.ticketMedio)} detail="Por pedido pago" />
-        <StatCard label="Por cliente" value={loading ? "—" : money(customerAverage)} detail="Média no filtro" />
-        <StatCard
-          label="Descontos"
-          value={loading ? "—" : money(analytics.totalDiscount)}
-          detail={
-            Object.keys(analytics.couponTotals).length > 0
-              ? `${Object.keys(analytics.couponTotals).length} cupom(ns)`
-              : "Sem cupons"
-          }
-        />
+        <div style={isMobile ? fat.summaryStatsMobile : { display: "contents" }}>
+          <StatCard label="Hoje" value={loading ? "—" : money(analytics.todayRevenue)} detail="Entrada do dia" compact={isMobile} />
+          <StatCard label="Ticket médio" value={loading ? "—" : money(analytics.ticketMedio)} detail="Por pedido pago" compact={isMobile} />
+          <StatCard label="Por cliente" value={loading ? "—" : money(customerAverage)} detail="Média no filtro" compact={isMobile} />
+          <StatCard
+            label="Descontos"
+            value={loading ? "—" : money(analytics.totalDiscount)}
+            detail={
+              Object.keys(analytics.couponTotals).length > 0
+                ? `${Object.keys(analytics.couponTotals).length} cupom(ns)`
+                : "Sem cupons"
+            }
+            compact={isMobile}
+          />
+        </div>
       </section>
 
-      <section style={{ ...fat.bento, ...(isTablet ? fat.bentoStack : {}) }}>
-        <article style={fat.panel}>
-          <div style={fat.panelHeader}>
+      <section style={{ ...fat.bento, ...(isMobile || isTablet ? fat.bentoStack : {}) }}>
+        <article style={{ ...fat.panel, ...(isMobile ? fat.panelTightMobile : {}) }}>
+          <div style={{ ...fat.panelHeader, ...(isMobile ? fat.panelHeaderMobile : {}) }}>
             <div>
               <h3 style={fat.panelTitle}>Evolução diária</h3>
               <p style={fat.panelSubtitle}>
@@ -179,8 +182,8 @@ export default function FaturamentoInsights({
         </article>
 
         <aside style={fat.sideStack}>
-          <article style={{ ...fat.panel, ...fat.panelTight }}>
-            <div style={fat.panelHeader}>
+          <article style={{ ...fat.panel, ...fat.panelTight, ...(isMobile ? fat.panelTightMobile : {}) }}>
+            <div style={{ ...fat.panelHeader, ...(isMobile ? fat.panelHeaderMobile : {}) }}>
               <div>
                 <h3 style={fat.panelTitle}>Formas de pagamento</h3>
                 <p style={fat.panelSubtitle}>Participação no faturamento filtrado.</p>
@@ -194,7 +197,7 @@ export default function FaturamentoInsights({
                   const pct = paymentTotal > 0 ? (value / paymentTotal) * 100 : 0;
                   return (
                     <div key={key} style={fat.paymentItem}>
-                      <div style={fat.paymentLine}>
+                      <div style={{ ...fat.paymentLine, ...(isMobile ? fat.paymentLineMobile : {}) }}>
                         <span>{paymentLabels[key] || key || "Outros"}</span>
                         <strong>
                           {money(value)} · {pct.toFixed(0)}%
@@ -247,9 +250,19 @@ export default function FaturamentoInsights({
   );
 }
 
-function StatCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+function StatCard({
+  label,
+  value,
+  detail,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  compact?: boolean;
+}) {
   return (
-    <article style={fat.statCard}>
+    <article style={{ ...fat.statCard, ...(compact ? fat.statCardMobile : {}) }}>
       <span style={fat.statLabel}>{label}</span>
       <strong style={fat.statValue}>{value}</strong>
       <span style={fat.statDetail}>{detail}</span>
