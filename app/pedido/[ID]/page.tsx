@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
-import { formatAddonSummary, getOrderPickupLabel, money } from "../../../lib/orderFeatures";
+import { getOrderPickupLabel, money } from "../../../lib/orderFeatures";
 import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import { formatBrasiliaDateTimeShort } from "../../../lib/brasiliaTime";
@@ -139,7 +139,9 @@ export default function PedidoPage({
   const isPaid = isPaymentConfirmed(order);
   const customerStatus = getCustomerStatus(order);
   const current = statusIndex(customerStatus);
-  const addonSummary = formatAddonSummary(order.addons);
+  const selectedAddons = (order.addons || []).filter(
+    (addon) => Number(addon.quantity || 0) > 0
+  );
   const itemCount = (order.items || []).reduce(
     (sum, item) => sum + (item.quantity ?? 1),
     0
@@ -299,10 +301,24 @@ export default function PedidoPage({
                 </div>
               )}
               {addonTotal > 0 && (
-                <div style={styles.summaryTotalLine}>
-                  <span>Complementos</span>
-                  <strong>{money(addonTotal)}</strong>
-                </div>
+                <>
+                  <div style={styles.summaryTotalLine}>
+                    <span>Complementos</span>
+                    <strong>{money(addonTotal)}</strong>
+                  </div>
+                  <div style={styles.addonSummaryList}>
+                    {selectedAddons.map((addon) => (
+                      <div key={addon.id || addon.name} style={styles.addonSummaryRow}>
+                        <span style={styles.addonSummaryName}>
+                          {Number(addon.quantity || 0)}x {addon.name}
+                        </span>
+                        <strong style={styles.addonSummaryPrice}>
+                          {money(Number(addon.unit_price || 0) * Number(addon.quantity || 0))}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
               {serviceFee > 0 && (
                 <div style={styles.summaryTotalLine}>
@@ -321,9 +337,6 @@ export default function PedidoPage({
                   <span>Fidelidade</span>
                   <strong style={styles.discountText}>-{money(loyaltyDiscount)}</strong>
                 </div>
-              )}
-              {addonSummary && (
-                <div style={styles.addonSummary}>Complementos: {addonSummary}</div>
               )}
               <div style={styles.addonSummary}>
                 Retirada: {getOrderPickupLabel(order)}
@@ -525,6 +538,29 @@ const styles: Record<string, CSSProperties> = {
     color: "rgba(255, 253, 248, 0.66)",
     fontSize: 13,
     lineHeight: 1.45,
+  },
+  addonSummaryList: {
+    display: "grid",
+    gap: 6,
+    paddingLeft: 10,
+    borderLeft: "2px solid rgba(255, 253, 248, 0.12)",
+  },
+  addonSummaryRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "start",
+    gap: 12,
+    color: "rgba(255, 253, 248, 0.66)",
+    fontSize: 13,
+    lineHeight: 1.45,
+  },
+  addonSummaryName: {
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  addonSummaryPrice: {
+    color: "rgba(255, 253, 248, 0.78)",
+    whiteSpace: "nowrap",
   },
   discountText: {
     color: "#0f7a4a",
