@@ -97,11 +97,13 @@ export function AdminShell({
   eyebrow,
   title,
   action,
+  hideMobileNav = false,
   children,
 }: {
   eyebrow: string;
   title: string;
   action?: ReactNode;
+  hideMobileNav?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -192,7 +194,7 @@ export function AdminShell({
         </header>
         {children}
       </section>
-      {isMobile && (
+      {isMobile && !hideMobileNav && (
         <nav style={styles.mobileTabBar} aria-label="Navegação principal">
           {[...navItems, ...extraNavItems].map((item) => {
             const { Icon } = item;

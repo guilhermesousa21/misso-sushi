@@ -494,6 +494,8 @@ export default function AdminMenuPage() {
     toast.success("Complementos salvos.");
   };
 
+  const modalOpen = Boolean(editingCategory || creatingCategoryModalOpen || editingItem);
+
   const headerActions = (
     <div style={{ ...styles.headerActions, ...(isMobile ? styles.headerActionsMobile : {}) }}>
       <Button type="button" onClick={() => handleAddItem()} style={isMobile ? styles.headerButtonMobile : undefined}>
@@ -510,7 +512,12 @@ export default function AdminMenuPage() {
   return (
     <>
       <Toaster position="top-right" />
-      <AdminShell eyebrow="Operação" title="Cardápio" action={headerActions}>
+      <AdminShell
+        eyebrow="Operação"
+        title="Cardápio"
+        action={headerActions}
+        hideMobileNav={modalOpen}
+      >
 
         <section style={{ ...styles.toolbar, ...(isMobile ? styles.toolbarStack : {}) }}>
           <label style={styles.searchWrap}>
@@ -2330,7 +2337,7 @@ const styles: Record<string, CSSProperties> = {
   modalOverlay: {
     position: "fixed",
     inset: 0,
-    zIndex: 60,
+    zIndex: 120,
     background: "rgba(28, 26, 23, 0.46)",
     display: "grid",
     placeItems: "center",
