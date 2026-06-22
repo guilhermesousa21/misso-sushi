@@ -310,11 +310,9 @@ export default function PedidoPage({
                     {selectedAddons.map((addon) => (
                       <div key={addon.id || addon.name} style={styles.addonSummaryRow}>
                         <span style={styles.addonSummaryName}>
-                          {Number(addon.quantity || 0)}x {addon.name}
-                        </span>
-                        <strong style={styles.addonSummaryPrice}>
+                          {Number(addon.quantity || 0)}x {addon.name}{" "}
                           {money(Number(addon.unit_price || 0) * Number(addon.quantity || 0))}
-                        </strong>
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -378,7 +376,7 @@ export default function PedidoPage({
             >
               {paymentLoading
                 ? "Preparando pagamento..."
-                : `Pagar pedido · ${money(orderTotal)}`}
+                : `Realizar pagamento · ${money(orderTotal)}`}
             </Button>
             {!isMobile && (
               <p style={styles.payHint}>
@@ -412,7 +410,7 @@ export default function PedidoPage({
             size="md"
             fullWidth
           >
-            {paymentLoading ? "Preparando..." : "Pagar pedido"}
+            {paymentLoading ? "Preparando..." : "Realizar pagamento"}
           </Button>
         </div>
       )}
@@ -562,10 +560,6 @@ const styles: Record<string, CSSProperties> = {
     borderLeft: "2px solid rgba(255, 253, 248, 0.12)",
   },
   addonSummaryRow: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    alignItems: "start",
-    gap: 12,
     color: "rgba(255, 253, 248, 0.66)",
     fontSize: 13,
     lineHeight: 1.45,
@@ -573,10 +567,6 @@ const styles: Record<string, CSSProperties> = {
   addonSummaryName: {
     minWidth: 0,
     overflowWrap: "anywhere",
-  },
-  addonSummaryPrice: {
-    color: "rgba(255, 253, 248, 0.78)",
-    whiteSpace: "nowrap",
   },
   discountText: {
     color: "#0f7a4a",

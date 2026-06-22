@@ -709,11 +709,9 @@ export default function CheckoutPage() {
               {selectedAddonList.map((addon) => (
                 <div key={addon.id} style={styles.addonSummaryRow}>
                   <span style={styles.addonSummaryName}>
-                    {addon.quantity}x {addon.name}
-                  </span>
-                  <strong style={styles.addonSummaryPrice}>
+                    {addon.quantity}x {addon.name}{" "}
                     {money(Number(addon.unit_price || 0) * addon.quantity)}
-                  </strong>
+                  </span>
                 </div>
               ))}
             </div>
@@ -960,7 +958,7 @@ export default function CheckoutPage() {
                   id="note"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Ex: sem cebolinha, enviar shoyu extra..."
+                  placeholder="Ex: sem cebolinha, sem wasabi, embalagem separada..."
                   style={{ ...styles.textarea, ...styles.detailsContent }}
                 />
               </details>
@@ -1232,9 +1230,9 @@ const styles: Record<string, CSSProperties> = {
   couponRowMobile: { gridTemplateColumns: "1fr" },
   field: { display: "grid", gap: 7 },
   label: { display: "block", marginBottom: 8, fontSize: 14, fontWeight: 850 },
-  input: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
-  select: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
-  textarea: { width: "100%", minHeight: 96, resize: "vertical", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 15 },
+  input: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 16 },
+  select: { width: "100%", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 16 },
+  textarea: { width: "100%", minHeight: 96, resize: "vertical", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: "13px 14px", background: "#fff", color: "#1c1a17", outlineColor: "#9f1d2f", fontSize: 16 },
   compactDetails: { background: "#fffdf8", border: "1px solid rgba(28, 26, 23, 0.07)", borderRadius: 10, padding: 16, boxShadow: "0 8px 18px rgba(28, 26, 23, 0.03)" },
   detailsSummary: { cursor: "pointer", fontSize: 17, fontWeight: 850, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" },
   detailsContent: { marginTop: 12 },
@@ -1296,10 +1294,6 @@ const styles: Record<string, CSSProperties> = {
     borderLeft: "2px solid rgba(255, 253, 248, 0.12)",
   },
   addonSummaryRow: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    alignItems: "start",
-    gap: 12,
     color: "rgba(255, 253, 248, 0.66)",
     fontSize: 13,
     lineHeight: 1.45,
@@ -1307,10 +1301,6 @@ const styles: Record<string, CSSProperties> = {
   addonSummaryName: {
     minWidth: 0,
     overflowWrap: "anywhere",
-  },
-  addonSummaryPrice: {
-    color: "rgba(255, 253, 248, 0.78)",
-    whiteSpace: "nowrap",
   },
   discountText: { color: "#0f7a4a" },
   loyaltyProgressTrack: {
@@ -1331,7 +1321,7 @@ const styles: Record<string, CSSProperties> = {
   mutedSmall: { marginTop: 4, color: "#766e64", fontSize: 13, lineHeight: 1.4 },
   noticeError: { borderRadius: 8, background: "#fee2e2", color: "#991b1b", padding: 12, marginBottom: 12, fontSize: 13, fontWeight: 800, lineHeight: 1.4 },
   qrImage: { display: "grid", placeItems: "center", width: 238, height: 238, borderRadius: 8, border: "1px solid rgba(28, 26, 23, 0.08)", background: "#fff" },
-  codeArea: { width: "100%", minHeight: 96, resize: "none", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: 12, color: "#514a43", background: "#fff", lineHeight: 1.45 },
+  codeArea: { width: "100%", minHeight: 96, resize: "none", border: "1px solid rgba(28, 26, 23, 0.12)", borderRadius: 8, padding: 12, color: "#514a43", background: "#fff", lineHeight: 1.45, fontSize: 16 },
   secondaryButton: { border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", padding: "12px 16px", cursor: "pointer", fontWeight: 850 },
   copyPixButton: { width: "100%", marginTop: 12, border: "none", borderRadius: 999, background: "#1c1a17", color: "#fffdf8", padding: "14px 18px", cursor: "pointer", fontWeight: 850, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: "0 14px 26px rgba(28, 26, 23, 0.18)" },
   copyPixIcon: { width: 24, height: 24, borderRadius: 999, background: "rgba(255, 253, 248, 0.14)", display: "grid", placeItems: "center", fontSize: 14, lineHeight: 1 },

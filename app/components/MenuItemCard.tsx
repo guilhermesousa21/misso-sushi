@@ -360,6 +360,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
   },
   cardFooterFeaturedMobile: {
+    display: "flex",
     flexDirection: "column",
     alignItems: "stretch",
     gap: 8,
@@ -408,6 +409,7 @@ const styles: Record<string, CSSProperties> = {
   },
   quantityControlFeaturedMobile: {
     alignSelf: "flex-end",
+    maxWidth: "100%",
   },
   quantityButton: {
     width: 36,

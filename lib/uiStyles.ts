@@ -68,7 +68,7 @@ export function getInputStyle(): CSSProperties {
     background: "#fff",
     color: colors.text,
     outlineColor: colors.brand,
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "inherit",
   };
 }
