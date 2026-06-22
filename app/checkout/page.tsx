@@ -23,7 +23,6 @@ import {
 import {
   expireOrderPayment,
   formatPaymentCountdown,
-  getPendingPaymentLabel,
   PIX_PAYMENT_TTL_MS,
   PIX_PAYMENT_TTL_SECONDS,
 } from "../../lib/pendingPayment";
@@ -81,14 +80,6 @@ type Promotion = {
 };
 
 type CheckoutState = "form" | "generating" | "awaiting_pix" | "paid";
-
-type PendingOrderSummary = {
-  id: number;
-  total?: number | null;
-  payment_status?: string | null;
-  payment_method?: string | null;
-  created_at?: string | null;
-};
 
 const sanitizeName = (value: string) =>
   value
@@ -179,7 +170,6 @@ export default function CheckoutPage() {
   const [availableAddons, setAvailableAddons] = useState(getCheckoutAddons(null));
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [cartNotice, setCartNotice] = useState("");
-  const [pendingOrders, setPendingOrders] = useState<PendingOrderSummary[]>([]);
   const [pixExpired, setPixExpired] = useState(false);
   const [scheduledOrderCounts, setScheduledOrderCounts] = useState<Record<string, number>>({});
 
@@ -432,36 +422,6 @@ export default function CheckoutPage() {
         if (!cancelled) setLoyaltyStatus(null);
       } finally {
         if (!cancelled) setLoyaltyLoading(false);
-      }
-    }, 450);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [phone]);
-
-  useEffect(() => {
-    const digits = onlyDigits(phone);
-    if (![10, 11].includes(digits.length)) {
-      setPendingOrders([]);
-      return;
-    }
-
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      try {
-        const res = await fetch("/api/customer/pending-orders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: digits }),
-        });
-        const data = await res.json();
-        if (!cancelled && res.ok) {
-          setPendingOrders(data.pendingOrders || []);
-        }
-      } catch {
-        if (!cancelled) setPendingOrders([]);
       }
     }, 450);
 
@@ -919,24 +879,6 @@ export default function CheckoutPage() {
         <span style={styles.summaryPill}>{itemCount} itens</span>
       </div>
       {cartNotice && <p style={styles.noticeError}>{cartNotice}</p>}
-      {pendingOrders.length > 0 && checkoutState === "form" && (
-        <div style={styles.pendingOrdersBanner}>
-          <p style={styles.pendingOrdersTitle}>Você tem pagamento pendente</p>
-          {pendingOrders.map((pendingOrder) => (
-            <div key={pendingOrder.id} style={styles.pendingOrderRow}>
-              <div>
-                <strong>Pedido #{pendingOrder.id}</strong>
-                <p style={styles.pendingOrderMeta}>
-                  {getPendingPaymentLabel(pendingOrder.payment_status)} · {money(Number(pendingOrder.total || 0))}
-                </p>
-              </div>
-              <Link href={`/pedido/${pendingOrder.id}`} style={styles.pendingOrderAction}>
-                Continuar pagamento
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
       <div style={styles.orderList}>
         {cart.map((item) => (
           <div key={item.lineKey} style={{ ...styles.summaryOrderRow, ...(isMobile ? styles.summaryOrderRowMobile : {}) }}>
@@ -1634,44 +1576,6 @@ const styles: Record<string, CSSProperties> = {
     textDecoration: "none",
     width: "100%",
     maxWidth: 320,
-  },
-  pendingOrdersBanner: {
-    marginBottom: 14,
-    borderRadius: 10,
-    background: "rgba(255, 253, 248, 0.08)",
-    border: "1px solid rgba(255, 253, 248, 0.12)",
-    padding: 14,
-    display: "grid",
-    gap: 10,
-  },
-  pendingOrdersTitle: {
-    margin: 0,
-    color: "#fffdf8",
-    fontSize: 14,
-    fontWeight: 850,
-  },
-  pendingOrderRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap",
-  },
-  pendingOrderMeta: {
-    marginTop: 4,
-    color: "rgba(255, 253, 248, 0.72)",
-    fontSize: 13,
-    lineHeight: 1.4,
-  },
-  pendingOrderAction: {
-    color: "#fffdf8",
-    background: "#9f1d2f",
-    borderRadius: 999,
-    padding: "10px 14px",
-    fontWeight: 850,
-    textDecoration: "none",
-    fontSize: 13,
-    whiteSpace: "nowrap",
   },
   pixMenuLink: {
     marginTop: 10,
