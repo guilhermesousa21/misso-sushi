@@ -1,4 +1,5 @@
 import { formatBrasiliaDateTime } from "./brasiliaTime";
+import { getOrderPickupLabel } from "./orderFeatures";
 
 type PrintableItem = {
   id?: number;
@@ -71,10 +72,7 @@ const getSubtotal = (order: PrintableOrder) =>
 const formatDateTime = (value?: string | null) =>
   value ? formatBrasiliaDateTime(value) : formatBrasiliaDateTime(new Date());
 
-const formatPickup = (order: PrintableOrder) =>
-  order.fulfillment_type === "scheduled" && order.scheduled_for
-    ? `Agendada para ${formatDateTime(order.scheduled_for)}`
-    : "O quanto antes";
+const formatPickup = (order: PrintableOrder) => getOrderPickupLabel(order);
 
 export function printOrder(order: PrintableOrder) {
   const printWindow = window.open("", "_blank", "width=420,height=720");

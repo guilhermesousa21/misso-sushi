@@ -8,14 +8,17 @@ import { useIsMobile } from "../../lib/useMediaQuery";
 type BackToMenuLinkProps = {
   variant?: "inline" | "header";
   label?: string;
+  floating?: boolean;
 };
 
 export function BackToMenuLink({
   variant = "inline",
   label = "Voltar ao cardápio",
+  floating = true,
 }: BackToMenuLinkProps) {
   const isMobile = useIsMobile();
   const displayLabel = variant === "header" && isMobile ? "Cardápio" : label;
+  const useFloatingHeader = variant === "header" && floating;
 
   return (
     <Link
@@ -24,6 +27,7 @@ export function BackToMenuLink({
         ...styles.base,
         ...(variant === "header" ? styles.header : styles.inline),
         ...(variant === "header" && isMobile ? styles.headerMobile : {}),
+        ...(variant === "header" && !useFloatingHeader ? styles.headerStatic : {}),
       }}
     >
       <span style={styles.icon} aria-hidden>
@@ -63,6 +67,12 @@ const styles: Record<string, CSSProperties> = {
     padding: "8px 10px",
     top: "calc(10px + env(safe-area-inset-top, 0px))",
     maxWidth: "none",
+  },
+  headerStatic: {
+    position: "relative",
+    top: "auto",
+    left: "auto",
+    alignSelf: "flex-start",
   },
   label: {
     overflow: "hidden",

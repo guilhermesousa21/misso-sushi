@@ -18,8 +18,8 @@ export function CheckoutFormSkeleton({ isMobile = false }: CheckoutFormSkeletonP
       aria-label="Carregando checkout"
     >
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
-        <Skeleton width={132} height={38} borderRadius={999} />
-        <div style={styles.headerTitle}>
+        <Skeleton width={132} height={38} borderRadius={999} style={isMobile ? { alignSelf: "flex-start" } : undefined} />
+        <div style={{ ...styles.headerTitle, ...(isMobile ? styles.headerTitleMobile : {}) }}>
           <Skeleton width={88} height={12} style={{ margin: "0 auto" }} />
           <Skeleton width={220} height={34} style={{ margin: "8px auto 0" }} />
         </div>
@@ -101,10 +101,18 @@ const styles: Record<string, CSSProperties> = {
     paddingTop: 18,
   },
   headerMobile: {
-    paddingTop: "calc(46px + env(safe-area-inset-top, 0px))",
+    paddingTop: "calc(12px + env(safe-area-inset-top, 0px))",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 14,
+    marginBottom: 4,
   },
   headerTitle: {
     textAlign: "center",
+  },
+  headerTitleMobile: {
+    width: "100%",
   },
   shell: {
     maxWidth: 1180,

@@ -134,13 +134,16 @@ export const formatAddonSummary = (
     })
     .join(", ");
 
-export const getOrderPickupLabel = (order: {
-  fulfillment_type?: string | null;
-  scheduled_for?: string | null;
-}) =>
+export const getOrderPickupLabel = (
+  order: {
+    fulfillment_type?: string | null;
+    scheduled_for?: string | null;
+  },
+  settings?: OperationalSettings | null
+) =>
   order.fulfillment_type === "scheduled" && order.scheduled_for
     ? `Agendada para ${formatPickupTime(order.scheduled_for)}`
-    : "O quanto antes";
+    : `Padrão (${getAverageTimeLabel(settings)})`;
 
 export const getKitchenPickupBadge = (order: {
   fulfillment_type?: string | null;

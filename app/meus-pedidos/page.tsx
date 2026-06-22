@@ -13,9 +13,10 @@ import { Input } from "../components/ui/Input";
 import { useCallback, useEffect, useState } from "react";
 import { formatCustomerPhone, isValidCustomerPhone, onlyDigits } from "../../lib/customerPhone";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
-import { getOrderPickupLabel, money } from "../../lib/orderFeatures";
+import { getOrderPickupLabel, money, type OperationalSettings } from "../../lib/orderFeatures";
 import { formatBrasiliaDateTimeShort } from "../../lib/brasiliaTime";
 import { useIsMobile } from "../../lib/useMediaQuery";
+import { supabase } from "../../lib/supabase";
 
 type CustomerOrder = {
   id: number;
@@ -54,6 +55,7 @@ export default function MeusPedidosPage() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [operationalSettings, setOperationalSettings] = useState<OperationalSettings | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [devCode, setDevCode] = useState("");
@@ -84,6 +86,17 @@ export default function MeusPedidosPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadOrders]);
+
+  useEffect(() => {
+    void supabase
+      .from("store_settings")
+      .select("average_time")
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setOperationalSettings(data as OperationalSettings);
+      });
+  }, []);
 
   const handlePhoneChange = (value: string) => {
     setPhone(formatCustomerPhone(value));
@@ -285,7 +298,7 @@ export default function MeusPedidosPage() {
                       {statusLabels[order.status || ""] || order.status || "Recebido"}
                     </Badge>
                   </div>
-                  <p style={styles.pickupLine}>{getOrderPickupLabel(order)}</p>
+                  <p style={styles.pickupLine}>{getOrderPickupLabel(order, operationalSettings)}</p>
                   <div style={styles.itemList}>
                     {(order.items || []).map((item, index) => (
                       <span key={`${order.id}-${item.id}-${index}`} style={styles.itemLine}>

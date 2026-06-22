@@ -746,8 +746,8 @@ export default function CheckoutPage() {
   return (
     <main style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <header style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
-        <BackToMenuLink variant="header" />
-        <div style={styles.headerTitle}>
+        <BackToMenuLink variant="header" floating={!isMobile} />
+        <div style={{ ...styles.headerTitle, ...(isMobile ? styles.headerTitleMobile : {}) }}>
           <div style={styles.headerLogo}>
             <BrandLogo size="sm" />
           </div>
@@ -1152,8 +1152,18 @@ const styles: Record<string, CSSProperties> = {
   page: { minHeight: "100vh", background: "#f5f1ea", color: "#171512", padding: "20px 20px 48px" },
   pageMobile: { padding: "18px 14px calc(110px + env(safe-area-inset-bottom, 0px))" },
   header: { maxWidth: 1180, margin: "0 auto 16px", position: "relative", display: "grid", justifyItems: "center", textAlign: "center", paddingTop: 18 },
-  headerMobile: { paddingTop: "calc(46px + env(safe-area-inset-top, 0px))" },
+  headerMobile: {
+    paddingTop: "calc(12px + env(safe-area-inset-top, 0px))",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 14,
+    marginBottom: 4,
+  },
   headerTitle: { textAlign: "center" },
+  headerTitleMobile: {
+    width: "100%",
+  },
   headerLogo: { display: "flex", justifyContent: "center", marginBottom: 8 },
   title: { marginTop: 6, fontSize: "clamp(30px, 4vw, 44px)", lineHeight: 1, fontWeight: 850 },
   shell: { maxWidth: 1180, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 378px", gap: 20, alignItems: "start" },

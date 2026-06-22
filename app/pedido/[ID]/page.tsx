@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
-import { getOrderPickupLabel, money } from "../../../lib/orderFeatures";
+import { getOrderPickupLabel, money, type OperationalSettings } from "../../../lib/orderFeatures";
 import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
 import { formatBrasiliaDateTimeShort } from "../../../lib/brasiliaTime";
@@ -33,6 +33,7 @@ type Order = {
   service_fee?: number | null;
   service_fee_label?: string | null;
   total?: number | null;
+  note?: string | null;
   addons?: { id: string; name: string; quantity: number; unit_price?: number | null }[] | null;
   items?: {
     id: number;
@@ -81,6 +82,7 @@ export default function PedidoPage({
   params: Promise<{ ID: string }>;
 }) {
   const [order, setOrder] = useState<Order | null>(null);
+  const [operationalSettings, setOperationalSettings] = useState<OperationalSettings | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [pixCode, setPixCode] = useState("");
@@ -94,13 +96,13 @@ export default function PedidoPage({
 
   useEffect(() => {
     async function loadOrder() {
-      const { data } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", orderId)
-        .single();
+      const [{ data }, { data: settingsData }] = await Promise.all([
+        supabase.from("orders").select("*").eq("id", orderId).single(),
+        supabase.from("store_settings").select("average_time").limit(1).maybeSingle(),
+      ]);
 
       if (data) setOrder(data);
+      if (settingsData) setOperationalSettings(settingsData as OperationalSettings);
     }
 
     loadOrder();
@@ -337,8 +339,14 @@ export default function PedidoPage({
                 </div>
               )}
               <div style={styles.addonSummary}>
-                Retirada: {getOrderPickupLabel(order)}
+                Retirada: {getOrderPickupLabel(order, operationalSettings)}
               </div>
+              {order.note?.trim() && (
+                <div style={styles.orderNote}>
+                  <span style={styles.orderNoteLabel}>Observação</span>
+                  <p style={styles.orderNoteText}>{order.note.trim()}</p>
+                </div>
+              )}
               <div style={styles.summaryGrandTotalLine}>
                 <span>Total</span>
                 <strong>{money(orderTotal)}</strong>
@@ -552,6 +560,27 @@ const styles: Record<string, CSSProperties> = {
     color: "rgba(255, 253, 248, 0.66)",
     fontSize: 13,
     lineHeight: 1.45,
+  },
+  orderNote: {
+    display: "grid",
+    gap: 4,
+    padding: "10px 12px",
+    borderRadius: 8,
+    background: "rgba(255, 253, 248, 0.06)",
+    border: "1px solid rgba(255, 253, 248, 0.1)",
+  },
+  orderNoteLabel: {
+    color: "rgba(255, 253, 248, 0.55)",
+    fontSize: 11,
+    fontWeight: 850,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+  },
+  orderNoteText: {
+    color: "rgba(255, 253, 248, 0.82)",
+    fontSize: 13,
+    lineHeight: 1.45,
+    overflowWrap: "anywhere",
   },
   addonSummaryList: {
     display: "grid",
