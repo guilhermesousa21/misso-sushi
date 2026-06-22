@@ -30,6 +30,7 @@ import { BrandLogo } from "./components/BrandLogo";
 import { MenuItemCard } from "./components/MenuItemCard";
 import { MenuPageSkeleton } from "./components/MenuPageSkeleton";
 import { colors } from "../lib/designTokens";
+import { readMenuBrowseDraft, writeMenuBrowseDraft } from "../lib/menuBrowseDraft";
 
 type CartLine = CartItem;
 
@@ -47,6 +48,7 @@ export default function Page() {
   const router = useRouter();
   const isMobile = useIsMobile();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [menuBrowseReady, setMenuBrowseReady] = useState(false);
   const [openCart, setOpenCart] = useState(false);
   const [activeCategory, setActiveCategory] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -62,6 +64,70 @@ export default function Page() {
   const [topItems, setTopItems] = useState<Record<number, number>>({});
   const [menuError, setMenuError] = useState("");
   const [menuLoading, setMenuLoading] = useState(true);
+
+  useEffect(() => {
+    const draft = readMenuBrowseDraft();
+    if (draft.searchTerm) setSearchTerm(draft.searchTerm);
+    if (draft.activeCategory) setActiveCategory(draft.activeCategory);
+    if (draft.openCart) setOpenCart(true);
+    setMenuBrowseReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!menuBrowseReady) return;
+
+    const timer = window.setTimeout(() => {
+      writeMenuBrowseDraft({
+        searchTerm,
+        activeCategory,
+        scrollY: window.scrollY,
+        openCart,
+      });
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [menuBrowseReady, searchTerm, activeCategory, openCart]);
+
+  useEffect(() => {
+    if (!menuBrowseReady || menuLoading) return;
+
+    const draft = readMenuBrowseDraft();
+    if (draft.scrollY <= 0) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo(0, draft.scrollY);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [menuBrowseReady, menuLoading]);
+
+  useEffect(() => {
+    if (!menuBrowseReady) return;
+
+    const saveScroll = () => {
+      writeMenuBrowseDraft({
+        searchTerm,
+        activeCategory,
+        scrollY: window.scrollY,
+        openCart,
+      });
+    };
+
+    let scrollTimer: number | undefined;
+    const onScroll = () => {
+      if (scrollTimer) window.clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(saveScroll, 180);
+    };
+
+    window.addEventListener("pagehide", saveScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("pagehide", saveScroll);
+      window.removeEventListener("scroll", onScroll);
+      if (scrollTimer) window.clearTimeout(scrollTimer);
+    };
+  }, [menuBrowseReady, searchTerm, activeCategory, openCart]);
 
   useEffect(() => {
     if (!openCart) return;
@@ -266,6 +332,12 @@ export default function Page() {
   const handleCheckout = () => {
     if (cart.length === 0 || !storeOpen) return;
     setOpenCart(false);
+    writeMenuBrowseDraft({
+      searchTerm,
+      activeCategory,
+      scrollY: window.scrollY,
+      openCart: false,
+    });
     router.push("/checkout");
   };
 

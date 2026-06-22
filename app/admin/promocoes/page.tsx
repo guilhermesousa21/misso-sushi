@@ -1,10 +1,15 @@
 "use client";
 
 import type { CSSProperties, FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import { AdminShell, EmptyState, adminStyles as styles } from "../AdminShell";
+import {
+  clearAdminPromocoesUiDraft,
+  readAdminPromocoesUiDraft,
+  writeAdminPromocoesUiDraft,
+} from "../../../lib/adminUiDraft";
 
 type Promotion = {
   id?: number;
@@ -106,6 +111,30 @@ export default function AdminPromotionsPage() {
   const [message, setMessage] = useState("");
   const isTablet = useIsTablet();
   const isMobile = useIsMobile();
+  const [promoUiReady, setPromoUiReady] = useState(false);
+  const pendingEditingPromotionId = useRef<number | null>(null);
+
+  useEffect(() => {
+    const draft = readAdminPromocoesUiDraft();
+    if (draft) {
+      setForm({ ...emptyPromotion, ...(draft.form as Promotion) });
+      pendingEditingPromotionId.current = draft.editingPromotionId;
+    }
+    setPromoUiReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!promoUiReady) return;
+
+    const timer = window.setTimeout(() => {
+      writeAdminPromocoesUiDraft({
+        form: form as unknown as Record<string, unknown>,
+        editingPromotionId: editingPromotion?.id ?? null,
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [promoUiReady, form, editingPromotion]);
 
   useEffect(() => {
     fetchPromotions();
@@ -118,13 +147,19 @@ export default function AdminPromotionsPage() {
       .order("id", { ascending: false });
 
     if (data) {
-      setPromotions(
-        (data as Promotion[]).filter(
-          (promotion) =>
-            !promotion.code.startsWith("EXCLUIDO-") &&
-            promotion.description !== "[excluido]"
-        )
+      const nextPromotions = (data as Promotion[]).filter(
+        (promotion) =>
+          !promotion.code.startsWith("EXCLUIDO-") &&
+          promotion.description !== "[excluido]"
       );
+      setPromotions(nextPromotions);
+
+      const editingId = pendingEditingPromotionId.current;
+      if (editingId) {
+        const match = nextPromotions.find((promotion) => promotion.id === editingId);
+        if (match) setEditingPromotion(match);
+        pendingEditingPromotionId.current = null;
+      }
     }
   }
 
@@ -173,6 +208,7 @@ export default function AdminPromotionsPage() {
     }
 
     setForm(emptyPromotion);
+    clearAdminPromocoesUiDraft();
     setMessage("Promoção criada com sucesso.");
     fetchPromotions();
   }
@@ -214,6 +250,7 @@ export default function AdminPromotionsPage() {
     }
 
     setEditingPromotion(null);
+    clearAdminPromocoesUiDraft();
     setMessage("Cupom atualizado com sucesso.");
     fetchPromotions();
   }

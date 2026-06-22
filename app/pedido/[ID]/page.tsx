@@ -3,6 +3,11 @@
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
+import {
+  clearPixPaymentSession,
+  readPixPaymentSession,
+  writePixPaymentSession,
+} from "../../../lib/pixPaymentSession";
 import { getOrderPickupLabel, money, type OperationalSettings } from "../../../lib/orderFeatures";
 import { formatItemModifiers } from "../../../lib/itemModifiers";
 import { supabase } from "../../../lib/supabase";
@@ -103,6 +108,17 @@ export default function PedidoPage({
 
       if (data) setOrder(data);
       if (settingsData) setOperationalSettings(settingsData as OperationalSettings);
+
+      const pixSession = readPixPaymentSession();
+      if (
+        pixSession &&
+        pixSession.orderId === Number(orderId) &&
+        (data as Order | null)?.payment_status?.trim().toLowerCase() !== "pago"
+      ) {
+        setPixQr(pixSession.pixQr);
+        setPixCode(pixSession.pixCode);
+        setShowPix(true);
+      }
     }
 
     loadOrder();
@@ -124,6 +140,12 @@ export default function PedidoPage({
       supabase.removeChannel(channel);
     };
   }, [orderId]);
+
+  useEffect(() => {
+    if (!order || !isPaymentConfirmed(order)) return;
+    clearPixPaymentSession();
+    setShowPix(false);
+  }, [order]);
 
   if (!order) {
     return (
@@ -208,6 +230,11 @@ export default function PedidoPage({
       setPixQr(pixData.qr_code_base64 || "");
       setPixCode(pixData.qr_code || "");
       setShowPix(true);
+      writePixPaymentSession({
+        orderId: order.id,
+        pixQr: pixData.qr_code_base64 || "",
+        pixCode: pixData.qr_code || "",
+      });
     } catch (error) {
       setPaymentError(error instanceof Error ? error.message : "Não foi possível continuar o pagamento.");
     } finally {

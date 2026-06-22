@@ -91,7 +91,9 @@ const styles: Record<string, CSSProperties> = {
     gap: 6,
   },
   stepButton: {
-    border: "1px solid rgba(28, 26, 23, 0.1)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(28, 26, 23, 0.1)",
     borderRadius: 10,
     background: "#fff",
     color: "#625b53",

@@ -9,7 +9,19 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  clearCheckoutDraft,
+  readCheckoutDraft,
+  writeCheckoutDraft,
+  type StoredCheckoutCoupon,
+} from "../../lib/checkoutDraft";
+import {
+  clearPixPaymentSession,
+  getPixSessionCountdownSeconds,
+  readPixPaymentSession,
+  writePixPaymentSession,
+} from "../../lib/pixPaymentSession";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../lib/supabase";
 import {
@@ -165,6 +177,8 @@ export default function CheckoutPage() {
   const [loyaltyStatus, setLoyaltyStatus] = useState<LoyaltyStatus | null>(null);
   const [loyaltyLoading, setLoyaltyLoading] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(1);
+  const [checkoutDraftReady, setCheckoutDraftReady] = useState(false);
+  const pendingCouponRevalidation = useRef<string | null>(null);
 
   const serviceFee = getServiceFee(operationalSettings);
   const serviceFeeLabel = getServiceFeeLabel(operationalSettings);
@@ -182,6 +196,119 @@ export default function CheckoutPage() {
   const loyaltyDiscount = loyaltyStatus?.eligibleNow ? LOYALTY_DISCOUNT_VALUE : 0;
   const finalTotal = Math.max(0, total + addonTotal + serviceFee - discountAmount - loyaltyDiscount);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  useEffect(() => {
+    const draft = readCheckoutDraft();
+    if (draft.name) setName(draft.name);
+    if (draft.phone) setPhone(draft.phone);
+    if (draft.note) setNote(draft.note);
+    if (draft.wantsScheduledPickup) setWantsScheduledPickup(true);
+    if (draft.scheduledFor) setScheduledFor(draft.scheduledFor);
+    if (Object.keys(draft.selectedAddons).length > 0) {
+      setSelectedAddons(draft.selectedAddons);
+    }
+    if (draft.method !== "pix") setMethod(draft.method);
+    if (draft.checkoutStep !== 1) setCheckoutStep(draft.checkoutStep);
+    if (draft.couponCode) setCouponCode(draft.couponCode);
+    if (draft.appliedCoupon) {
+      setAppliedCoupon(draft.appliedCoupon as Promotion);
+      pendingCouponRevalidation.current = draft.appliedCoupon.code;
+    }
+
+    const pixSession = readPixPaymentSession();
+    if (pixSession) {
+      setPendingOrderId(pixSession.orderId);
+      setPixQr(pixSession.pixQr);
+      setPixCode(pixSession.pixCode);
+      setPixCountdown(getPixSessionCountdownSeconds(pixSession));
+      setCheckoutState("awaiting_pix");
+    }
+
+    setCheckoutDraftReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!checkoutDraftReady) return;
+
+    const timer = window.setTimeout(() => {
+      writeCheckoutDraft({
+        name,
+        phone,
+        note,
+        wantsScheduledPickup,
+        scheduledFor,
+        selectedAddons,
+        method,
+        checkoutStep,
+        couponCode,
+        appliedCoupon: appliedCoupon
+          ? ({
+              id: appliedCoupon.id,
+              code: appliedCoupon.code,
+              description: appliedCoupon.description,
+              discount_type: appliedCoupon.discount_type,
+              discount_value: appliedCoupon.discount_value,
+              min_order_value: appliedCoupon.min_order_value,
+              usage_limit: appliedCoupon.usage_limit,
+              used_count: appliedCoupon.used_count,
+              starts_at: appliedCoupon.starts_at,
+              expires_at: appliedCoupon.expires_at,
+            } satisfies StoredCheckoutCoupon)
+          : null,
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    checkoutDraftReady,
+    name,
+    phone,
+    note,
+    wantsScheduledPickup,
+    scheduledFor,
+    selectedAddons,
+    method,
+    checkoutStep,
+    couponCode,
+    appliedCoupon,
+  ]);
+
+  useEffect(() => {
+    const code = pendingCouponRevalidation.current;
+    if (!checkoutDraftReady || !code || total <= 0) return;
+
+    pendingCouponRevalidation.current = null;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/coupon/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, subtotal: total }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setAppliedCoupon(null);
+          setCouponMessage(data.error || "Cupom não está mais disponível.");
+          return;
+        }
+        setAppliedCoupon(data as Promotion);
+        setCouponCode(data.code);
+        setCouponMessage(`Cupom aplicado: -${money(data.discount)}.`);
+      } catch {
+        if (!cancelled) {
+          setAppliedCoupon(null);
+          setCouponMessage("Não foi possível validar o cupom salvo.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutDraftReady, total]);
 
   useEffect(() => {
     async function fetchStoreStatus() {
@@ -306,6 +433,8 @@ export default function CheckoutPage() {
       redirected = true;
       setCheckoutState("paid");
       clear();
+      clearCheckoutDraft();
+      clearPixPaymentSession();
       setTimeout(() => router.push(`/pedido/${pendingOrderId}`), 2200);
     };
 
@@ -468,6 +597,11 @@ export default function CheckoutPage() {
       setPixCode(pixData.qr_code || "");
       setPixCountdown(PIX_WAIT_SECONDS);
       setCheckoutState("awaiting_pix");
+      writePixPaymentSession({
+        orderId: savedOrder.id,
+        pixQr: pixData.qr_code_base64 || "",
+        pixCode: pixData.qr_code || "",
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível gerar o PIX.");
       setCheckoutState("form");

@@ -31,6 +31,10 @@ import { supabase } from "../../../lib/supabase";
 import { useIsMobile, useIsTablet } from "../../../lib/useMediaQuery";
 import { MenuItem } from "../../../types";
 import { getButtonStyle, getInputStyle, getSelectStyle, eyebrowStyle } from "../../../lib/uiStyles";
+import {
+  readAdminMenuUiDraft,
+  writeAdminMenuUiDraft,
+} from "../../../lib/adminUiDraft";
 import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -138,6 +142,7 @@ export default function AdminMenuPage() {
   const [dropTarget, setDropTarget] = useState<DragState | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [menuUiReady, setMenuUiReady] = useState(false);
   const canReorder = !search.trim() && !filterCategory;
   const forceExpandedCategories = Boolean(search.trim() || filterCategory);
   const clearDragState = () => {
@@ -150,6 +155,30 @@ export default function AdminMenuPage() {
       ?.closest<HTMLElement>("[data-category-drop-target]")
       ?.dataset.categoryDropTarget;
   };
+
+  useEffect(() => {
+    const draft = readAdminMenuUiDraft();
+    if (draft.search) setSearch(draft.search);
+    if (draft.filterCategory) setFilterCategory(draft.filterCategory);
+    if (draft.expandedCategories.length > 0) {
+      setExpandedCategories(new Set(draft.expandedCategories));
+    }
+    setMenuUiReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!menuUiReady) return;
+
+    const timer = window.setTimeout(() => {
+      writeAdminMenuUiDraft({
+        search,
+        filterCategory,
+        expandedCategories: Array.from(expandedCategories),
+      });
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [menuUiReady, search, filterCategory, expandedCategories]);
 
   useEffect(() => {
     async function fetchMenuData() {

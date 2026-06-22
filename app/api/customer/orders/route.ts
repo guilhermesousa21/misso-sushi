@@ -31,7 +31,7 @@ export async function GET() {
 
     if (error) throw error;
 
-    return NextResponse.json({ orders: data || [] });
+    return NextResponse.json({ orders: data || [], phone: session.phone });
   } catch {
     return NextResponse.json({ error: "Não foi possível carregar seus pedidos." }, { status: 500 });
   }

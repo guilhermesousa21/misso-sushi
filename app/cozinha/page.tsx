@@ -21,6 +21,11 @@ import { BrandLogo } from "../components/BrandLogo";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { eyebrowStyle } from "../../lib/uiStyles";
+import {
+  readCozinhaFilter,
+  writeCozinhaFilter,
+  type KitchenFilter,
+} from "../../lib/cozinhaDraft";
 
 type OrderItem = {
   id: number;
@@ -55,8 +60,6 @@ type ConfirmationState =
   | { action: "ready"; order: Order }
   | { action: "picked_up"; order: Order }
   | null;
-
-type KitchenFilter = "recebidos" | "prontos" | "atrasados" | "retirados";
 
 const isOrderPickedUp = (order: Order) =>
   normalizeKitchenStatus(order.status) === "retirado" || order.status === "retirado";
@@ -138,7 +141,18 @@ export default function AdminPanel() {
   const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
   const [confirming, setConfirming] = useState(false);
   const [filter, setFilter] = useState<KitchenFilter | null>(null);
+  const [filterReady, setFilterReady] = useState(false);
   const previousOrderIds = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    setFilter(readCozinhaFilter());
+    setFilterReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filterReady) return;
+    writeCozinhaFilter(filter);
+  }, [filterReady, filter]);
 
   useEffect(() => {
     let mounted = true;
@@ -507,17 +521,32 @@ export default function AdminPanel() {
                   ...(isMobile ? styles.actionsMobile : {}),
                 }}
               >
-                <Button type="button" variant="ghost" size="sm" onClick={() => printOrder(order)} style={isMobile ? styles.actionButtonMobile : undefined}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => printOrder(order)}
+                  style={{
+                    ...(isMobile ? styles.actionButtonMobile : {}),
+                    ...styles.actionPrint,
+                  }}
+                >
                   <Printer size={15} strokeWidth={2.2} />
                   Imprimir
                 </Button>
                 <Button
                   type="button"
                   size="sm"
-                  variant={kitchenStatus === "pronto" || kitchenStatus === "retirado" ? "ghost" : "secondary"}
+                  variant="ghost"
                   onClick={() => setConfirmation({ action: "ready", order })}
                   disabled={kitchenStatus === "pronto" || kitchenStatus === "retirado"}
-                  style={isMobile ? styles.actionButtonMobile : undefined}
+                  style={{
+                    ...(isMobile ? styles.actionButtonMobile : {}),
+                    ...styles.actionStatusButton,
+                    ...(kitchenStatus === "pronto" || kitchenStatus === "retirado"
+                      ? styles.actionMarkReadyDone
+                      : styles.actionMarkReady),
+                  }}
                 >
                   <CheckCircle2 size={15} strokeWidth={2.2} />
                   {kitchenStatus === "pronto" || kitchenStatus === "retirado" ? "Pronto" : "Marcar pronto"}
@@ -525,10 +554,18 @@ export default function AdminPanel() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={kitchenStatus === "retirado" ? "ghost" : kitchenStatus === "pronto" ? "primary" : "ghost"}
+                  variant="ghost"
                   onClick={() => setConfirmation({ action: "picked_up", order })}
                   disabled={kitchenStatus !== "pronto"}
-                  style={isMobile ? styles.actionButtonMobile : undefined}
+                  style={{
+                    ...(isMobile ? styles.actionButtonMobile : {}),
+                    ...styles.actionStatusButton,
+                    ...(kitchenStatus === "retirado"
+                      ? styles.actionPickedUpDone
+                      : kitchenStatus === "pronto"
+                        ? styles.actionPickedUp
+                        : styles.actionPickedUpDisabled),
+                  }}
                 >
                   <PackageCheck size={15} strokeWidth={2.2} />
                   {kitchenStatus === "retirado" ? "Retirado" : "Marcar retirado"}
@@ -607,10 +644,16 @@ export default function AdminPanel() {
                 variant="ghost"
                 onClick={() => setConfirmation(null)}
                 disabled={confirming}
+                style={styles.confirmCancelButton}
               >
                 Cancelar
               </Button>
-              <Button type="button" onClick={handleConfirmAction} disabled={confirming} style={{ flex: 1 }}>
+              <Button
+                type="button"
+                onClick={handleConfirmAction}
+                disabled={confirming}
+                style={{ ...styles.confirmPrimaryButton, flex: 1 }}
+              >
                 {confirming
                   ? "Processando..."
                   : confirmation.action === "ready"
@@ -682,7 +725,7 @@ const styles: Record<string, CSSProperties> = {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   },
   headerStatButton: {
-    background: "var(--color-dark)",
+    background: "linear-gradient(145deg, #2f2b26 0%, #1c1a17 100%)",
     color: "var(--color-surface)",
     borderRadius: 14,
     padding: "15px 16px",
@@ -690,28 +733,37 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     alignContent: "space-between",
     gap: 8,
-    border: "none",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(255, 253, 248, 0.08)",
     textAlign: "left",
     cursor: "pointer",
     font: "inherit",
+    boxShadow: "0 12px 28px rgba(28, 26, 23, 0.14)",
     transition: "transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease",
   },
   headerStatInactive: {
-    opacity: 0.72,
+    opacity: 0.78,
   },
   headerStatActive: {
     opacity: 1,
-    boxShadow: "inset 0 0 0 2px #fffdf8",
+    boxShadow: "0 16px 34px rgba(28, 26, 23, 0.2), inset 0 0 0 2px rgba(255, 253, 248, 0.92)",
     transform: "translateY(-1px)",
   },
   headerStatAlert: {
-    background: "#991b1b",
+    background: "linear-gradient(145deg, #b3223a 0%, #9b1c31 100%)",
+    borderColor: "rgba(255, 253, 248, 0.14)",
+    boxShadow: "0 12px 28px rgba(159, 29, 47, 0.24)",
   },
   headerStatSuccess: {
-    background: "#15803d",
+    background: "linear-gradient(145deg, #22c55e 0%, #15803d 100%)",
+    borderColor: "rgba(255, 253, 248, 0.14)",
+    boxShadow: "0 12px 28px rgba(22, 163, 74, 0.22)",
   },
   headerStatPickedUp: {
-    background: "#3730a3",
+    background: "linear-gradient(145deg, #64748b 0%, #475569 100%)",
+    borderColor: "rgba(255, 253, 248, 0.12)",
+    boxShadow: "0 12px 28px rgba(71, 85, 105, 0.2)",
   },
   headerStatLabel: {
     fontSize: 18,
@@ -798,7 +850,7 @@ const styles: Record<string, CSSProperties> = {
     color: "#fffdf8",
   },
   pickupBadgeScheduled: {
-    background: "#3730a3",
+    background: "linear-gradient(145deg, #64748b 0%, #475569 100%)",
     color: "#fffdf8",
   },
   badgeStack: {
@@ -886,6 +938,12 @@ const styles: Record<string, CSSProperties> = {
   actionsTablet: {
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   },
+  actionPrint: {
+    background: "#fffdf8",
+    color: "#514a43",
+    border: "1px solid rgba(28, 26, 23, 0.12)",
+    boxShadow: "0 8px 18px rgba(28, 26, 23, 0.06)",
+  },
   actionSecondary: {
     border: "none",
     borderRadius: 999,
@@ -900,36 +958,43 @@ const styles: Record<string, CSSProperties> = {
   actionStatusButton: {
     border: "none",
     borderRadius: 999,
-    color: "#fff",
-    padding: 12,
+    padding: "12px 14px",
     cursor: "pointer",
     fontWeight: 850,
-    minHeight: 52,
+    minHeight: 46,
     whiteSpace: "nowrap",
   },
   actionMarkReady: {
-    background: "#16a34a",
-    boxShadow: "0 8px 18px rgba(22, 163, 74, 0.24)",
+    background: "linear-gradient(145deg, #22c55e 0%, #15803d 100%)",
+    color: "#fffdf8",
+    boxShadow: "0 10px 22px rgba(22, 163, 74, 0.24)",
   },
   actionMarkReadyDone: {
-    background: "#16a34a",
-    color: "#fff",
-    cursor: "not-allowed",
-    boxShadow: "inset 0 0 0 2px rgba(255, 255, 255, 0.28)",
+    background: "#ecfdf5",
+    color: "#15803d",
+    border: "1px solid rgba(22, 163, 74, 0.22)",
+    boxShadow: "none",
+    cursor: "default",
   },
   actionPickedUp: {
-    background: "#3730a3",
+    background: "linear-gradient(145deg, #b3223a 0%, #9b1c31 100%)",
+    color: "#fffdf8",
+    boxShadow: "0 10px 22px rgba(159, 29, 47, 0.22)",
   },
   actionPickedUpDone: {
-    background: "#e0e7ff",
-    color: "#3730a3",
-    cursor: "not-allowed",
+    background: "#f0ebe2",
+    color: "#625b53",
+    border: "1px solid rgba(28, 26, 23, 0.1)",
+    boxShadow: "none",
+    cursor: "default",
   },
   actionPickedUpDisabled: {
-    background: "#e0e7ff",
-    color: "#6366f1",
+    background: "#f7f4ef",
+    color: "#9a9288",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    boxShadow: "none",
     cursor: "not-allowed",
-    opacity: 0.72,
+    opacity: 1,
   },
   modalOverlay: {
     position: "fixed",
@@ -960,7 +1025,7 @@ const styles: Record<string, CSSProperties> = {
     width: 38,
     height: 38,
     borderRadius: 999,
-    background: "#1c1a17",
+    background: "linear-gradient(145deg, #b3223a 0%, #9b1c31 100%)",
     color: "#fffdf8",
     display: "inline-flex",
     alignItems: "center",
@@ -968,6 +1033,7 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 18,
     fontWeight: 900,
     flex: "0 0 auto",
+    boxShadow: "0 10px 22px rgba(159, 29, 47, 0.2)",
   },
   confirmEyebrow: {
     color: "#9f1d2f",
@@ -1005,6 +1071,17 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: 10,
+  },
+  confirmCancelButton: {
+    background: "#f0ebe2",
+    color: "#1c1a17",
+    border: "1px solid rgba(28, 26, 23, 0.08)",
+    boxShadow: "none",
+  },
+  confirmPrimaryButton: {
+    background: "linear-gradient(145deg, #b3223a 0%, #9b1c31 100%)",
+    color: "#fffdf8",
+    boxShadow: "0 12px 26px rgba(159, 29, 47, 0.24)",
   },
   confirmCancel: {
     border: "none",

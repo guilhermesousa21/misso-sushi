@@ -10,6 +10,10 @@ import FaturamentoInsights from "./FaturamentoInsights";
 import PedidosSection from "./PedidosSection";
 import { fat } from "./faturamentoStyles";
 import { normalize, type AdminOrder } from "../AdminShell";
+import {
+  readAdminFaturamentoUiDraft,
+  writeAdminFaturamentoUiDraft,
+} from "../../../lib/adminUiDraft";
 
 type DateRange = "today" | "7d" | "30d" | "all" | "custom";
 type PageView = "painel" | "pedidos";
@@ -40,8 +44,40 @@ export default function FaturamentoTab({ initialSearch = "" }: { initialSearch?:
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [view, setView] = useState<PageView>(initialSearch.trim() ? "pedidos" : "painel");
+  const [uiReady, setUiReady] = useState(false);
   const isMobile = useIsMobile();
   const hasClientFilter = Boolean(initialSearch.trim());
+
+  useEffect(() => {
+    if (initialSearch.trim()) {
+      setUiReady(true);
+      return;
+    }
+
+    const draft = readAdminFaturamentoUiDraft();
+    setSearch(draft.search);
+    setDateRange(draft.dateRange);
+    setDateFrom(draft.dateFrom);
+    setDateTo(draft.dateTo);
+    setView(draft.view);
+    setUiReady(true);
+  }, [initialSearch]);
+
+  useEffect(() => {
+    if (!uiReady || initialSearch.trim()) return;
+
+    const timer = window.setTimeout(() => {
+      writeAdminFaturamentoUiDraft({
+        search,
+        dateRange,
+        dateFrom,
+        dateTo,
+        view,
+      });
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [uiReady, initialSearch, search, dateRange, dateFrom, dateTo, view]);
 
   useEffect(() => {
     let mounted = true;

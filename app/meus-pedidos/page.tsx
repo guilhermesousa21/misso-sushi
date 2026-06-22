@@ -12,6 +12,7 @@ import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { useCallback, useEffect, useState } from "react";
 import { formatCustomerPhone, isValidCustomerPhone, onlyDigits } from "../../lib/customerPhone";
+import { readCheckoutDraft } from "../../lib/checkoutDraft";
 import { formatOrderItemLabel } from "../../lib/itemModifiers";
 import { getOrderPickupLabel, money, type OperationalSettings } from "../../lib/orderFeatures";
 import { formatBrasiliaDateTimeShort } from "../../lib/brasiliaTime";
@@ -72,11 +73,19 @@ export default function MeusPedidosPage() {
         return;
       }
       setOrders(data.orders || []);
+      if (data.phone) setPhone(formatCustomerPhone(String(data.phone)));
       setStep("orders");
     } catch {
       setMessage("Não foi possível carregar seus pedidos.");
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const draft = readCheckoutDraft();
+    if (draft.phone) {
+      setPhone((current) => current || draft.phone);
     }
   }, []);
 

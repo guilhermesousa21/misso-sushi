@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import type { CSSProperties, FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Clock3, Save } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import {
@@ -16,6 +16,11 @@ import { AdminShell, adminStyles as baseStyles } from "../AdminShell";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import {
+  clearAdminConfigUiDraft,
+  readAdminConfigUiDraft,
+  writeAdminConfigUiDraft,
+} from "../../../lib/adminUiDraft";
 
 type StoreSettings = {
   id?: number;
@@ -72,6 +77,8 @@ export default function AdminSettingsPage() {
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
   const isMobile = useIsMobile();
+  const [configUiReady, setConfigUiReady] = useState(false);
+  const pendingConfigDraft = useRef(readAdminConfigUiDraft());
 
   const withinBusinessHours = isWithinBusinessHours(now, settings.business_hours);
   const storeOpenNow = settings.is_open;
@@ -102,16 +109,51 @@ export default function AdminSettingsPage() {
         .maybeSingle();
 
       if (data) {
-        setSettings({
+        const loadedSettings = {
           ...defaultSettings,
           ...(data as StoreSettings),
           business_hours: getBusinessHours((data as StoreSettings).business_hours),
+        };
+        if (pendingConfigDraft.current) {
+          setSettings({
+            ...loadedSettings,
+            ...(pendingConfigDraft.current.settings as StoreSettings),
+            business_hours: getBusinessHours(
+              (pendingConfigDraft.current.settings as StoreSettings).business_hours ||
+                loadedSettings.business_hours
+            ),
+          });
+          pendingConfigDraft.current = null;
+        } else {
+          setSettings(loadedSettings);
+        }
+      } else if (pendingConfigDraft.current) {
+        setSettings({
+          ...defaultSettings,
+          ...(pendingConfigDraft.current.settings as StoreSettings),
+          business_hours: getBusinessHours(
+            (pendingConfigDraft.current.settings as StoreSettings).business_hours
+          ),
         });
+        pendingConfigDraft.current = null;
       }
+      setConfigUiReady(true);
     }
 
     fetchSettings();
   }, []);
+
+  useEffect(() => {
+    if (!configUiReady) return;
+
+    const timer = window.setTimeout(() => {
+      writeAdminConfigUiDraft({
+        settings: settings as unknown as Record<string, unknown>,
+      });
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [configUiReady, settings]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -183,6 +225,7 @@ export default function AdminSettingsPage() {
         business_hours: getBusinessHours((data[0] as StoreSettings).business_hours),
       });
     }
+    clearAdminConfigUiDraft();
     setMessage("Configurações salvas.");
   }
 
