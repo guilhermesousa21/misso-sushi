@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Clock3, ClipboardList, Search, ShoppingBag, X } from "lucide-react";
-import toast from "react-hot-toast";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import {
   getBusinessHours,
@@ -275,7 +274,6 @@ export default function Page() {
   const handleAddToCart = (item: MenuItem) => {
     addToCart(item);
     setAddedPulseId(item.id);
-    toast.success(`${item.name} adicionado`);
     window.setTimeout(() => setAddedPulseId((current) => (current === item.id ? null : current)), 280);
   };
 

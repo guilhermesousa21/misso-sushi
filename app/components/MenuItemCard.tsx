@@ -193,7 +193,9 @@ const styles: Record<string, CSSProperties> = {
   menuCard: {
     minHeight: 132,
     background: colors.surface,
-    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(28, 26, 23, 0.08)",
     borderRadius: 12,
     display: "grid",
     gridTemplateColumns: "116px minmax(0, 1fr)",
@@ -208,7 +210,9 @@ const styles: Record<string, CSSProperties> = {
   },
   featuredCard: {
     background: colors.surface,
-    border: "1px solid rgba(28, 26, 23, 0.08)",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "rgba(28, 26, 23, 0.08)",
     borderRadius: 14,
     overflow: "hidden",
     boxShadow: shadows.card,
