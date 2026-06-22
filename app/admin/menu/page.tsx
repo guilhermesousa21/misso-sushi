@@ -880,7 +880,7 @@ export default function AdminMenuPage() {
                             }}
                           />
                         </button>
-                        <span style={styles.itemSwitchLabel}>
+                        <span style={{ ...styles.itemSwitchLabel, ...(isMobile ? styles.itemSwitchLabelMobile : {}) }}>
                           {itemActive ? "Ativo" : "Pausado"}
                         </span>
                         <Button
@@ -2278,8 +2278,7 @@ const styles: Record<string, CSSProperties> = {
     flexWrap: "wrap",
   },
   itemActionsMobile: {
-    display: "grid",
-    gridTemplateColumns: "auto 1fr auto",
+    display: "flex",
     alignItems: "center",
     gap: 8,
     width: "100%",
@@ -2323,12 +2322,16 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 850,
     minWidth: 48,
   },
+  itemSwitchLabelMobile: {
+    flex: 1,
+    minWidth: 0,
+  },
   secondaryButton: getButtonStyle("ghost", "sm"),
   secondaryButtonMobile: {
-    justifySelf: "end",
+    flexShrink: 0,
+    marginLeft: "auto",
     minHeight: 40,
     padding: "10px 14px",
-    marginLeft: 0,
   },
   inactiveButton: {
     background: "#f0ebe2",
