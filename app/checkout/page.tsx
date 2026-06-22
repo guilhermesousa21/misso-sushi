@@ -708,8 +708,12 @@ export default function CheckoutPage() {
             <div style={styles.addonSummaryList}>
               {selectedAddonList.map((addon) => (
                 <div key={addon.id} style={styles.addonSummaryRow}>
-                  <span>{addon.quantity}x {addon.name}</span>
-                  <strong>{money(Number(addon.unit_price || 0) * addon.quantity)}</strong>
+                  <span style={styles.addonSummaryName}>
+                    {addon.quantity}x {addon.name}
+                  </span>
+                  <strong style={styles.addonSummaryPrice}>
+                    {money(Number(addon.unit_price || 0) * addon.quantity)}
+                  </strong>
                 </div>
               ))}
             </div>
@@ -1278,14 +1282,28 @@ const styles: Record<string, CSSProperties> = {
   summaryTotalBox: { display: "grid", gap: 10, marginTop: 18, padding: "0" },
   summaryTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "rgba(255, 253, 248, 0.78)", fontSize: 15 },
   summaryGrandTotalLine: { display: "flex", justifyContent: "space-between", gap: 16, color: "#fffdf8", fontSize: 22, fontWeight: 850 },
-  addonSummaryList: { display: "grid", gap: 4 },
+  addonSummaryList: {
+    display: "grid",
+    gap: 6,
+    paddingLeft: 10,
+    borderLeft: "2px solid rgba(255, 253, 248, 0.12)",
+  },
   addonSummaryRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 16,
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "start",
+    gap: 12,
     color: "rgba(255, 253, 248, 0.66)",
     fontSize: 13,
     lineHeight: 1.45,
+  },
+  addonSummaryName: {
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  addonSummaryPrice: {
+    color: "rgba(255, 253, 248, 0.78)",
+    whiteSpace: "nowrap",
   },
   discountText: { color: "#0f7a4a" },
   loyaltyProgressTrack: {
